@@ -83,7 +83,7 @@ func (s *scalarString) UnmarshalJSON(data []byte) error {
 }
 
 func (c *Client) Series(ctx context.Context, externalMovieID string) ([]Season, error) {
-	current, embedURLs, err := c.movieEmbeds(ctx, externalMovieID)
+	current, movieHTML, embedURLs, err := c.movieDocument(ctx, externalMovieID)
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +107,20 @@ func (c *Client) Series(ctx context.Context, externalMovieID string) ([]Season, 
 		}
 		seriesEmbeds++
 		mergeSeasons(merged, seasons)
+	}
+	// Alternative players add episodes the primary ones lack, and keep the
+	// catalog available while the primary players are down.
+	for _, playerURL := range alternativePlayerURLs(movieHTML, c.baseURL.Scheme) {
+		player, loadErr := c.loadAlternativePlayer(ctx, playerURL)
+		if loadErr != nil {
+			parseErrors = append(parseErrors, fmt.Errorf("%s: %w", playerURL, loadErr))
+			continue
+		}
+		if !player.catalog.isSeries() {
+			continue
+		}
+		seriesEmbeds++
+		player.catalog.seasons(merged)
 	}
 	if seriesEmbeds == 0 {
 		if len(parseErrors) > 0 {

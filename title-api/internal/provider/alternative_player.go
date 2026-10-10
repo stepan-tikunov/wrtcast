@@ -26,9 +26,21 @@ var (
 )
 
 type alternativeCatalog struct {
-	Type   string                                           `json:"type"`
-	Active alternativeFile                                  `json:"active"`
-	All    map[string]map[string]map[string]alternativeFile `json:"all"`
+	Type   string          `json:"type"`
+	Active alternativeFile `json:"active"`
+	// For a series: season -> episode -> translation -> file. Movies put
+	// unrelated data here, so it is only decoded for series.
+	All json.RawMessage `json:"all"`
+}
+
+type alternativeEpisodes map[string]map[string]map[string]alternativeFile
+
+func (catalog alternativeCatalog) episodes() alternativeEpisodes {
+	var episodes alternativeEpisodes
+	if catalog.isSeries() {
+		_ = json.Unmarshal(catalog.All, &episodes)
+	}
+	return episodes
 }
 
 type alternativeFile struct {
@@ -58,7 +70,46 @@ func alternativePlayerURLs(page []byte, scheme string) []string {
 	return uniqueEmbedURLs(matches, scheme)
 }
 
-func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, season int32, episode string) ([]MovieStream, error) {
+// alternativePlayer is the bootstrap state of an alternative player page: its
+// session, the values the playback request is signed with, and the catalog
+// of files (one movie, or translations per season and episode).
+type alternativePlayer struct {
+	client    *http.Client
+	playerURL *url.URL
+	viewport  string
+	token     string
+	catalog   alternativeCatalog
+}
+
+func (catalog alternativeCatalog) isSeries() bool {
+	return strings.EqualFold(catalog.Type, "serial")
+}
+
+// seasons adds the catalog's episodes to target without overwriting entries
+// from the primary players, which carry titles and durations.
+func (catalog alternativeCatalog) seasons(target map[int32]map[string]Episode) {
+	for seasonKey, episodes := range catalog.episodes() {
+		seasonNumber, err := strconv.ParseInt(strings.TrimSpace(seasonKey), 10, 32)
+		if err != nil {
+			continue
+		}
+		key := int32(seasonNumber)
+		for episodeKey, translations := range episodes {
+			number := strings.TrimSpace(episodeKey)
+			if number == "" || len(translations) == 0 {
+				continue
+			}
+			if target[key] == nil {
+				target[key] = make(map[string]Episode)
+			}
+			if _, exists := target[key][number]; !exists {
+				target[key][number] = Episode{Number: number}
+			}
+		}
+	}
+}
+
+func (c *Client) loadAlternativePlayer(ctx context.Context, rawPlayerURL string) (*alternativePlayer, error) {
 	playerURL, err := url.Parse(rawPlayerURL)
 	if err != nil || playerURL.Scheme == "" || playerURL.Hostname() == "" {
 		return nil, errors.New("invalid alternative player URL")
@@ -101,7 +152,18 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 		}
 		return nil, fmt.Errorf("decode player catalog %q: %w", preview, err)
 	}
-	file, err := catalog.selectedFile(season, episode)
+	return &alternativePlayer{
+		client: client, playerURL: playerURL, viewport: viewport, token: token, catalog: catalog,
+	}, nil
+}
+
+func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, season int32, episode string) ([]MovieStream, error) {
+	player, err := c.loadAlternativePlayer(ctx, rawPlayerURL)
+	if err != nil {
+		return nil, err
+	}
+	client, playerURL, viewport, token := player.client, player.playerURL, player.viewport, player.token
+	file, err := player.catalog.selectedFile(season, episode)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +174,7 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 	}
 	form := url.Values{"token": {token}, "av1": {"true"}, "autoplay": {"0"}, "audio": {""}, "subtitle": {""}}
 	endpoint := playerURL.ResolveReference(&url.URL{Path: "/bnsi/movies/" + strconv.FormatInt(file.ID, 10)})
-	request, err = http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), strings.NewReader(form.Encode()))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -122,11 +184,11 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 	request.Header.Set("Origin", playerURL.Scheme+"://"+playerURL.Host)
 	request.Header.Set("Referer", playerURL.String())
 	request.Header.Set("Borth", hex.EncodeToString(fingerprint)+"|"+playerChallenge(viewport))
-	response, err = client.Do(request)
+	response, err := client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("request playback: %w", err)
 	}
-	body, err = readAlternativeResponse(response)
+	body, err := readAlternativeResponse(response)
 	if err != nil {
 		return nil, fmt.Errorf("request playback: %w", err)
 	}
@@ -185,8 +247,8 @@ func decodeJSSingleQuotedString(value string) (string, error) {
 }
 
 func (catalog alternativeCatalog) selectedFile(season int32, episode string) (alternativeFile, error) {
-	if strings.EqualFold(catalog.Type, "serial") {
-		translations := catalog.All[strconv.FormatInt(int64(season), 10)][strings.TrimSpace(episode)]
+	if catalog.isSeries() {
+		translations := catalog.episodes()[strconv.FormatInt(int64(season), 10)][strings.TrimSpace(episode)]
 		keys := make([]string, 0, len(translations))
 		for key := range translations {
 			keys = append(keys, key)

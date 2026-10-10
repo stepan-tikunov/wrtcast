@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -49,9 +50,7 @@ func TestAlternativePlayerBootstrapAndSelection(t *testing.T) {
 		t.Fatalf("unexpected player URLs: %#v", urls)
 	}
 
-	catalog := alternativeCatalog{Type: "serial", All: map[string]map[string]map[string]alternativeFile{
-		"1": {"2": {"t66": {ID: 985376, Translation: "Dub"}}},
-	}}
+	catalog := alternativeCatalog{Type: "serial", All: json.RawMessage(`{"1":{"2":{"t66":{"id":985376,"translation":"Dub"}}}}`)}
 	file, err := catalog.selectedFile(1, "2")
 	if err != nil || file.ID != 985376 {
 		t.Fatalf("selectedFile() = %+v, %v", file, err)

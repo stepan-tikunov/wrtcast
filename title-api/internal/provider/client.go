@@ -101,14 +101,6 @@ func primaryStreamName(index, total int) string {
 	return fmt.Sprintf("Основной плеер %d", index+1)
 }
 
-func (c *Client) movieEmbeds(ctx context.Context, externalMovieID string) (*session, []string, error) {
-	current, _, embedURLs, err := c.movieDocument(ctx, externalMovieID)
-	if err != nil {
-		return nil, nil, err
-	}
-	return current, embedURLs, nil
-}
-
 func (c *Client) movieDocument(ctx context.Context, externalMovieID string) (*session, []byte, []string, error) {
 	siteMovieID, err := c.parseExternalTitleID(externalMovieID)
 	if err != nil {

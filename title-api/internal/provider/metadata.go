@@ -53,9 +53,34 @@ func (c *Client) TitleMetadata(ctx context.Context, externalMovieID string) (Tit
 	metadata.TitleID = externalMovieID
 	metadata.MediaType, metadata.DurationSeconds, err = c.mediaTypeFromEmbeds(ctx, current, embedURLs)
 	if err != nil {
-		return TitleMetadata{}, err
+		// The primary players may be down while the alternative ones on the
+		// same page still work; their catalog tells movies from series.
+		mediaType, alternativeErr := c.mediaTypeFromAlternativePlayers(ctx, movieHTML)
+		if alternativeErr != nil {
+			return TitleMetadata{}, errors.Join(err, alternativeErr)
+		}
+		metadata.MediaType = mediaType
 	}
 	return metadata, nil
+}
+
+func (c *Client) mediaTypeFromAlternativePlayers(ctx context.Context, movieHTML []byte) (MediaType, error) {
+	loadErrors := make([]error, 0)
+	for _, playerURL := range alternativePlayerURLs(movieHTML, c.baseURL.Scheme) {
+		player, err := c.loadAlternativePlayer(ctx, playerURL)
+		if err != nil {
+			loadErrors = append(loadErrors, fmt.Errorf("%s: %w", playerURL, err))
+			continue
+		}
+		if player.catalog.isSeries() {
+			return MediaTypeSeries, nil
+		}
+		return MediaTypeMovie, nil
+	}
+	if len(loadErrors) > 0 {
+		return MediaTypeUnspecified, fmt.Errorf("inspect alternative players: %w", errors.Join(loadErrors...))
+	}
+	return MediaTypeUnspecified, ErrMediaTypeUnknown
 }
 
 func (c *Client) mediaTypeFromEmbeds(
