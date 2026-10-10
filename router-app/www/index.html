@@ -185,6 +185,35 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 #prog div{transition:width .3s linear}
 svg.spring{animation:spring .3s ease-out}
 #toast{animation:tin .25s cubic-bezier(.2,.8,.2,1)}
+/* desktop: a centered column and floating panels instead of edge-to-edge */
+@media (min-width:900px){
+  :root{--gut:max(32px,calc((100vw - 1180px) / 2));--dgut:max(40px,calc((100vw - 980px) / 2))}
+  header{justify-content:center;padding:20px var(--gut) 16px}
+  #f{max-width:640px}
+  #grid{grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:28px 22px;padding:8px var(--gut) 140px}
+  .card b{font-size:15px}
+  #det .top{padding:24px var(--dgut) 36px}
+  #det .hero{gap:28px}
+  #dposter{width:210px;border-radius:14px}
+  #det h1{font-size:34px}
+  #dmeta{font-size:15px}
+  #dplay{width:auto;min-width:260px;margin-top:24px}
+  #dinfo{padding:8px var(--dgut) 4px}
+  #ddesc{max-width:760px;-webkit-line-clamp:6;font-size:16px}
+  #seasons{flex-wrap:wrap;padding:20px var(--dgut) 10px}
+  #eps{display:grid;grid-template-columns:1fr 1fr;column-gap:40px;padding:0 var(--dgut)}
+  #pl,.sheet{margin:0 auto;bottom:16px;border-radius:20px}
+  #pl{width:min(560px,calc(100% - 32px));padding-bottom:12px}
+  .sheet{width:min(480px,calc(100% - 32px));padding-bottom:16px}
+  #toast{bottom:112px}
+}
+@media (hover:hover){
+  .card img{transition:opacity .35s,transform .2s,filter .2s}
+  .card:hover img{transform:translateY(-3px);filter:brightness(1.12)}
+  .ep:hover,.dev:hover:not(:disabled){background:var(--s1)}
+  .chip:hover:not(.on),.pill:hover:not(.ac),.ib:hover{filter:brightness(1.25)}
+  .pill.ac:hover{filter:brightness(1.08)}
+}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -723,6 +752,25 @@ function render(s) {
   if (s.now?.source) $('source').value = s.now.source;
 }
 
+// Where playback is now, extrapolated from the last status.
+const position = m => (m.time || 0) + (m.state == 'PLAYING' ? (Date.now() - statusAt) / 1000 : 0);
+
+// Repeated ±10 taps move the timer right away and add up into one seek sent
+// once the tapping stops; polled status would undo them until then.
+let seekTimer = null;
+function skip(delta) {
+  const m = st?.media;
+  if (!m) return;
+  m.time = Math.max(0, Math.min(position(m) + delta, m.duration || Infinity));
+  statusAt = Date.now();
+  showTime();
+  clearTimeout(seekTimer);
+  seekTimer = setTimeout(() => {
+    seekTimer = null;
+    cmd('seek', position(m).toFixed(1));
+  }, 600);
+}
+
 async function cmd(c, arg) {
   const m = st?.media;
   if (c == 'toggle') {
@@ -750,7 +798,7 @@ async function poll() {
     const sent = device;
     const s = await api(withDevice('status'));
     pollError = '';
-    if (!pending && sent == device) render(s);
+    if (!pending && !seekTimer && sent == device) render(s);
   } catch (e) {
     if (e.message == 'device not found' && device) {
       // The saved TV is gone; fall back to the default one.
@@ -868,7 +916,9 @@ $('f').onsubmit = e => {
 };
 document.querySelectorAll('[data-c]').forEach(b => b.onclick = e => {
   e.stopPropagation();
-  cmd(b.dataset.c, b.dataset.a);
+  const c = b.dataset.c;
+  if (c == 'rew' || c == 'ff') skip(c == 'ff' ? +b.dataset.a : -b.dataset.a);
+  else cmd(c, b.dataset.a);
 });
 $('bar').onclick = () => layers.at(-1) == 'pl' ? closeTop() : openLayer('pl');
 $('collapse').onclick = e => {
