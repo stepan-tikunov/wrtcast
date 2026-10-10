@@ -118,6 +118,7 @@ castctl -H 192.168.1.50 status                       # JSON: приложени�
 castctl -H 192.168.1.50 pause | resume | stop | quit
 castctl -H 192.168.1.50 seek 600 | ff 30 | rew 10   # секунды
 castctl -H 192.168.1.50 audio en | subs off          # id дорожки, язык или название
+castctl -H 192.168.1.50 substyle size=1.3,bg=#00000099
 castctl -H 192.168.1.50 volume 40 | mute | unmute
 ```
 

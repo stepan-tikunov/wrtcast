@@ -15,6 +15,7 @@ const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const COMMANDS = {
 	pause: null, resume: null, stop: null, quit: null, mute: null, unmute: null,
 	seek: 'num', ff: 'num', rew: 'num', volume: 'num', audio: 'str', subs: 'str',
+	substyle: 'style',
 };
 const REASONS = {
 	'200': 'OK', '400': 'Bad Request', '401': 'Unauthorized',
@@ -198,6 +199,10 @@ function ulength(s) {
 			n++;
 	return n;
 }
+
+// castctl subtitle style: "size=1.3,color=#FFFF00,bg=#00000099,edge=outline".
+const valid_style = s => length(s) <= 200 &&
+	match(s, /^[a-z]+=[#.0-9A-Za-z]+(,[a-z]+=[#.0-9A-Za-z]+)*$/);
 
 function title_id(p) {
 	if (!match(p.id ?? '', /^[0-9A-Za-z]{1,64}$/))
@@ -446,6 +451,11 @@ const routes = {
 			     t.lang || 'und', 'sub' + t.id);
 			labels['sub' + t.id] = t.name;
 		}
+		if (p.style != null) {
+			if (!valid_style(p.style))
+				fail(400, 'invalid subtitle style');
+			push(args, '-y', p.style);
+		}
 		let st = castctl(dev, ...args);
 		for (let t in s.audio)
 			labels[t.id] = t.name;
@@ -469,6 +479,8 @@ const routes = {
 			fail(400, 'numeric arg required');
 		if (kind == 'str' && (arg == '' || length(arg) > 128))
 			fail(400, 'arg required');
+		if (kind == 'style' && !valid_style(arg))
+			fail(400, 'invalid subtitle style');
 		return with_now(castctl(dev, c, arg), dev);
 	},
 };

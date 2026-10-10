@@ -108,10 +108,12 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* device picker */
-#devs{position:fixed;left:0;right:0;bottom:0;z-index:6;padding:8px 16px max(16px,env(safe-area-inset-bottom));background:var(--s1);border-radius:20px 20px 0 0;box-shadow:0 -6px 30px #000c}
-#devs .handle{width:40px;height:5px;margin:0 auto 8px;border-radius:3px;background:var(--s3)}
-#devs h2{display:flex;align-items:center;margin:0 0 4px;font-size:18px}
-#devs h2 span{flex:1}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:8;padding:8px 16px max(16px,env(safe-area-inset-bottom));background:var(--s1);border-radius:20px 20px 0 0;box-shadow:0 -6px 30px #000c}
+.sheet .handle{width:40px;height:5px;margin:0 auto 8px;border-radius:3px;background:var(--s3)}
+.sheet h2{display:flex;align-items:center;margin:0 0 4px;font-size:18px}
+.sheet h2 span{flex:1}
+/* A sheet over the player dims the player too. */
+#shade.top{z-index:7}
 #devlist .dev{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;padding:8px 4px;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
 .dev span{flex:1;min-width:0}
 .dev b{display:block;font-weight:550}
@@ -121,10 +123,19 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .dev i{width:10px;height:10px;border-radius:50%;background:var(--ac);visibility:hidden}
 .dev.on i{visibility:visible}
 #devlist .note{padding:24px}
+.pick{display:flex;gap:6px}
+.pick select{flex:1;min-width:0}
+#styb{flex:none;width:46px;height:46px;border-radius:14px;background:var(--s2);font-weight:700;font-size:15px}
+#stypv{display:grid;place-items:end center;height:110px;margin:8px 0 14px;padding:12px;border-radius:14px;background:linear-gradient(160deg,#4a5a6a,#1d2630 60%,#3b2f2a);overflow:hidden}
+#stypv span{padding:1px 6px;border-radius:3px;line-height:1.3;text-align:center;transition:all .2s}
+.opt{margin:0 0 8px}
+.opt label{display:flex;justify-content:space-between;margin:0 2px;color:var(--mu);font-size:12px}
+.opt b{color:var(--tx);font-weight:500;font-variant-numeric:tabular-nums}
+#styreset{display:block;margin:4px auto 0;padding:8px 16px;border:0;background:none;color:var(--mu);font-size:14px}
 #devname{display:flex;align-items:center;gap:6px;margin:8px auto 0;padding:6px 12px;border:0;border-radius:16px;background:none;color:var(--mu);font-size:14px}
 #devname svg{width:18px;height:18px}
 
-#toast{position:fixed;left:50%;bottom:96px;z-index:7;transform:translateX(-50%);width:max-content;max-width:90%;padding:10px 16px;border-radius:12px;background:var(--err);color:#fff;font-size:14px;box-shadow:0 4px 16px #0008}
+#toast{position:fixed;left:50%;bottom:96px;z-index:9;transform:translateX(-50%);width:max-content;max-width:90%;padding:10px 16px;border-radius:12px;background:var(--err);color:#fff;font-size:14px;box-shadow:0 4px 16px #0008}
 #toast:empty{display:none}
 
 /* motion */
@@ -153,8 +164,8 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 #det h1,#dmeta,#dplay{animation:pop .4s .1s cubic-bezier(.2,.8,.2,1) backwards}
 .ep.anim{animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 18ms)}
 .chip{transition:background .2s,color .2s}
-#pl,#devs{animation:rise .3s cubic-bezier(.2,.8,.2,1)}
-#devs.out{animation:sink .22s ease-in forwards}
+#pl,.sheet{animation:rise .3s cubic-bezier(.2,.8,.2,1)}
+.sheet.out{animation:sink .22s ease-in forwards}
 @keyframes sink{to{transform:translateY(100%)}}
 .dev{animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 40ms)}
 #full{display:grid!important;grid-template-rows:0fr;transition:grid-template-rows .32s cubic-bezier(.2,.8,.2,1)}
@@ -229,17 +240,25 @@ svg.spring{animation:spring .3s ease-out}
       <button class="ib ep-nav" id="next" aria-label="Следующая серия"><svg><use href="#i-next"/></svg></button>
     </div>
     <div class="row"><button class="ib" data-c="mute" id="mu" aria-label="Звук"><svg><use href="#i-vol"/></svg></button><input type="range" id="vol" min="0" max="100" step="5" aria-label="Громкость"></div>
-    <div class="row"><div class="sel"><label for="audio">Озвучка</label><select id="audio"></select></div><div class="sel"><label for="subs">Субтитры</label><select id="subs"></select></div></div>
+    <div class="row"><div class="sel"><label for="audio">Озвучка</label><select id="audio"></select></div><div class="sel"><label for="subs">Субтитры</label><div class="pick"><select id="subs"></select><button class="ib" id="styb" aria-label="Вид субтитров">Aa</button></div></div></div>
     <div class="row" id="eprow"><button class="pill" id="eplist"><svg><use href="#i-list"/></svg>Серии</button></div>
     <button id="stop" data-c="stop">Остановить</button>
     <button id="devname"><svg><use href="#i-tv"/></svg><span></span></button>
     </div>
   </div></div>
 </section>
-<section id="devs" hidden>
+<section id="devs" class="sheet" hidden>
   <div class="handle"></div>
   <h2><span>Где смотреть</span><button class="ib" id="devscan" aria-label="Обновить"><svg><use href="#i-refresh"/></svg></button></h2>
   <div id="devlist"></div>
+</section>
+<section id="sty" class="sheet" hidden>
+  <div class="handle"></div>
+  <h2><span>Вид субтитров</span><button class="ib" id="stycollapse" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button></h2>
+  <div id="stypv"><span>Сны — это послания из глубины.</span></div>
+  <div class="opt"><label for="stysize">Размер<b id="stysizev"></b></label><input type="range" id="stysize" min="0.5" max="2.5" step="0.1"></div>
+  <div class="opt"><label for="stybg">Фон<b id="stybgv"></b></label><input type="range" id="stybg" min="0" max="100" step="5"></div>
+  <button id="styreset">Сбросить</button>
 </section>
 <div id="toast"></div>
 
@@ -255,6 +274,9 @@ const titles = {};      // /title answers by id
 const layers = [];      // open overlays; the back button closes the last one
 let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF default
 let devices = null;     // last /devices answer
+let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null = receiver default
+localStorage.removeItem('subStyle'); // older format with colors
+const SHEETS = { dev: 'devs', sty: 'sty' }; // layer name -> bottom sheet
 
 // Requests that talk to the TV carry the chosen device.
 const withDevice = path => device ? path + (path.includes('?') ? '&' : '?') + 'device=' + encodeURIComponent(device) : path;
@@ -342,8 +364,9 @@ function showLayer(name, on) {
   const e = $(name == 'det' ? 'det' : 'shade');
   // The shade is shared by the player and the device picker.
   if (on) show(e);
-  else if (name == 'det' || !layers.some(l => l == 'pl' || l == 'dev')) animateOut(e);
-  if (name == 'dev') on ? show($('devs')) : animateOut($('devs'));
+  else if (name == 'det' || !layers.some(l => l == 'pl' || l in SHEETS)) animateOut(e);
+  if (name in SHEETS) on ? show($(SHEETS[name])) : animateOut($(SHEETS[name]));
+  $('shade').classList.toggle('top', layers.some(l => l in SHEETS));
   if (name == 'pl') {
     $('pl').classList.toggle('open', on);
     $('full').inert = !on || !!pending;
@@ -525,6 +548,7 @@ async function play(m) {
   if (pending) return;
   const req = { id: m.id, title: m.title };
   if (m.poster) req.poster = m.poster;
+  if (subStyle) req.style = styleSpec(subStyle); // the receiver resets it on every load
   if (m.season != null) Object.assign(req, { season: String(m.season), episode: m.episode });
   pending = req;
   refresh();
@@ -572,7 +596,7 @@ function fill(sel, tracks, off) {
     sel.dataset.key = key;
     sel.replaceChildren(...opts.map(([v, t]) => el('option', { value: v }, t)));
   }
-  sel.parentNode.hidden = !tracks.length;
+  sel.closest('.sel').hidden = !tracks.length;
   const a = tracks.find(t => t.active);
   sel.value = a ? a.id : 'off';
 }
@@ -707,7 +731,7 @@ function renderDevices() {
     b.style.setProperty('--i', i);
     b.onclick = async () => {
       // The player may belong to the previous TV, so close it as well.
-      while (layers.some(l => l == 'pl' || l == 'dev')) await closeTop();
+      while (layers.some(l => l == 'pl' || l in SHEETS)) await closeTop();
       selectDevice(d.id);
     };
     return b;
@@ -736,6 +760,35 @@ function selectDevice(id) {
   refresh();
   renderDevices();
   poll();
+}
+
+// ---- subtitle style -----------------------------------------------------
+
+// The receiver ignores colors and edges for side-loaded WebVTT, so only the
+// size and the opacity of the black background behind the text are offered.
+const STYLE_DEFAULT = { size: 1, bg: 0 };
+const styleSpec = s => `size=${s.size},bg=#000000` +
+  Math.round(s.bg * 2.55).toString(16).padStart(2, '0').toUpperCase();
+
+// Preview and labels follow the sliders; the TV gets the value on release.
+function renderStyle(s = { ...STYLE_DEFAULT, ...subStyle }) {
+  $('stysize').value = s.size;
+  $('stybg').value = s.bg;
+  $('stysizev').textContent = Math.round(s.size * 100) + '%';
+  $('stybgv').textContent = s.bg ? s.bg + '%' : 'нет';
+  const pv = $('stypv').firstChild.style;
+  pv.fontSize = 15 * s.size + 'px';
+  pv.background = `rgba(0,0,0,${s.bg / 100})`;
+  $('styreset').hidden = !subStyle;
+}
+
+// Sends the style to the TV now; it is also resent with every play.
+function setStyle(s) {
+  subStyle = s;
+  if (s) localStorage.subs = JSON.stringify(s);
+  else localStorage.removeItem('subs');
+  renderStyle();
+  if (st?.media) cmd('substyle', styleSpec(s || STYLE_DEFAULT));
 }
 
 // ---- wiring -------------------------------------------------------------
@@ -790,6 +843,15 @@ $('devbtn').onclick = () => {
 };
 $('devname').onclick = $('devbtn').onclick;
 $('devscan').onclick = () => loadDevices(true);
+$('styb').onclick = () => {
+  openLayer('sty');
+  renderStyle();
+};
+$('styreset').onclick = () => setStyle(null);
+$('stycollapse').onclick = closeTop;
+const sliderStyle = () => ({ size: +$('stysize').value, bg: +$('stybg').value });
+$('stysize').oninput = $('stybg').oninput = () => renderStyle(sliderStyle());
+$('stysize').onchange = $('stybg').onchange = () => setStyle(sliderStyle());
 $('next').onclick = () => stepEpisode(1);
 $('prev').onclick = () => stepEpisode(-1);
 document.addEventListener('visibilitychange', poll);

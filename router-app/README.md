@@ -52,6 +52,11 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
   временем, ±10 с, громкость, выбор озвучки и субтитров. Для сериалов в ряду
   кнопок появляются предыдущая и следующая серия (с переходом между
   сезонами), а также кнопка «Серии» со списком.
+- Кнопка «Aa» рядом с субтитрами открывает «Вид субтитров» с превью и двумя
+  ползунками: размер текста и непрозрачность чёрного фона под ним (цвет и
+  обводку ресивер для подгружаемых VTT игнорирует). Значение уходит на ТВ
+  (`substyle`), когда ползунок отпускают, хранится в `localStorage` и
+  передаётся с каждым `play`.
 - Кнопка «назад» на телефоне закрывает плеер и страницу тайтла.
 - Пауза переключается мгновенно. Статус запрашивается каждые 2 с, пока
   вкладка видна, а позиция между запросами досчитывается, поэтому таймер
@@ -83,8 +88,8 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
 | `GET /api/search?q=` | `{results:[{id,title,year,poster}]}`, `q` — не меньше 3 символов |
 | `GET /api/streams?id=` | `{streams:[{index,url,audio:[{id,name,lang,default}],subs:[{id,name,lang,forced}]}]}` |
 | `GET /api/title?id=` | `{id,title,original,year,description,poster,type,quality,countries,genres,directors,actors,ratings:[{source,value}],duration,seasons}`; `type` — `movie` или `series`, `seasons` (`[{season,episodes:[{episode,title,duration}]}]`) у фильмов `null`; разделы сайта и годы из `genres` убираются |
-| `POST /api/play` `id`, `stream`=0, `title`?, `poster`?, `season`+`episode`? | получает свежие потоки фильма (или серии, если переданы `season`/`episode`), запускает `castctl play`, возвращает статус. Субтитры title-api — отдельные WebVTT-файлы вне HLS-манифеста, поэтому они передаются ТВ в `LOAD` (`castctl play -s`) через прокси и выключены, пока их не выберут |
-| `POST /api/cmd` `c`, `arg`? | `pause resume stop quit mute unmute` · `seek ff rew volume` (число) · `audio subs` (id/язык/название/`off`) |
+| `POST /api/play` `id`, `stream`=0, `title`?, `poster`?, `season`+`episode`?, `style`? | получает свежие потоки фильма (или серии, если переданы `season`/`episode`), запускает `castctl play`, возвращает статус. Субтитры title-api — отдельные WebVTT-файлы вне HLS-манифеста, поэтому они передаются ТВ в `LOAD` (`castctl play -s`) через прокси и выключены, пока их не выберут. `style` — вид субтитров, ТВ сбрасывает его при каждом запуске |
+| `POST /api/cmd` `c`, `arg`? | `pause resume stop quit mute unmute` · `seek ff rew volume` (число) · `audio subs` (id/язык/название/`off`) · `substyle` (`size=…,bg=#RRGGBBAA`, формат `castctl substyle`) |
 | `GET /api/devices` `refresh`? | `{devices:[{id,name,model,host,port}],default}`: `castctl discover`, кэш на 60 с, если не передан `refresh=1`; `default` — id устройства из `cast_host` |
 | `GET /api/status` | `castctl status`; если поток запущен через `/api/play`, добавляет `now:{id,stream,title,poster,season,episode}` и к каждой дорожке `label` из title-api; всегда добавляет `device:{id,name}` |
 | `GET /api/p/<name>?u=<url>` | медиапрокси, см. ниже |
