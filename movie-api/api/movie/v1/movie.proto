@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package movie.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "movie-api/api/movie/v1;moviev1";
+
+service MovieService {
+  rpc SearchMovies(SearchMoviesQuery) returns (SearchMoviesQueryResponse) {
+    option (google.api.http) = {
+      get: "/v1/movies:search"
+    };
+  }
+
+  rpc GetStreamsByMovieID(GetStreamsByMovieIDQuery) returns (GetStreamsByMovieIDQueryResponse) {
+    option (google.api.http) = {
+      get: "/v1/movies/{movie_id}/streams"
+    };
+  }
+}
+
+message SearchMoviesQuery {
+  string query = 1;
+}
+
+message SearchMoviesQueryResponse {
+  message SearchResult {
+    string movie_id = 1;
+    string movie_title = 2;
+    string movie_year = 3;
+    string movie_poster_link = 4;
+  }
+
+  repeated SearchResult results = 1;
+}
+
+message GetStreamsByMovieIDQuery {
+  string movie_id = 1;
+}
+
+message GetStreamsByMovieIDQueryResponse {
+  message MovieStream {
+    message AudioTrack {
+      string id = 1;
+      string name = 2;
+      string language = 3;
+      bool default = 4;
+      string playlist_url = 5;
+    }
+
+    message SubtitleTrack {
+      string id = 1;
+      string name = 2;
+      string language = 3;
+      bool forced = 4;
+      string playlist_url = 5;
+    }
+
+    string master_playlist_url = 1;
+    repeated AudioTrack audio_tracks = 2;
+    repeated SubtitleTrack subtitles = 3;
+  }
+
+  repeated MovieStream streams = 1;
+}
