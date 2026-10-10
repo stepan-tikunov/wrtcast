@@ -1049,13 +1049,13 @@ static void usage(void)
 "commands:\n"
 "  discover [-t seconds]               list Chromecasts on the local network\n"
 "                                      as JSON (listens 2 s by default)\n"
-"  play <url> [-t content-type] [-l] [-s url lang name]... [-y style]\n"
-"                                      load and play a stream (HLS by default;\n"
-"                                      -l marks it as a live stream); waits\n"
-"                                      until playback starts or fails; each -s\n"
-"                                      adds a WebVTT subtitle track (off until\n"
-"                                      selected with \"subs\"); -y sets the\n"
-"                                      subtitle style as in substyle\n"
+"  play <url> [-t content-type] [-l] [-p seconds] [-s url lang name]...\n"
+"       [-y style]                     load and play a stream (HLS by default)\n"
+"                                      and wait until playback starts or\n"
+"                                      fails; -l: live stream; -p: start\n"
+"                                      position; -s: add a WebVTT subtitle\n"
+"                                      track (off until chosen with \"subs\");\n"
+"                                      -y: subtitle style as in substyle\n"
 "  pause | resume                      pause / resume playback\n"
 "  stop                                stop media\n"
 "  quit                                close the app on the device\n"
@@ -1238,6 +1238,15 @@ static void text_style(char *out, size_t cap, const char *spec)
 	snprintf(out + n, cap - n, "}");
 }
 
+static double parse_seconds(const char *s)
+{
+	char *end;
+	double v = strtod(s, &end);
+	if (end == s || *end || v < 0)
+		die("invalid number of seconds: %s", s);
+	return v;
+}
+
 /*
  * Subtitles that are not in the HLS manifest are side-loaded: LOAD lists them
  * as WebVTT text tracks, and they can be switched with "subs" afterwards.
@@ -1275,6 +1284,7 @@ static void cmd_play(int argc, char **argv)
 	const char *content_type = "application/x-mpegURL";
 	const char *stream_type = "BUFFERED";
 	const char *src = NULL, *style = NULL;
+	double start = 0;
 	char *subs[MAX_SUBS * 3];
 	int nsubs = 0;
 	struct app a;
@@ -1290,6 +1300,8 @@ static void cmd_play(int argc, char **argv)
 			stream_type = "LIVE";
 		else if (!strcmp(argv[i], "-y") && i + 1 < argc)
 			style = argv[++i];
+		else if (!strcmp(argv[i], "-p") && i + 1 < argc)
+			start = parse_seconds(argv[++i]);
 		else if (!strcmp(argv[i], "-s") && i + 3 < argc) {
 			if (nsubs == MAX_SUBS)
 				die("at most %d subtitle tracks", MAX_SUBS);
@@ -1310,10 +1322,10 @@ static void cmd_play(int argc, char **argv)
 	jescape(url, sizeof(url), src);
 	jescape(ctype, sizeof(ctype), content_type);
 	n = snprintf(body, sizeof(body),
-		     "\"type\":\"LOAD\",\"autoplay\":true,\"currentTime\":0,"
+		     "\"type\":\"LOAD\",\"autoplay\":true,\"currentTime\":%.1f,"
 		     "\"media\":{\"contentId\":%s,\"contentType\":%s,"
 		     "\"streamType\":\"%s\"",
-		     url, ctype, stream_type);
+		     start, url, ctype, stream_type);
 	n = append_subs(body, n, sizeof(body) - 2, subs, nsubs);
 	if (style) {
 		char st[512];
@@ -1326,15 +1338,6 @@ static void cmd_play(int argc, char **argv)
 	md.ntracks = md.nactive = -1;
 	wait_for_playback(a.transport_id, r, &md);
 	print_status(&a, &md);
-}
-
-static double parse_seconds(const char *s)
-{
-	char *end;
-	double v = strtod(s, &end);
-	if (end == s || *end || v < 0)
-		die("invalid number of seconds: %s", s);
-	return v;
 }
 
 static void cmd_seek(struct app *a, struct media *md, double t)
