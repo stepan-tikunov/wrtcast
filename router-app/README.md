@@ -104,6 +104,7 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
 | `GET /api/devices` `refresh`? | `{devices:[{id,name,model,host,port}],default}`: `castctl discover`, кэш на 60 с, если не передан `refresh=1`; `default` — id устройства из `cast_host` |
 | `GET /api/status` | `castctl status`; если поток запущен через `/api/play`, добавляет `now:{id,stream,title,poster,season,episode,quality,qualities,source,sources}` и к каждой дорожке `label` из title-api; всегда добавляет `device:{id,name}` |
 | `GET /api/p/<name>?u=<url>` | медиапрокси, см. ниже |
+| `GET /api/sub/<тв>/<n>.vtt` | субтитр № n из последнего `play` на этом ТВ: подписанные ссылки бывают по ~2 КБ и не помещаются в сообщение `LOAD` (64 КБ), поэтому ресивер получает короткие, а настоящие адреса и заголовки лежат в `/tmp/wrtcast.subs.<host>`. Порядок: сначала русские, английские, украинские; если дорожки не влезают в `LOAD`, castctl отбрасывает последние |
 
 Параметры POST можно передавать в query string, как форму или как JSON.
 

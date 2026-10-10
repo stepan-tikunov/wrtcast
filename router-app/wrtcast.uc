@@ -10,6 +10,7 @@ import { popen, readfile, writefile, stdin, stdout } from 'fs';
 import { cursor } from 'uci';
 
 const STATE = '/tmp/wrtcast.now.';         // + host key; what /play started
+const SUBS = '/tmp/wrtcast.subs.';         // + host key; subtitle URLs for /sub
 const DEVICES = '/tmp/wrtcast.devices.json'; // last discovery result
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const COMMANDS = {
@@ -100,7 +101,11 @@ function run(cmd) {
 }
 
 function api(path) {
-	let r = run(`uclient-fetch -q -T 20 -O - ${shq(API + path)}`);
+	let cmd = `uclient-fetch -q -T 20 -O - ${shq(API + path)}`;
+	let r = run(cmd);
+	// The provider's players fail now and then; one retry usually helps.
+	if (r.code != 0)
+		r = run(cmd);
 	if (r.code != 0)
 		fail(502, 'title-api request failed');
 	let j = json(r.out);
@@ -199,7 +204,8 @@ function castctl_try(dev, ...args) {
 	return type(j) == 'object' ? j : null;
 }
 
-const state_file = dev => STATE + replace(host_of(dev), /[^0-9A-Za-z.]/g, '_');
+const state_key = dev => replace(host_of(dev), /[^0-9A-Za-z.]/g, '_');
+const state_file = dev => STATE + state_key(dev);
 
 // Character count of a UTF-8 string (continuation bytes are skipped).
 function ulength(s) {
@@ -208,6 +214,21 @@ function ulength(s) {
 		if ((ord(s, i) & 0xC0) != 0x80)
 			n++;
 	return n;
+}
+
+// castctl drops the tracks that don't fit the LOAD message from the end, so
+// Russian, English and Ukrainian ones go first.
+function pick_subs(subs) {
+	let rank = t => {
+		let l = substr(lc(t.lang ?? ''), 0, 2);
+		return l == 'ru' ? 0 : l == 'en' ? 1 : l == 'uk' ? 2 : 3;
+	};
+	let list = [];
+	for (let i, t in subs ?? [])
+		if (t.url)
+			push(list, { t, i });
+	list = sort(list, (a, b) => rank(a.t) - rank(b.t) || a.i - b.i);
+	return map(list, x => x.t);
 }
 
 // castctl subtitle style: "size=1.3,color=#FFFF00,bg=#00000099,edge=outline".
@@ -632,10 +653,15 @@ const routes = {
 			push(args, '-p', p.start);
 		if (s.fmp4)
 			push(args, '-f', 'fmp4');
-		for (let t in s.subs) {
-			if (!t.url)
-				continue;
-			push(args, '-s', PROXY ? purl(t.url, public_base(), null, h) : t.url,
+		// Signed subtitle URLs can be ~2 KB each through the proxy, too much
+		// for the 64 KB LOAD message, so the receiver gets short /sub/<tv>/<n>
+		// links that look the real URL up in a file written beforehand.
+		let picked = pick_subs(s.subs);
+		writefile(SUBS + state_key(dev), sprintf('%J', {
+			urls: map(picked, t => t.url), headers: h,
+		}));
+		for (let i, t in picked) {
+			push(args, '-s', PROXY ? `${public_base()}/api/sub/${state_key(dev)}/${i}.vtt` : t.url,
 			     t.lang || 'und', 'sub' + t.id);
 			labels['sub' + t.id] = t.name;
 		}
@@ -685,6 +711,15 @@ if (pm) {
 		fail(405, 'method not allowed');
 	let qs = parse_form(getenv('QUERY_STRING'), {});
 	proxy(pm[1], qs.u, qs.q, qs.h);
+}
+// Subtitles of what /play started, by index (see the short links in /play).
+let sm = match(path, /^\/sub\/([0-9A-Za-z._]+)\/([0-9]+)\.vtt$/);
+if (sm) {
+	let subs = json(readfile(SUBS + sm[1]) ?? 'null');
+	let url = subs?.urls?.[+sm[2]];
+	if (!url)
+		fail(404, 'no such subtitle');
+	proxy('sub.vtt', url, null, subs.headers || null);
 }
 
 let p = params();
