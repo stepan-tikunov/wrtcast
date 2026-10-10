@@ -91,6 +91,14 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #pl.open #handle{display:block}
 #pl.open #thumb{width:48px;height:72px}
 input[type=range]{width:100%;height:32px;margin:0;accent-color:var(--ac);background:none}
+#posw{position:relative}
+#pos{pointer-events:none}
+#posx{position:absolute;left:0;right:0;top:-10px;bottom:-10px;touch-action:none;cursor:pointer}
+#bub{position:absolute;bottom:calc(100% + 10px);transform:translateX(-50%);padding:6px 12px;border-radius:12px;background:var(--tx);color:#111;text-align:center;white-space:nowrap;pointer-events:none;box-shadow:0 4px 16px #0008}
+#bub b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+#bub small{display:block;color:#555;font-size:12px;font-variant-numeric:tabular-nums}
+/* The bubble rises above the controls, out of the clipped panel. */
+#pl.scrub #full>div{overflow:visible}
 .times{display:flex;justify-content:space-between;color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums;margin-top:-4px}
 .ctl{display:flex;align-items:center;justify-content:center;gap:20px;margin:10px 0}
 .ctl.series{justify-content:space-between;gap:0}
@@ -262,7 +270,7 @@ svg.spring{animation:spring .3s ease-out}
   <div id="full"><div>
     <div class="starting"><span class="spin"></span>Управление появится после запуска</div>
     <div class="live">
-    <input type="range" id="pos" min="0" max="1" step="1" value="0" aria-label="Позиция">
+    <div id="posw"><input type="range" id="pos" min="0" max="1" step="1" value="0" aria-label="Позиция" tabindex="-1"><div id="posx"></div><div id="bub" hidden><b></b><small></small></div></div>
     <div class="times"><span id="cur">0:00</span><span id="rem"></span></div>
     <div class="ctl" id="ctl">
       <button class="ib ep-nav" id="prev" aria-label="Предыдущая серия"><svg><use href="#i-prev"/></svg></button>
@@ -926,24 +934,64 @@ $('collapse').onclick = e => {
   closeTop();
 };
 $('shade').onclick = closeTop;
-for (const id of ['pos', 'vol']) {
-  const r = $(id);
-  r.oninput = () => {
-    drag = id;
-    if (id == 'pos') {
-      $('cur').textContent = fmt(r.value);
-      $('rem').textContent = '−' + fmt(r.max - r.value);
-    }
-  };
-  r.onchange = () => {
-    drag = null;
-    if (id == 'pos' && st?.media) {
-      st.media.time = +r.value;
-      statusAt = Date.now();
-    }
-    cmd(id == 'pos' ? 'seek' : 'volume', r.value);
-  };
+$('vol').oninput = () => drag = 'vol';
+$('vol').onchange = () => {
+  drag = null;
+  cmd('volume', $('vol').value);
+};
+
+// Seeking: the bar jumps to the finger and then follows it; the higher the
+// finger above the bar, the slower it moves, down to ~0.6 s per pixel, so
+// any second can be hit. A bubble shows the target until release.
+const SCRUB = [[60, 1, ''], [120, .5, 'медленнее ×½'], [180, .25, 'точнее ×¼'], [Infinity, .1, 'посекундно']];
+let scrub = null;
+function showScrub(hint) {
+  const { v, from, max, box } = scrub, d = v - from;
+  $('pos').value = v;
+  $('cur').textContent = fmt(v);
+  $('rem').textContent = '−' + fmt(max - v);
+  $('bub').firstChild.textContent = fmt(v);
+  $('bub').lastChild.textContent = (d < 0 ? '−' : '+') + fmt(Math.abs(d)) + (hint ? ' · ' + hint : '');
+  $('bub').style.left = Math.min(Math.max(v / max * box.width, 60), box.width - 60) + 'px';
 }
+$('posx').onpointerdown = e => {
+  const m = st?.media, box = $('pos').getBoundingClientRect(), max = m?.duration;
+  if (!max || pending) return;
+  e.preventDefault();
+  $('posx').setPointerCapture(e.pointerId);
+  const v = Math.min(Math.max((e.clientX - box.left) / box.width * max, 0), max);
+  scrub = { x: e.clientX, v, from: position(m), max, box };
+  drag = 'pos';
+  $('bub').hidden = false;
+  $('pl').classList.add('scrub');
+  showScrub('');
+};
+$('posx').onpointermove = e => {
+  if (!scrub) return;
+  const { box, max } = scrub;
+  const [, speed, hint] = SCRUB.find(([dy]) => box.top + box.height / 2 - e.clientY < dy);
+  scrub.v = Math.min(Math.max(scrub.v + (e.clientX - scrub.x) / box.width * max * speed, 0), max);
+  scrub.x = e.clientX;
+  showScrub(hint);
+};
+function endScrub(seek) {
+  if (!scrub) return;
+  const v = Math.round(scrub.v);
+  scrub = null;
+  drag = null;
+  $('bub').hidden = true;
+  $('pl').classList.remove('scrub');
+  if (seek && st?.media) {
+    clearTimeout(seekTimer); // the drag wins over pending ±10 taps
+    seekTimer = null;
+    st.media.time = v;
+    statusAt = Date.now();
+    cmd('seek', v);
+  }
+  showTime();
+}
+$('posx').onpointerup = () => endScrub(true);
+$('posx').onpointercancel = () => endScrub(false);
 $('audio').onchange = e => cmd('audio', e.target.value);
 $('subs').onchange = e => cmd('subs', e.target.value);
 // Replays what is on from the current position with some settings changed.
