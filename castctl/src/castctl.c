@@ -29,6 +29,7 @@
 
 #define DEFAULT_PORT "8009"
 #define TIMEOUT_MS 10000
+#define LOAD_TIMEOUT_S 20 /* how long play waits for playback to start */
 #define MAX_MSG (64 * 1024)
 #define MAX_TRACKS 32
 
@@ -711,7 +712,8 @@ static void usage(void)
 "\n"
 "commands:\n"
 "  play <url> [-t content-type] [-l]   load and play a stream (HLS by default;\n"
-"                                      -l marks it as a live stream)\n"
+"                                      -l marks it as a live stream); waits\n"
+"                                      until playback starts or fails\n"
 "  pause | resume                      pause / resume playback\n"
 "  stop                                stop media\n"
 "  quit                                close the app on the device\n"
@@ -751,6 +753,66 @@ static void media_command(struct app *a, struct media *md, const char *body)
 	parse_media_status(r, md);
 }
 
+/*
+ * The reply to LOAD is not a reliable verdict: the receiver may answer with
+ * an early MEDIA_STATUS while the player is still IDLE and send LOAD_FAILED
+ * (or IDLE with an idleReason) only once the stream turns out to be broken.
+ * Reads the media channel until playback starts or fails. Still BUFFERING at
+ * the deadline counts as started: the network may just be slow.
+ */
+static void wait_for_playback(const char *transport, const char *r,
+			      struct media *md)
+{
+	time_t deadline = time(NULL) + LOAD_TIMEOUT_S;
+	long session = 0;
+	struct cast_msg m;
+	char type[48];
+	double v;
+
+	for (;;) {
+		check_reply_type(r, "load");
+		jstr(r, "type", type, sizeof(type));
+		/* Statuses of the session replaced by this LOAD are ignored. */
+		if (!strcmp(type, "MEDIA_STATUS") &&
+		    (!session || !jnum(r, "status.0.mediaSessionId", &v) ||
+		     (long)v == session)) {
+			parse_media_status(r, md);
+			if (!md->session_id) {
+				if (session)
+					die("load failed: media session ended");
+			} else {
+				session = md->session_id;
+				if (!strcmp(md->state, "PLAYING") ||
+				    !strcmp(md->state, "PAUSED"))
+					return;
+				if (!strcmp(md->state, "IDLE") && *md->idle_reason)
+					die("load failed: IDLE %s", md->idle_reason);
+			}
+		}
+		if (time(NULL) >= deadline) {
+			if (!strcmp(md->state, "BUFFERING"))
+				return;
+			die("load failed: playback did not start in %d s",
+			    LOAD_TIMEOUT_S);
+		}
+		/* Heartbeat PINGs every few seconds keep this from blocking long. */
+		for (;;) {
+			cast_recv(&m);
+			if (!strcmp(m.ns, NS_CONN)) {
+				if (jstr(m.payload, "type", type, sizeof(type)) &&
+				    !strcmp(type, "CLOSE") && !strcmp(m.src, transport))
+					die("device closed the channel");
+				continue;
+			}
+			if (!strcmp(m.ns, NS_MEDIA) && !strcmp(m.src, transport))
+				break;
+			if (time(NULL) >= deadline)
+				break;
+		}
+		r = m.payload;
+	}
+}
+
 static void cmd_play(int argc, char **argv)
 {
 	static char body[8192];
@@ -788,10 +850,9 @@ static void cmd_play(int argc, char **argv)
 		 "\"streamType\":\"%s\"}",
 		 url, ctype, stream_type);
 	r = request(a.transport_id, NS_MEDIA, body);
-	check_reply_type(r, "load");
 	memset(&md, 0, sizeof(md));
 	md.ntracks = md.nactive = -1;
-	parse_media_status(r, &md);
+	wait_for_playback(a.transport_id, r, &md);
 	print_status(&a, &md);
 }
 
