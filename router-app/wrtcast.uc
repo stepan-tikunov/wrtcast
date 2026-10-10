@@ -1,16 +1,16 @@
 #!/usr/bin/ucode
-// castbff — CGI backend for the Chromecast remote. Proxies the title-api
+// wrtcast — CGI backend for the Chromecast remote. Proxies the title-api
 // HTTP/JSON gateway, drives castctl and relays media (HLS playlists, segments,
 // posters) so upstream headers and CORS are under our control. Chromecasts
 // are found with castctl discover; requests pick one with device=<id>.
-// Configured in /etc/config/castbff.
+// Configured in /etc/config/wrtcast.
 'use strict';
 
 import { popen, readfile, writefile, stdin, stdout } from 'fs';
 import { cursor } from 'uci';
 
-const STATE = '/tmp/castbff.now.';         // + host key; what /play started
-const DEVICES = '/tmp/castbff.devices.json'; // last discovery result
+const STATE = '/tmp/wrtcast.now.';         // + host key; what /play started
+const DEVICES = '/tmp/wrtcast.devices.json'; // last discovery result
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const COMMANDS = {
 	pause: null, resume: null, stop: null, quit: null, mute: null, unmute: null,
@@ -29,7 +29,7 @@ const MIME = {
 };
 
 const uci = cursor();
-const conf = (k, d) => uci.get('castbff', 'main', k) ?? d;
+const conf = (k, d) => uci.get('wrtcast', 'main', k) ?? d;
 const API = rtrim(conf('api_url', 'http://127.0.0.1:8080'), '/');
 const CAST_HOST = conf('cast_host', '');
 const TOKEN = conf('token', '');

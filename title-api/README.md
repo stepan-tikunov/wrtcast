@@ -1,33 +1,56 @@
 # Title API
 
-Build and run:
+Сборка и запуск:
 
 ```sh
 make
 ./title-api
 ```
 
-The gRPC server listens on `:50051` and the HTTP/JSON gateway on `:8080` by
-default. Configuration:
+По умолчанию gRPC-сервер слушает `:50051`, а HTTP/JSON-шлюз — `:8080`.
+Настройки:
 
-- `GRPC_ADDR` — listen address;
-- `HTTP_ADDR` — HTTP gateway listen address;
-- `MOVIE_PROVIDER_BASE_URL` — provider base URL (a built-in default is used
-  when omitted).
+- `GRPC_ADDR` — адрес gRPC-сервера;
+- `HTTP_ADDR` — адрес HTTP-шлюза;
+- `MOVIE_PROVIDER_BASE_URL` — базовый URL провайдера (если не задан,
+  используется встроенный);
+- `MOVIE_PROVIDER_USER_AGENT` — User-Agent ресивера (см. ниже);
+- `HTTPS_PROXY` / `HTTP_PROXY` — прокси для исходящих запросов, в том числе
+  `socks5://…`.
 
-The anti-bot session is initialized before the gRPC listener starts, refreshed
-every five minutes, and refreshed immediately when a request encounters a new
-challenge.
+Антибот-сессия создаётся до запуска gRPC-сервера, обновляется каждые пять
+минут и сразу же, если запрос наткнулся на новую проверку.
 
-`title_id` is the first eight hexadecimal characters of SHA-1 of the provider
-hostname followed by the decimal site title ID. For the default provider and
-site ID `42185`, it is:
+## Docker
+
+```sh
+docker build -t title-api .
+docker run -p 8080:8080 title-api
+```
+
+[`compose.yaml`](compose.yaml) рассчитан на VPS, где сервис доступен только
+через WireGuard: HTTP-шлюз слушает WireGuard-адрес сервера, gRPC — только
+loopback, наружу ничего не публикуется. Исходящие запросы можно направить
+через SOCKS5-прокси на домашнем роутере, чтобы провайдер и его CDN видели тот
+же IP, с которого потом загружаются сегменты:
+
+```sh
+WG_ADDR=10.0.0.1 EGRESS_PROXY=socks5://10.0.0.2:1080 docker compose up -d --build
+```
+
+## Идентификаторы
+
+`title_id` — первые восемь шестнадцатеричных символов SHA-1 от имени хоста
+провайдера, за которыми идёт десятичный ID тайтла на сайте. Для провайдера по
+умолчанию и ID `42185` получается:
 
 ```text
 67c18f3642185
 ```
 
-Full-text title search accepts queries of at least three characters:
+## Поиск
+
+Полнотекстовый поиск принимает запросы от трёх символов:
 
 ```sh
 grpcurl -plaintext \
@@ -36,18 +59,20 @@ grpcurl -plaintext \
   title.v1.TitleService/SearchTitles
 ```
 
-The same method is exposed through its `google.api.http` annotation:
+Тот же метод доступен через аннотацию `google.api.http`:
 
 ```sh
 curl --get --data-urlencode 'query=Дюна' \
   'http://localhost:8080/v1/search'
 ```
 
-Search results contain the title ID, title, year, and absolute poster URL. Up
-to 30 results are returned by the provider's first search page.
+Результаты содержат ID тайтла, название, год и абсолютный URL постера.
+Возвращается до 30 результатов с первой страницы поиска провайдера.
 
-Full title details, including the authoritative media type and a series season
-and episode catalog, are available through `GetTitleDetails`:
+## Подробности о тайтле
+
+Полная информация о тайтле, включая достоверный тип (фильм или сериал) и
+каталог сезонов и серий, доступна через `GetTitleDetails`:
 
 ```sh
 curl 'http://localhost:8080/v1/titles/67c18f3643222'
@@ -58,13 +83,15 @@ grpcurl -plaintext \
   title.v1.TitleService/GetTitleDetails
 ```
 
-For movies, `durationSeconds` is read from player metadata when available. If
-it is absent, the service follows the signed HLS master playlist and sums the
-selected media playlist's `#EXTINF` durations. Series expose duration per
-episode instead of a single total title duration.
+Для фильмов `durationSeconds` берётся из метаданных плеера, если они есть.
+Если нет, сервис открывает подписанный master-плейлист HLS и суммирует
+длительности `#EXTINF` выбранного медиаплейлиста. У сериалов длительность
+указывается для каждой серии, а не для тайтла целиком.
 
-`GetPlaybackStreams` returns movie streams when only `title_id` is provided. For
-a series, pass `season_number` and `episode_number` to select the episode:
+## Потоки
+
+`GetPlaybackStreams` возвращает потоки фильма, если передан только `title_id`.
+Для сериала передайте `season_number` и `episode_number`, чтобы выбрать серию:
 
 ```sh
 curl 'http://localhost:8080/v1/titles/67c18f3642185/playback-streams'
@@ -80,27 +107,31 @@ grpcurl -plaintext \
   title.v1.TitleService/GetPlaybackStreams
 ```
 
-Season and episode fields are ignored for movies.
+Для фильмов поля сезона и серии игнорируются.
 
-The HTTP gateway allows requests from any origin (`Access-Control-Allow-Origin: *`)
-and handles CORS preflight requests.
+Ответ содержит по одной записи на каждый доступный плеер. В каждой записи —
+подписанный URL master-плейлиста HLS, список аудиодорожек без дублей и
+доступные субтитры. Видеоварианты намеренно не перечисляются: HLS-плеер
+выбирает их сам из master-плейлиста.
 
-Poster images on the provider site are behind the same anti-bot challenge, so
-they are served through the service's session:
+Подписанные ссылки на медиа запрашиваются с User-Agent ресивера Chromecast,
+потому что CDN проверяет тот же User-Agent при загрузке HLS-сегментов. Для
+другой прошивки ресивера его можно заменить через `MOVIE_PROVIDER_USER_AGENT`.
+
+## Постеры
+
+Постеры на сайте провайдера закрыты той же антибот-проверкой, поэтому сервис
+отдаёт их через свою сессию:
 
 ```sh
-curl --get --data-urlencode 'url=<moviePosterLink>' \
+curl --get --data-urlencode 'url=<posterLink>' \
   'http://localhost:8080/v1/posters' -o poster.jpg
 ```
 
-Only URLs on the provider host are accepted (`400` otherwise); upstream failures
-return `502`.
+Принимаются только URL на хосте провайдера (иначе `400`); ошибки источника
+возвращают `502`.
 
-Signed media URLs are generated for the Chromecast receiver User-Agent because
-the CDN validates the same User-Agent on HLS segment requests. Override it for a
-different receiver firmware with `MOVIE_PROVIDER_USER_AGENT`.
+## CORS
 
-The response contains one entry per playable embed. Each entry has a signed HLS
-master playlist URL, a deduplicated list of audio tracks, and available subtitle
-tracks. Video variants are intentionally omitted because the HLS player selects
-them adaptively from the master playlist.
+HTTP-шлюз принимает запросы с любого источника
+(`Access-Control-Allow-Origin: *`) и обрабатывает preflight-запросы CORS.
