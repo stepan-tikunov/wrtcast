@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<title>Cast</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#121212;color:#eee;font:16px/1.3 system-ui,sans-serif}
+button,select,input{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:2;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));background:#121212e8;backdrop-filter:blur(8px)}
+#q{width:100%;height:46px;padding:0 14px;border:0;border-radius:12px;background:#262626;outline:none;font-size:17px}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:12px;padding:6px 12px 200px}
+.card{display:block;align-self:start;padding:0;border:0;background:none;text-align:left}
+.card img{display:block}
+.card i{display:grid;place-items:center;color:#555;font:600 40px system-ui;font-style:normal}
+.card img,.card i{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:10px;background:#262626}
+.card b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:6px;font-size:14px;font-weight:500}
+.card span{color:#888;font-size:13px}
+#msg{padding:24px 12px;color:#888;text-align:center}
+#msg:empty{display:none}
+#pl{position:fixed;left:0;right:0;bottom:0;z-index:3;padding:0 16px max(12px,env(safe-area-inset-bottom));background:#1e1e1e;border-radius:18px 18px 0 0;box-shadow:0 -4px 24px #000a}
+#bar{display:flex;align-items:center;gap:12px;min-height:64px}
+#bar div{flex:1;min-width:0}
+#title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
+#st{color:#999;font-size:13px}
+#full{display:none;padding-bottom:6px}
+#pl.open #full{display:block}
+.btn{min-width:52px;height:52px;border:0;border-radius:26px;background:#2c2c2c;font-size:17px}
+.btn.big{width:64px;height:64px;border-radius:32px;background:#e8e8e8;color:#111;font-size:24px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0}
+input[type=range]{width:100%;height:32px;margin:0;accent-color:#e8e8e8}
+.times{display:flex;justify-content:space-between;color:#999;font-size:13px}
+select{flex:1;min-width:0;height:46px;padding:0 10px;border:0;border-radius:12px;background:#2c2c2c}
+#toast{position:fixed;left:50%;top:70px;z-index:4;transform:translateX(-50%);max-width:90%;padding:10px 16px;border-radius:12px;background:#b3261e;color:#fff;font-size:14px}
+#toast:empty{display:none}
+</style>
+</head>
+<body>
+<header><form id="f"><input id="q" type="search" placeholder="Поиск фильма" enterkeyhint="search" autocomplete="off"></form></header>
+<main id="grid"></main>
+<p id="msg">Найдите фильм и нажмите на него, чтобы запустить на ТВ</p>
+<div id="toast"></div>
+<section id="pl" hidden>
+  <div id="bar"><div><b id="title"></b><span id="st"></span></div><button class="btn" id="tg" data-c="toggle">▶</button></div>
+  <div id="full">
+    <input type="range" id="pos" min="0" max="1" step="1" value="0">
+    <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+    <div class="row">
+      <button class="btn" data-c="rew" data-a="30">−30</button>
+      <button class="btn" data-c="rew" data-a="10">−10</button>
+      <button class="btn big" data-c="toggle" id="pp">▶</button>
+      <button class="btn" data-c="ff" data-a="10">+10</button>
+      <button class="btn" data-c="ff" data-a="30">+30</button>
+    </div>
+    <div class="row"><button class="btn" data-c="mute" id="mu">🔊</button><input type="range" id="vol" min="0" max="100" step="5"></div>
+    <div class="row"><select id="audio"></select><select id="subs"></select></div>
+    <div class="row"><button class="btn" data-c="stop" style="flex:1">Остановить</button></div>
+  </div>
+</section>
+<script>
+const $ = id => document.getElementById(id);
+const STATES = { PLAYING: 'Играет', PAUSED: 'Пауза', BUFFERING: 'Загрузка…', IDLE: 'Остановлено' };
+let token = localStorage.token || '', st = null, drag = null, busy = false, toastTimer;
+
+async function api(path, body) {
+  const o = { headers: {} };
+  if (token) o.headers['X-Token'] = token;
+  if (body) {
+    o.method = 'POST';
+    o.headers['Content-Type'] = 'application/json';
+    o.body = JSON.stringify(body);
+  }
+  const r = await fetch('api/' + path, o);
+  const j = await r.json().catch(() => ({ error: r.statusText }));
+  if (r.status == 401 && (token = prompt('Токен доступа') || '')) {
+    localStorage.token = token;
+    return api(path, body);
+  }
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+
+function toast(e) {
+  $('toast').textContent = e.message || e;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('toast').textContent = '', 4000);
+}
+
+function fmt(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`;
+}
+
+function el(tag, props, ...kids) {
+  const e = Object.assign(document.createElement(tag), props);
+  e.append(...kids);
+  return e;
+}
+
+async function search(q) {
+  localStorage.q = q;
+  $('msg').textContent = 'Ищу…';
+  $('grid').replaceChildren();
+  try {
+    const { results } = await api('search?q=' + encodeURIComponent(q));
+    $('msg').textContent = results.length ? '' : 'Ничего не найдено';
+    $('grid').replaceChildren(...results.map(m => {
+      // Posters sit behind the provider's anti-bot page and often fail to load.
+      const ph = () => el('i', {}, (m.title || '?')[0]);
+      const img = m.poster
+        ? el('img', { src: m.poster, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer' })
+        : ph();
+      img.onerror = () => img.replaceWith(ph());
+      const b = el('button', { className: 'card' }, img, el('b', {}, m.title), el('span', {}, m.year));
+      b.onclick = () => play(m);
+      return b;
+    }));
+  } catch (e) {
+    $('msg').textContent = '';
+    toast(e);
+  }
+}
+
+async function play(m) {
+  render({ media: { state: 'BUFFERING' }, now: { title: m.title } });
+  try {
+    render(await api('play', { id: m.id, title: m.title }));
+  } catch (e) {
+    toast(e);
+    poll();
+  }
+}
+
+// Track lists change rarely; rebuild options only when they do, so an open
+// <select> isn't reset by polling.
+function fill(sel, tracks, off) {
+  const opts = tracks.map(t => [t.id, (t.label || t.name || t.lang || t.id) + (t.lang ? ` (${t.lang})` : '')]);
+  if (off) opts.unshift(['off', 'Без субтитров']);
+  const key = JSON.stringify(opts);
+  if (sel.dataset.key != key) {
+    sel.dataset.key = key;
+    sel.replaceChildren(...opts.map(([v, t]) => el('option', { value: v }, t)));
+  }
+  sel.hidden = !tracks.length;
+  const a = tracks.find(t => t.active);
+  sel.value = a ? a.id : 'off';
+}
+
+function render(s) {
+  st = s;
+  const m = s.media;
+  $('pl').hidden = !m;
+  if (!m) return;
+  const playing = m.state == 'PLAYING' || m.state == 'BUFFERING';
+  $('title').textContent = s.now?.title || 'Chromecast';
+  $('st').textContent = (STATES[m.state] || m.state) + (m.duration ? ` · ${fmt(m.time)} / ${fmt(m.duration)}` : '');
+  $('tg').textContent = $('pp').textContent = playing ? '⏸' : '▶';
+  if (drag != 'pos') {
+    $('pos').max = m.duration || 1;
+    $('pos').value = m.time || 0;
+    $('cur').textContent = fmt(m.time);
+  }
+  $('dur').textContent = fmt(m.duration);
+  if (drag != 'vol' && s.volume != null) $('vol').value = Math.round(s.volume * 100);
+  $('mu').textContent = s.muted ? '🔇' : '🔊';
+  const tr = m.tracks || [];
+  fill($('audio'), tr.filter(t => t.type == 'AUDIO'), false);
+  fill($('subs'), tr.filter(t => t.type == 'TEXT'), true);
+}
+
+async function cmd(c, arg) {
+  if (c == 'toggle') c = st?.media?.state == 'PAUSED' ? 'resume' : 'pause';
+  if (c == 'mute' && st?.muted) c = 'unmute';
+  try {
+    render(await api('cmd', arg == null ? { c } : { c, arg: String(arg) }));
+  } catch (e) {
+    toast(e);
+  }
+}
+
+async function poll() {
+  if (busy || document.hidden) return;
+  busy = true;
+  try {
+    render(await api('status'));
+  } catch (e) {
+    toast(e);
+  }
+  busy = false;
+}
+
+$('f').onsubmit = e => {
+  e.preventDefault();
+  const q = $('q').value.trim();
+  if (q.length < 3) return toast('Минимум 3 символа');
+  $('q').blur();
+  search(q);
+};
+document.querySelectorAll('[data-c]').forEach(b => b.onclick = e => {
+  e.stopPropagation();
+  cmd(b.dataset.c, b.dataset.a);
+});
+$('bar').onclick = () => $('pl').classList.toggle('open');
+for (const id of ['pos', 'vol']) {
+  const r = $(id);
+  r.oninput = () => {
+    drag = id;
+    if (id == 'pos') $('cur').textContent = fmt(r.value);
+  };
+  r.onchange = () => {
+    drag = null;
+    cmd(id == 'pos' ? 'seek' : 'volume', r.value);
+  };
+}
+$('audio').onchange = e => cmd('audio', e.target.value);
+$('subs').onchange = e => cmd('subs', e.target.value);
+document.addEventListener('visibilitychange', poll);
+
+if (localStorage.q) search($('q').value = localStorage.q);
+poll();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>
