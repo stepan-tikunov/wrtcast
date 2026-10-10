@@ -23,10 +23,15 @@ make
 
 ## Docker
 
+Образ для amd64 и arm64 собирается GitHub Actions при каждом изменении
+`title-api/` в `master` и публикуется в GitHub Container Registry:
+
 ```sh
-docker build -t title-api .
-docker run -p 8080:8080 title-api
+docker run -p 8080:8080 ghcr.io/stepan-tikunov/wrtcast/title-api
 ```
+
+Теги: `latest` (последний `master`), `sha-<коммит>` и `<версия>` для тегов
+`v*`. Собрать локально: `docker build -t title-api .`
 
 [`compose.yaml`](compose.yaml) рассчитан на VPS, где сервис доступен только
 через WireGuard: HTTP-шлюз слушает WireGuard-адрес сервера, gRPC — только
@@ -35,7 +40,8 @@ loopback, наружу ничего не публикуется. Исходящ�
 же IP, с которого потом загружаются сегменты:
 
 ```sh
-WG_ADDR=10.0.0.1 EGRESS_PROXY=socks5://10.0.0.2:1080 docker compose up -d --build
+WG_ADDR=10.0.0.1 EGRESS_PROXY=socks5://10.0.0.2:1080 docker compose up -d
+docker compose pull && docker compose up -d     # обновление
 ```
 
 ## Идентификаторы

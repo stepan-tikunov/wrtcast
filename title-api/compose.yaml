@@ -8,10 +8,13 @@
 # the provider and its CDN see the home IP that later fetches the segments.
 # Leave it empty to go out directly from the server.
 #
-#   WG_ADDR=10.0.0.1 EGRESS_PROXY=socks5://10.0.0.2:1080 docker compose up -d --build
+# The image is built by GitHub Actions; add `build: .` to build it locally.
+#
+#   WG_ADDR=10.0.0.1 EGRESS_PROXY=socks5://10.0.0.2:1080 docker compose up -d
+#   docker compose pull && docker compose up -d     # update
 services:
   title-api:
-    build: .
+    image: ghcr.io/stepan-tikunov/wrtcast/title-api:latest
     network_mode: host
     restart: unless-stopped
     environment:

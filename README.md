@@ -72,7 +72,7 @@ Google Home, а телефону не надо оставаться включё
 ```sh
 cd title-api
 make && HTTP_ADDR=:8080 ./title-api
-# или: docker build -t title-api . && docker run -p 8080:8080 title-api
+# или готовый образ: docker run -p 8080:8080 ghcr.io/stepan-tikunov/wrtcast/title-api
 ```
 
 В [`title-api/compose.yaml`](title-api/compose.yaml) есть вариант для VPS:
