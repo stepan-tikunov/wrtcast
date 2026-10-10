@@ -132,6 +132,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .dev.on i{visibility:visible}
 #devlist .note{padding:24px}
 #srclist .dev:disabled{opacity:.45}
+#srclist .note{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px}
 .pick{display:flex;gap:6px}
 .pick select{flex:1;min-width:0}
 #styb{flex:none;width:46px;height:46px;border-radius:14px;background:var(--s2);font-weight:700;font-size:15px}
@@ -295,8 +296,7 @@ svg.spring{animation:spring .3s ease-out}
 </section>
 <section id="srcs" class="sheet" hidden>
   <div class="handle"></div>
-  <h2><span>Источник недоступен</span></h2>
-  <p class="note">Выберите другой:</p>
+  <h2><span id="srctitle"></span></h2>
   <div id="srclist"></div>
 </section>
 <section id="sty" class="sheet" hidden>
@@ -578,14 +578,14 @@ function renderEpisodes(force) {
       ...(generic ? [el('span', {}, `${e.episode} серия`)] : [el('b', {}, e.episode), el('span', {}, e.title)]),
       el('small', {}, on ? (pending ? 'запуск…' : 'на ТВ') : e.duration ? Math.round(e.duration / 60) + ' мин' : ''));
     b.style.setProperty('--i', i);
-    b.onclick = () => play({ id: m.id, title: m.title, poster: m.poster, season: sn, episode: e.episode });
+    b.onclick = () => start({ id: m.id, title: m.title, poster: m.poster, season: sn, episode: e.episode });
     return b;
   }));
 }
 
 $('dplay').onclick = () => {
   if (st?.media && st.now?.id == item.id) return openLayer('pl');
-  play(item);
+  start(item);
 };
 $('dback').onclick = closeTop;
 
@@ -618,15 +618,44 @@ async function play(m) {
     // Sources are resolved one at a time; when the chosen one is rejected,
     // offer the others instead of failing outright.
     const { source: bad, sources } = e.body || {};
-    if (sources?.some(n => n != bad)) chooseSource(m, bad, sources);
-    else toast('Не удалось запустить: ' + e.message);
+    if (sources?.some(n => n != bad)) {
+      openLayer('src');
+      showSources(m, sources, bad);
+    } else toast('Не удалось запустить: ' + e.message);
   }
 }
 
-function chooseSource(m, bad, sources) {
-  $('srclist').replaceChildren(...sources.map((n, i) => {
-    const b = el('button', { className: 'dev', disabled: n == bad },
-      el('span', {}, el('b', {}, n), n == bad ? el('small', {}, 'не открылся') : ''));
+// Starting from the details page asks for the source first. The router
+// remembers the list it shows, so playing costs no second provider request.
+async function start(m) {
+  if (pending) return;
+  $('srctitle').textContent = 'Откуда смотреть';
+  $('srclist').replaceChildren(el('p', { className: 'note' }, el('span', { className: 'spin' }), 'Ищу источники…'));
+  openLayer('src');
+  const q = new URLSearchParams({ id: m.id });
+  if (m.season != null) q.set('season', m.season), q.set('episode', m.episode);
+  let names;
+  try {
+    names = (await api(withDevice('streams?' + q))).streams.map(s => s.name);
+  } catch (e) {
+    if (layers.at(-1) == 'src') await closeTop();
+    return toast('Не удалось найти источники: ' + e.message);
+  }
+  if (layers.at(-1) != 'src') return; // closed while loading
+  if (names.length < 2) {
+    await closeTop();
+    return play(m);
+  }
+  showSources(m, names, null);
+}
+
+// bad: the source that just failed, if any.
+function showSources(m, names, bad) {
+  const pref = names.includes(localStorage.source) ? localStorage.source : names[0];
+  $('srctitle').textContent = bad ? 'Источник недоступен' : 'Откуда смотреть';
+  $('srclist').replaceChildren(...names.map((n, i) => {
+    const b = el('button', { className: 'dev' + (n == pref && !bad ? ' on' : ''), disabled: n == bad },
+      el('span', {}, el('b', {}, n), n == bad ? el('small', {}, 'не открылся') : ''), el('i'));
     b.style.setProperty('--i', i);
     b.onclick = async () => {
       await closeTop();
@@ -635,7 +664,6 @@ function chooseSource(m, bad, sources) {
     };
     return b;
   }));
-  openLayer('src');
 }
 
 // Plays the episode next to the current one (dir = 1 or -1), crossing

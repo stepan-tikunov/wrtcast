@@ -11,7 +11,7 @@ import { cursor } from 'uci';
 
 const STATE = '/tmp/wrtcast.now.';         // + host key; what /play started
 const SUBS = '/tmp/wrtcast.subs.';         // + host key; subtitle URLs for /sub
-const LIST = '/tmp/wrtcast.list.';         // + host key; streams of the last /play
+const LIST = '/tmp/wrtcast.list.';         // + host key; streams last asked for
 const DEVICES = '/tmp/wrtcast.devices.json'; // last discovery result
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const COMMANDS = {
@@ -261,6 +261,19 @@ function streams(id, season, episode) {
 			lang: t.language, forced: !!t.forced, url: t.playlistUrl,
 		})),
 	}));
+}
+
+// The streams of a title, remembered per TV for 10 minutes: the UI lists the
+// sources before playing and may retry with another, all from one provider
+// request.
+function title_streams(dev, id, season, episode) {
+	let f = LIST + state_key(dev), c = json(readfile(f) ?? 'null');
+	if (c?.streams && c.id == id && c.season == season &&
+	    c.episode == episode && time() - c.fetched < 600)
+		return c;
+	c = { id, season, episode, streams: streams(id, season, episode), fetched: time() };
+	writefile(f, sprintf('%J', c));
+	return c;
 }
 
 // Adds the device, the movie started via /play and human-readable track
@@ -544,7 +557,7 @@ const routes = {
 			season = +p.season;
 			episode = p.episode;
 		}
-		return { streams: streams(title_id(p), season, episode) };
+		return { streams: title_streams(device(p), title_id(p), season, episode).streams };
 	},
 
 	'GET /title': p => {
@@ -621,19 +634,9 @@ const routes = {
 			list = last.streams;
 			fetched = last.fetched;
 		} else {
-			// The list of the last title asked for, so trying another source
-			// after a failure doesn't ask the provider again.
-			let c = json(readfile(LIST + state_key(dev)) ?? 'null');
-			if (c?.streams && c.id == id && c.season == season &&
-			    c.episode == episode && time() - c.fetched < 600) {
-				list = c.streams;
-				fetched = c.fetched;
-			} else {
-				list = streams(id, season, episode);
-				fetched = time();
-				writefile(LIST + state_key(dev), sprintf('%J',
-					{ id, season, episode, streams: list, fetched }));
-			}
+			let c = title_streams(dev, id, season, episode);
+			list = c.streams;
+			fetched = c.fetched;
 		}
 		// The source is picked by name, so a preference survives episodes
 		// whose stream order differs; stream=<n> is the fallback.
