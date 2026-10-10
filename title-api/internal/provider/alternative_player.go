@@ -196,7 +196,14 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 	if err := json.Unmarshal(body, &playback); err != nil {
 		return nil, fmt.Errorf("decode playback: %w", err)
 	}
-	return c.alternativePlaybackStreams(ctx, client, playerURL, playback), nil
+	if len(playback.HLSSource) == 0 {
+		return nil, fmt.Errorf("playback has no HLS sources: %.200s", body)
+	}
+	streams := c.alternativePlaybackStreams(ctx, client, playerURL, playback)
+	if len(streams) == 0 {
+		return nil, fmt.Errorf("no variant of %d sources resolved", len(playback.HLSSource))
+	}
+	return streams, nil
 }
 
 func readAlternativeResponse(response *http.Response) ([]byte, error) {
