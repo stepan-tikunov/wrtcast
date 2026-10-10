@@ -20,11 +20,10 @@ var (
 var ErrInvalidSearchQuery = errors.New("invalid search query")
 
 type SearchResult struct {
-	TitleID         string
-	Title           string
-	Year            string
-	PosterURL       string
-	DurationSeconds uint64
+	TitleID   string
+	Title     string
+	Year      string
+	PosterURL string
 }
 
 func (c *Client) Search(ctx context.Context, query string) ([]SearchResult, error) {

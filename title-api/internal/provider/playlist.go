@@ -3,6 +3,7 @@ package provider
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -119,4 +120,57 @@ func resolveReference(base *url.URL, reference string) string {
 		return reference
 	}
 	return base.ResolveReference(target).String()
+}
+
+func mediaPlaylistDuration(body string) (uint64, bool) {
+	var total float64
+	found := false
+	scanner := bufio.NewScanner(strings.NewReader(body))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "#EXTINF:") {
+			continue
+		}
+		value := strings.TrimPrefix(line, "#EXTINF:")
+		if comma := strings.IndexByte(value, ','); comma >= 0 {
+			value = value[:comma]
+		}
+		duration, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		if err != nil || duration < 0 {
+			continue
+		}
+		total += duration
+		found = true
+	}
+	if !found {
+		return 0, false
+	}
+	return uint64(math.Round(total)), true
+}
+
+func firstVariantURL(playlistURL, body string) (string, bool) {
+	base, err := url.Parse(playlistURL)
+	if err != nil {
+		return "", false
+	}
+	wantsURI := false
+	scanner := bufio.NewScanner(strings.NewReader(body))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		switch {
+		case strings.HasPrefix(line, "#EXT-X-STREAM-INF:"):
+			wantsURI = true
+		case wantsURI && line != "" && !strings.HasPrefix(line, "#"):
+			reference, parseErr := url.Parse(line)
+			if parseErr != nil {
+				return "", false
+			}
+			resolved := base.ResolveReference(reference)
+			if resolved.RawQuery == "" {
+				resolved.RawQuery = base.RawQuery
+			}
+			return resolved.String(), true
+		}
+	}
+	return "", false
 }

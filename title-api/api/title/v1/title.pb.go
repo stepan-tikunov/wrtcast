@@ -524,14 +524,13 @@ func (x *MediaStream) GetSubtitles() []*MediaStream_SubtitleTrack {
 }
 
 type SearchTitlesQueryResponse_SearchResult struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	TitleId         string                 `protobuf:"bytes,1,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`
-	Title           string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Year            string                 `protobuf:"bytes,3,opt,name=year,proto3" json:"year,omitempty"`
-	PosterLink      string                 `protobuf:"bytes,4,opt,name=poster_link,json=posterLink,proto3" json:"poster_link,omitempty"`
-	DurationSeconds uint64                 `protobuf:"varint,5,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TitleId       string                 `protobuf:"bytes,1,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Year          string                 `protobuf:"bytes,3,opt,name=year,proto3" json:"year,omitempty"`
+	PosterLink    string                 `protobuf:"bytes,4,opt,name=poster_link,json=posterLink,proto3" json:"poster_link,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SearchTitlesQueryResponse_SearchResult) Reset() {
@@ -590,13 +589,6 @@ func (x *SearchTitlesQueryResponse_SearchResult) GetPosterLink() string {
 		return x.PosterLink
 	}
 	return ""
-}
-
-func (x *SearchTitlesQueryResponse_SearchResult) GetDurationSeconds() uint64 {
-	if x != nil {
-		return x.DurationSeconds
-	}
-	return 0
 }
 
 type GetTitleDetailsQueryResponse_Rating struct {
@@ -921,16 +913,15 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\n" +
 	"\x18api/title/v1/title.proto\x12\btitle.v1\x1a\x1cgoogle/api/annotations.proto\")\n" +
 	"\x11SearchTitlesQuery\x12\x14\n" +
-	"\x05query\x18\x01 \x01(\tR\x05query\"\x89\x02\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\"\xdd\x01\n" +
 	"\x19SearchTitlesQueryResponse\x12J\n" +
-	"\aresults\x18\x01 \x03(\v20.title.v1.SearchTitlesQueryResponse.SearchResultR\aresults\x1a\x9f\x01\n" +
+	"\aresults\x18\x01 \x03(\v20.title.v1.SearchTitlesQueryResponse.SearchResultR\aresults\x1at\n" +
 	"\fSearchResult\x12\x19\n" +
 	"\btitle_id\x18\x01 \x01(\tR\atitleId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
 	"\x04year\x18\x03 \x01(\tR\x04year\x12\x1f\n" +
 	"\vposter_link\x18\x04 \x01(\tR\n" +
-	"posterLink\x12)\n" +
-	"\x10duration_seconds\x18\x05 \x01(\x04R\x0fdurationSeconds\"\xaf\x01\n" +
+	"posterLink\"\xaf\x01\n" +
 	"\x17GetPlaybackStreamsQuery\x12\x19\n" +
 	"\btitle_id\x18\x01 \x01(\tR\atitleId\x12(\n" +
 	"\rseason_number\x18\x02 \x01(\x05H\x00R\fseasonNumber\x88\x01\x01\x12*\n" +

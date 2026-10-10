@@ -22,11 +22,10 @@ func (gatewayTestService) SearchTitles(
 ) (*titlev1.SearchTitlesQueryResponse, error) {
 	return &titlev1.SearchTitlesQueryResponse{
 		Results: []*titlev1.SearchTitlesQueryResponse_SearchResult{{
-			TitleId:         "67c18f3642185",
-			Title:           query.GetQuery(),
-			Year:            "2021",
-			PosterLink:      "https://cdn.example/poster.jpg",
-			DurationSeconds: 9360,
+			TitleId:    "67c18f3642185",
+			Title:      query.GetQuery(),
+			Year:       "2021",
+			PosterLink: "https://cdn.example/poster.jpg",
 		}},
 	}, nil
 }
@@ -111,16 +110,15 @@ func TestSearchTitlesHTTPAnnotation(t *testing.T) {
 
 	var body struct {
 		Results []struct {
-			TitleID         string `json:"titleId"`
-			Title           string `json:"title"`
-			DurationSeconds string `json:"durationSeconds"`
+			TitleID string `json:"titleId"`
+			Title   string `json:"title"`
 		} `json:"results"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
 	if len(body.Results) != 1 || body.Results[0].TitleID != "67c18f3642185" ||
-		body.Results[0].Title != "Дюна" || body.Results[0].DurationSeconds != "9360" {
+		body.Results[0].Title != "Дюна" {
 		t.Fatalf("unexpected response: %s", response.Body.String())
 	}
 }

@@ -29,3 +29,31 @@ video/v1.m3u8?token=three
 		t.Fatalf("unexpected subtitles: %+v", stream.Subtitles)
 	}
 }
+
+func TestMediaPlaylistDuration(t *testing.T) {
+	t.Parallel()
+	duration, ok := mediaPlaylistDuration(`#EXTM3U
+#EXT-X-TARGETDURATION:6
+#EXTINF:5.25,
+segment-1.ts
+#EXTINF:4.75,Title
+segment-2.ts
+`)
+	if !ok || duration != 10 {
+		t.Fatalf("mediaPlaylistDuration() = %d, %v; want 10, true", duration, ok)
+	}
+	if duration, ok := mediaPlaylistDuration("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nvideo.m3u8\n"); ok || duration != 0 {
+		t.Fatalf("master mediaPlaylistDuration() = %d, %v; want 0, false", duration, ok)
+	}
+}
+
+func TestFirstVariantURLPreservesMasterQuery(t *testing.T) {
+	t.Parallel()
+	variant, ok := firstVariantURL(
+		"https://cdn.example/path/master.m3u8?token=one&marker",
+		"#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nvideo/index.m3u8\n",
+	)
+	if !ok || variant != "https://cdn.example/path/video/index.m3u8?token=one&marker" {
+		t.Fatalf("firstVariantURL() = %q, %v", variant, ok)
+	}
+}

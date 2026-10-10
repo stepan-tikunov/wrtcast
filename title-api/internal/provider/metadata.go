@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	stdhtml "html"
+	"math"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -14,7 +16,7 @@ import (
 
 var ErrMediaTypeUnknown = errors.New("media type could not be determined")
 
-var titleDurationPattern = regexp.MustCompile(`(?s)["']?duration["']?\s*:\s*([0-9]+)`)
+var titleDurationPattern = regexp.MustCompile(`(?s)["']?duration["']?\s*:\s*["']?([0-9]+(?:\.[0-9]+)?)["']?`)
 
 type TitleMetadata struct {
 	TitleID         string
@@ -73,12 +75,15 @@ func (c *Client) mediaTypeFromEmbeds(
 		if containsSeriesPlaylist(embedHTML) {
 			return MediaTypeSeries, 0, nil
 		}
-		if hlsPattern.FindSubmatch(embedHTML) != nil {
+		hlsMatch := hlsPattern.FindSubmatch(embedHTML)
+		if len(hlsMatch) == 2 {
 			hasMovie = true
-			if match := titleDurationPattern.FindSubmatch(embedHTML); len(match) == 2 {
-				if duration, parseErr := strconv.ParseUint(string(match[1]), 10, 64); parseErr == nil {
-					durationSeconds = duration
-				}
+			duration := playerDuration(embedHTML)
+			if duration == 0 {
+				duration, _ = c.durationFromEmbedHLS(ctx, current, embedHTML, hlsMatch[1])
+			}
+			if duration > durationSeconds {
+				durationSeconds = duration
 			}
 		}
 	}
@@ -89,6 +94,63 @@ func (c *Client) mediaTypeFromEmbeds(
 		return MediaTypeUnspecified, 0, fmt.Errorf("inspect player embeds: %w", errors.Join(fetchErrors...))
 	}
 	return MediaTypeUnspecified, 0, ErrMediaTypeUnknown
+}
+
+func playerDuration(embedHTML []byte) uint64 {
+	match := titleDurationPattern.FindSubmatch(embedHTML)
+	if len(match) != 2 {
+		return 0
+	}
+	duration, err := strconv.ParseFloat(string(match[1]), 64)
+	if err != nil || duration <= 0 {
+		return 0
+	}
+	return uint64(math.Round(duration))
+}
+
+func (c *Client) durationFromEmbedHLS(
+	ctx context.Context,
+	current *session,
+	embedHTML []byte,
+	escapedHLSURL []byte,
+) (uint64, error) {
+	hlsURL, err := decodeJSString(string(escapedHLSURL))
+	if err != nil {
+		return 0, fmt.Errorf("decode duration HLS URL: %w", err)
+	}
+	marker, err := parseDynamicMarker(embedHTML)
+	if err != nil {
+		return 0, err
+	}
+	return c.hlsDuration(
+		ctx,
+		current,
+		appendDynamicMarker(stdhtml.UnescapeString(hlsURL), marker),
+		0,
+	)
+}
+
+func (c *Client) hlsDuration(
+	ctx context.Context,
+	current *session,
+	playlistURL string,
+	depth int,
+) (uint64, error) {
+	if depth > 2 {
+		return 0, errors.New("HLS duration playlist nesting is too deep")
+	}
+	body, _, err := c.get(ctx, current, playlistURL, "")
+	if err != nil {
+		return 0, fmt.Errorf("fetch HLS duration playlist: %w", err)
+	}
+	if duration, ok := mediaPlaylistDuration(string(body)); ok {
+		return duration, nil
+	}
+	variantURL, ok := firstVariantURL(playlistURL, string(body))
+	if !ok {
+		return 0, errors.New("HLS duration playlist has no media segments or variants")
+	}
+	return c.hlsDuration(ctx, current, variantURL, depth+1)
 }
 
 func parseTitleMetadata(body []byte, baseURL *url.URL) (TitleMetadata, error) {

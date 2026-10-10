@@ -43,11 +43,8 @@ curl --get --data-urlencode 'query=Дюна' \
   'http://localhost:8080/v1/search'
 ```
 
-Search results contain the title ID, title, year, absolute poster URL, and
-duration in seconds. Up to 30 results are returned by the provider's first
-search page. The provider does not include duration in search cards, so
-`durationSeconds` is `0` when it cannot be determined without fetching every
-title separately.
+Search results contain the title ID, title, year, and absolute poster URL. Up
+to 30 results are returned by the provider's first search page.
 
 Full title details, including the authoritative media type and a series season
 and episode catalog, are available through `GetTitleDetails`:
@@ -60,6 +57,11 @@ grpcurl -plaintext \
   localhost:50051 \
   title.v1.TitleService/GetTitleDetails
 ```
+
+For movies, `durationSeconds` is read from player metadata when available. If
+it is absent, the service follows the signed HLS master playlist and sums the
+selected media playlist's `#EXTINF` durations. Series expose duration per
+episode instead of a single total title duration.
 
 `GetPlaybackStreams` returns movie streams when only `title_id` is provided. For
 a series, pass `season_number` and `episode_number` to select the episode:

@@ -66,14 +66,22 @@ func TestRealTitleService(t *testing.T) {
 		t.Fatal("search returned no title IDs")
 	}
 
+	movieID := providerClient.ExternalTitleID("42185")
 	movie, err := client.GetPlaybackStreams(ctx, &titlev1.GetPlaybackStreamsQuery{
-		TitleId: providerClient.ExternalTitleID("42185"),
+		TitleId: movieID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(movie.GetStreams()) == 0 || movie.GetStreams()[0].GetMasterPlaylistUrl() == "" {
 		t.Fatal("movie has no playback streams")
+	}
+	movieDetails, err := client.GetTitleDetails(ctx, &titlev1.GetTitleDetailsQuery{TitleId: movieID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if movieDetails.GetDurationSeconds() == 0 {
+		t.Fatal("movie details have zero duration")
 	}
 
 	seriesID := providerClient.ExternalTitleID("20973")

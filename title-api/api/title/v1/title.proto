@@ -42,7 +42,6 @@ message SearchTitlesQueryResponse {
     string title = 2;
     string year = 3;
     string poster_link = 4;
-    uint64 duration_seconds = 5;
   }
 
   repeated SearchResult results = 1;

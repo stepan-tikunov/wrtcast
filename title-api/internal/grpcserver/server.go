@@ -42,11 +42,10 @@ func (s *Server) SearchTitles(
 	}
 	for _, result := range results {
 		response.Results = append(response.Results, &titlev1.SearchTitlesQueryResponse_SearchResult{
-			TitleId:         result.TitleID,
-			Title:           result.Title,
-			Year:            result.Year,
-			PosterLink:      result.PosterURL,
-			DurationSeconds: result.DurationSeconds,
+			TitleId:    result.TitleID,
+			Title:      result.Title,
+			Year:       result.Year,
+			PosterLink: result.PosterURL,
 		})
 	}
 	return response, nil

@@ -116,3 +116,67 @@ func TestParseTitleMetadataRequiresTitle(t *testing.T) {
 		t.Fatal("parseTitleMetadata() error = nil, want missing title error")
 	}
 }
+
+func TestClientTitleMetadataDurationFallbacks(t *testing.T) {
+	t.Parallel()
+
+	var serverURL string
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/":
+			_, _ = response.Write([]byte("ready"))
+		case "/index.php":
+			siteID := request.URL.Query().Get("newsid")
+			_, _ = response.Write([]byte(titlePage(serverURL, siteID, "Duration", "Duration", "2026", "США")))
+		case "/embed/movie/100":
+			_, _ = response.Write([]byte(`makePlayer({source:{hls:"https://cdn.example/quoted.m3u8",duration:"5400"}})`))
+		case "/embed/movie/101":
+			_, _ = fmt.Fprintf(response, `makePlayer({source:{hls:"%s/master.m3u8?token=base"}}); var lok=1,x="marker";`, serverURL)
+		case "/embed/movie/102":
+			_, _ = fmt.Fprintf(response, `makePlayer({source:{hls:"%s/direct.m3u8?token=base"}}); var lok=1,x="marker";`, serverURL)
+		case "/embed/movie/103":
+			_, _ = fmt.Fprintf(response, `makePlayer({source:{hls:"%s/missing.m3u8"}}); var lok=1,x="marker";`, serverURL)
+		case "/master.m3u8":
+			_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\nvideo.m3u8\n"))
+		case "/video.m3u8":
+			if request.URL.Query().Get("token") != "base" {
+				t.Errorf("variant lost master query: %s", request.URL.RawQuery)
+			}
+			_, _ = response.Write([]byte("#EXTM3U\n#EXTINF:5.25,\na.ts\n#EXTINF:4.75,\nb.ts\n"))
+		case "/direct.m3u8":
+			_, _ = response.Write([]byte("#EXTM3U\n#EXTINF:3.5,\na.ts\n#EXTINF:3.5,\nb.ts\n"))
+		default:
+			response.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	serverURL = server.URL
+
+	client, err := NewClient(Config{BaseURL: server.URL, RefreshInterval: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := client.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range []struct {
+		siteID   string
+		duration uint64
+	}{
+		{siteID: "100", duration: 5400},
+		{siteID: "101", duration: 10},
+		{siteID: "102", duration: 7},
+		{siteID: "103", duration: 0},
+	} {
+		metadata, metadataErr := client.TitleMetadata(ctx, client.ExternalTitleID(test.siteID))
+		if metadataErr != nil {
+			t.Fatalf("TitleMetadata(%s): %v", test.siteID, metadataErr)
+		}
+		if metadata.DurationSeconds != test.duration {
+			t.Fatalf("TitleMetadata(%s) duration = %d, want %d", test.siteID, metadata.DurationSeconds, test.duration)
+		}
+	}
+}

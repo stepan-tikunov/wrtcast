@@ -155,11 +155,7 @@ func (c *Client) streamFromHLS(
 	audioNames []string,
 	subtitles []SubtitleTrack,
 ) (MovieStream, error) {
-	separator := "?"
-	if strings.Contains(hlsURL, "?") {
-		separator = "&"
-	}
-	masterURL := hlsURL + separator + marker
+	masterURL := appendDynamicMarker(hlsURL, marker)
 
 	masterBody, _, err := c.get(ctx, current, masterURL, "")
 	if err != nil {
@@ -169,6 +165,14 @@ func (c *Client) streamFromHLS(
 		return MovieStream{}, errors.New("HLS master response is not an m3u8 playlist")
 	}
 	return parseMaster(masterURL, string(masterBody), audioNames, subtitles)
+}
+
+func appendDynamicMarker(hlsURL, marker string) string {
+	separator := "?"
+	if strings.Contains(hlsURL, "?") {
+		separator = "&"
+	}
+	return hlsURL + separator + marker
 }
 
 func parseDynamicMarker(embedHTML []byte) (string, error) {
