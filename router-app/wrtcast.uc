@@ -565,7 +565,7 @@ const routes = {
 
 	// play also switches the quality or the source of what is on: with
 	// reuse=1 it takes the streams from the last play of the same title if
-	// they are still fresh (title-api keeps synthetic masters for 10 min),
+	// they are still fresh (title-api keeps synthetic masters for 6 hours),
 	// and start/audio/subs restore the position and tracks.
 	'POST /play': p => {
 		let id = title_id(p), season = null, episode = null;
@@ -592,7 +592,7 @@ const routes = {
 		let list, fetched;
 		if (p.reuse == '1' && last?.streams && last.id == id &&
 		    last.season == season && last.episode == episode &&
-		    time() - last.fetched < 480) {
+		    time() - last.fetched < 19800) {
 			list = last.streams;
 			fetched = last.fetched;
 		} else {

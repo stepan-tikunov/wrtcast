@@ -88,7 +88,7 @@ func NewClient(config Config) (*Client, error) {
 		httpTimeout:     config.HTTPTimeout,
 		userAgent:       config.UserAgent,
 		mediaBaseURL:    strings.TrimRight(mediaBaseURL.String(), "/"),
-		masters:         newMasterStore(10*time.Minute, 256),
+		masters:         newMasterStore(6*time.Hour, 4096),
 	}, nil
 }
 
