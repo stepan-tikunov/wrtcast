@@ -243,6 +243,7 @@ svg.spring{animation:spring .3s ease-out}
     </div>
     <div class="row"><button class="ib" data-c="mute" id="mu" aria-label="Звук"><svg><use href="#i-vol"/></svg></button><input type="range" id="vol" min="0" max="100" step="5" aria-label="Громкость"></div>
     <div class="row"><div class="sel"><label for="audio">Озвучка</label><select id="audio"></select></div><div class="sel"><label for="subs">Субтитры</label><div class="pick"><select id="subs"></select><button class="ib" id="styb" aria-label="Вид субтитров">Aa</button></div></div></div>
+    <div class="row" id="qrow"><div class="sel"><label for="quality">Качество</label><select id="quality"></select></div></div>
     <div class="row" id="eprow"><button class="pill" id="eplist"><svg><use href="#i-list"/></svg>Серии</button></div>
     <button id="stop" data-c="stop">Остановить</button>
     <button id="devname"><svg><use href="#i-tv"/></svg><span></span></button>
@@ -551,6 +552,11 @@ async function play(m) {
   if (pending) return;
   const req = { id: m.id, title: m.title };
   if (m.poster) req.poster = m.poster;
+  // Quality switches replay the same stream from the current position.
+  for (const k of ['stream', 'start', 'audio', 'subs', 'reuse'])
+    if (m[k] != null) req[k] = String(m[k]);
+  const quality = m.quality ?? localStorage.quality;
+  if (quality) req.quality = quality;
   req.style = styleSpec(subStyle || {}); // the receiver resets it on every load
   if (m.season != null) Object.assign(req, { season: String(m.season), episode: m.episode });
   pending = req;
@@ -673,6 +679,15 @@ function render(s) {
   const tr = m.tracks || [];
   fill($('audio'), tr.filter(t => t.type == 'AUDIO'), false);
   fill($('subs'), tr.filter(t => t.type == 'TEXT'), true);
+  // Variants come from the master playlist; the BFF trims it to the chosen one.
+  const qs = s.now?.qualities || [];
+  $('qrow').hidden = qs.length < 2;
+  const qopts = [...qs.map(q => [q, q]), ['auto', 'Авто']];
+  if ($('quality').dataset.key != JSON.stringify(qopts)) {
+    $('quality').dataset.key = JSON.stringify(qopts);
+    $('quality').replaceChildren(...qopts.map(([v, t]) => el('option', { value: v }, t)));
+  }
+  $('quality').value = s.now?.quality || 'auto';
 }
 
 async function cmd(c, arg) {
@@ -848,6 +863,17 @@ for (const id of ['pos', 'vol']) {
 }
 $('audio').onchange = e => cmd('audio', e.target.value);
 $('subs').onchange = e => cmd('subs', e.target.value);
+$('quality').onchange = e => {
+  const n = st?.now, m = st?.media;
+  if (!n || !m) return;
+  localStorage.quality = e.target.value;
+  const active = type => m.tracks?.find(t => t.type == type && t.active)?.name;
+  let t = m.time || 0;
+  if (m.state == 'PLAYING') t += (Date.now() - statusAt) / 1000;
+  play({ id: n.id, title: n.title, poster: n.poster, season: n.season, episode: n.episode,
+    stream: n.stream, quality: e.target.value, start: t.toFixed(1), reuse: 1,
+    audio: active('AUDIO'), subs: active('TEXT') || 'off' });
+};
 $('eplist').onclick = async () => {
   const n = st?.now;
   if (!n) return;

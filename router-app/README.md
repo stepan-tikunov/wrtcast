@@ -59,6 +59,11 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
   (`substyle`), когда ползунок отпускают, хранится в `localStorage` и
   передаётся с каждым `play`. Шрифт передаётся всегда, по умолчанию обычный:
   у ресивера по умолчанию моноширинный.
+- Селект «Качество» показывает варианты из master-плейлиста и «Авто». Смена
+  качества перезапускает поток с текущей позиции с теми же озвучкой и
+  субтитрами (пауза в несколько секунд). Выбор запоминается и применяется к
+  следующим запускам; по умолчанию — лучшее качество, потому что сам ресивер,
+  меряя скорость через прокси, часто выбирает худшее.
 - Кнопка «назад» на телефоне закрывает плеер и страницу тайтла.
 - Пауза переключается мгновенно. Статус запрашивается каждые 2 с, пока
   вкладка видна, а позиция между запросами досчитывается, поэтому таймер
@@ -90,10 +95,10 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
 | `GET /api/search?q=` | `{results:[{id,title,year,poster}]}`, `q` — не меньше 3 символов |
 | `GET /api/streams?id=` | `{streams:[{index,url,audio:[{id,name,lang,default}],subs:[{id,name,lang,forced}]}]}` |
 | `GET /api/title?id=` | `{id,title,original,year,description,poster,type,quality,countries,genres,directors,actors,ratings:[{source,value}],duration,seasons}`; `type` — `movie` или `series`, `seasons` (`[{season,episodes:[{episode,title,duration}]}]`) у фильмов `null`; разделы сайта и годы из `genres` убираются |
-| `POST /api/play` `id`, `stream`=0, `title`?, `poster`?, `season`+`episode`?, `style`? | получает свежие потоки фильма (или серии, если переданы `season`/`episode`), запускает `castctl play`, возвращает статус. Субтитры title-api — отдельные WebVTT-файлы вне HLS-манифеста, поэтому они передаются ТВ в `LOAD` (`castctl play -s`) через прокси и выключены, пока их не выберут. `style` — вид субтитров, ТВ сбрасывает его при каждом запуске |
+| `POST /api/play` `id`, `stream`=0, `title`?, `poster`?, `season`+`episode`?, `style`?, `quality`?, `start`?, `audio`?, `subs`?, `reuse`? | получает свежие потоки фильма (или серии, если переданы `season`/`episode`), запускает `castctl play`, возвращает статус. Субтитры title-api — отдельные WebVTT-файлы вне HLS-манифеста, поэтому они передаются ТВ в `LOAD` (`castctl play -s`) через прокси и выключены, пока их не выберут. `style` — вид субтитров, ТВ сбрасывает его при каждом запуске. `quality` — `720p`, `360p`… или `auto`; без него берётся лучшее качество из master-плейлиста, недоступное заменяется ближайшим ниже. `start`, `audio`, `subs` восстанавливают позицию и дорожки, а `reuse=1` берёт поток из прошлого `play` того же тайтла без запроса к title-api — так UI переключает качество |
 | `POST /api/cmd` `c`, `arg`? | `pause resume stop quit mute unmute` · `seek ff rew volume` (число) · `audio subs` (id/язык/название/`off`) · `substyle` (`size=…,bg=#RRGGBBAA`, формат `castctl substyle`) |
 | `GET /api/devices` `refresh`? | `{devices:[{id,name,model,host,port}],default}`: `castctl discover`, кэш на 60 с, если не передан `refresh=1`; `default` — id устройства из `cast_host` |
-| `GET /api/status` | `castctl status`; если поток запущен через `/api/play`, добавляет `now:{id,stream,title,poster,season,episode}` и к каждой дорожке `label` из title-api; всегда добавляет `device:{id,name}` |
+| `GET /api/status` | `castctl status`; если поток запущен через `/api/play`, добавляет `now:{id,stream,title,poster,season,episode,quality,qualities}` и к каждой дорожке `label` из title-api; всегда добавляет `device:{id,name}` |
 | `GET /api/p/<name>?u=<url>` | медиапрокси, см. ниже |
 
 Параметры POST можно передавать в query string, как форму или как JSON.
@@ -131,6 +136,8 @@ curl "$B/status?device=0123456789abcdef0123456789abcdef"
   обратно в `/api/p/<имя файла>`, поэтому вложенные плейлисты, сегменты, ключи
   и субтитры тоже идут через прокси. `<name>` сохраняет исходное имя файла,
   чтобы ресивер мог определить формат сегмента по расширению.
+- С `&q=<ширина>` в master-плейлисте остаются только варианты этой ширины
+  (выбор качества).
 - Ресивер переключает озвучку по языку, поэтому из нескольких озвучек на
   одном языке доступна была бы только первая. В master-плейлисте таким
   дорожкам добавляется подтег из `NAME` (`ru` → `ru-x-rus1`), в статусе он
