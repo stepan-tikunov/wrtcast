@@ -1,0 +1,3 @@
+/movie-api/**
+!/movie-api/**/
+!/movie-api/**/*.proto
