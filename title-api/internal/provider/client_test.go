@@ -98,7 +98,8 @@ video-2.m3u8
 	if err != nil {
 		t.Fatalf("Streams() before refresh: %v", err)
 	}
-	if len(streams) != 2 || streams[0].AudioTracks[0].Name != "Dub" ||
+	if len(streams) != 2 || streams[0].Name != "Основной плеер 1" ||
+		streams[1].Name != "Основной плеер 2" || streams[0].AudioTracks[0].Name != "Dub" ||
 		len(streams[0].Subtitles) != 1 || streams[0].Subtitles[0].Language != "ru" ||
 		streams[1].AudioTracks[0].Language != "en" {
 		t.Fatalf("unexpected streams: %+v", streams)

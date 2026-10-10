@@ -232,6 +232,7 @@ func (c *Client) alternativePlaybackStreams(
 			}
 			id := c.masters.put(master)
 			streams[index] = MovieStream{
+				Name:              strings.TrimSpace(source.Label),
 				MasterPlaylistURL: c.mediaBaseURL + "/v1/media/" + id + "/master.m3u8",
 				AudioTracks:       []AudioTrack{{ID: "alternative", Name: strings.TrimSpace(source.Label), Language: languageFromLabel(source.Label), Default: true}},
 				Subtitles:         subtitles,

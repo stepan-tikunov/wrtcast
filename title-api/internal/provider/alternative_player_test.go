@@ -94,7 +94,8 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 
 	playerURL, _ := url.Parse("https://player.example/")
 	streams := client.alternativePlaybackStreams(context.Background(), server.Client(), playerURL, playback)
-	if len(streams) != 1 || streams[0].AudioTracks[0].Name != "(Russian) Dub" ||
+	if len(streams) != 1 || streams[0].Name != "(Russian) Dub" ||
+		streams[0].AudioTracks[0].Name != "(Russian) Dub" ||
 		streams[0].AudioTracks[0].Language != "ru" || len(streams[0].Subtitles) != 1 ||
 		len(streams[0].ProxyHeaders) != 1 || streams[0].ProxyHeaders[0].Name != "Origin" ||
 		streams[0].ProxyHeaders[0].Value != "https://player.example" {

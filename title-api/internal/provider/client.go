@@ -22,6 +22,7 @@ var (
 )
 
 type MovieStream struct {
+	Name              string
 	MasterPlaylistURL string
 	AudioTracks       []AudioTrack
 	Subtitles         []SubtitleTrack
@@ -63,7 +64,7 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 	streams := make([]MovieStream, 0, len(embedURLs))
 	streamErrors := make([]error, 0)
 	seriesEmbeds := 0
-	for _, embedURL := range embedURLs {
+	for index, embedURL := range embedURLs {
 		stream, streamErr := c.streamFromEmbed(ctx, current, embedURL)
 		if errors.Is(streamErr, ErrNotMovie) {
 			seriesEmbeds++
@@ -73,6 +74,7 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 			streamErrors = append(streamErrors, fmt.Errorf("%s: %w", embedURL, streamErr))
 			continue
 		}
+		stream.Name = primaryStreamName(index, len(embedURLs))
 		streams = append(streams, stream)
 	}
 	for _, playerURL := range alternativePlayerURLs(movieHTML, c.baseURL.Scheme) {
@@ -90,6 +92,13 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 		return nil, fmt.Errorf("no playable embed found: %w", errors.Join(streamErrors...))
 	}
 	return streams, nil
+}
+
+func primaryStreamName(index, total int) string {
+	if total <= 1 {
+		return "Основной плеер"
+	}
+	return fmt.Sprintf("Основной плеер %d", index+1)
 }
 
 func (c *Client) movieEmbeds(ctx context.Context, externalMovieID string) (*session, []string, error) {

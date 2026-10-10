@@ -121,4 +121,5 @@ message MediaStream {
   repeated AudioTrack audio_tracks = 2;
   repeated SubtitleTrack subtitles = 3;
   repeated ProxyHeader proxy_headers = 4;
+  string name = 5;
 }

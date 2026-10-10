@@ -137,7 +137,7 @@ func (c *Client) EpisodeStreams(
 	streamErrors := make([]error, 0)
 	seriesEmbeds := 0
 	episodeFound := false
-	for _, embedURL := range embedURLs {
+	for index, embedURL := range embedURLs {
 		embedHTML, _, fetchErr := c.get(ctx, current, embedURL, c.baseURL.String()+"/")
 		if fetchErr != nil {
 			streamErrors = append(streamErrors, fmt.Errorf("%s: fetch embed: %w", embedURL, fetchErr))
@@ -178,6 +178,7 @@ func (c *Client) EpisodeStreams(
 			streamErrors = append(streamErrors, fmt.Errorf("%s: %w", embedURL, streamErr))
 			continue
 		}
+		stream.Name = primaryStreamName(index, len(embedURLs))
 		streams = append(streams, stream)
 	}
 	for _, playerURL := range alternativePlayerURLs(movieHTML, c.baseURL.Scheme) {

@@ -130,10 +130,12 @@ func TestTitleServicePlaybackAndDetails(t *testing.T) {
 func TestMediaStreamsMapsProxyHeaders(t *testing.T) {
 	t.Parallel()
 	streams := mediaStreams([]provider.MovieStream{{
+		Name:              "Русский дубляж",
 		MasterPlaylistURL: "https://api.example/master.m3u8",
 		ProxyHeaders:      []provider.ProxyHeader{{Name: "Origin", Value: "https://player.example"}},
 	}})
-	if len(streams) != 1 || len(streams[0].GetProxyHeaders()) != 1 ||
+	if len(streams) != 1 || streams[0].GetName() != "Русский дубляж" ||
+		len(streams[0].GetProxyHeaders()) != 1 ||
 		streams[0].GetProxyHeaders()[0].GetName() != "Origin" ||
 		streams[0].GetProxyHeaders()[0].GetValue() != "https://player.example" {
 		t.Fatalf("unexpected streams: %+v", streams)

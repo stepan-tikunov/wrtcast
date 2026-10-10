@@ -189,6 +189,7 @@ func mediaStreams(streams []provider.MovieStream) []*titlev1.MediaStream {
 	response := make([]*titlev1.MediaStream, 0, len(streams))
 	for _, stream := range streams {
 		mediaStream := &titlev1.MediaStream{
+			Name:              stream.Name,
 			MasterPlaylistUrl: stream.MasterPlaylistURL,
 			ProxyHeaders: make(
 				[]*titlev1.MediaStream_ProxyHeader,

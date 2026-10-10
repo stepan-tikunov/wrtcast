@@ -469,6 +469,7 @@ type MediaStream struct {
 	AudioTracks       []*MediaStream_AudioTrack    `protobuf:"bytes,2,rep,name=audio_tracks,json=audioTracks,proto3" json:"audio_tracks,omitempty"`
 	Subtitles         []*MediaStream_SubtitleTrack `protobuf:"bytes,3,rep,name=subtitles,proto3" json:"subtitles,omitempty"`
 	ProxyHeaders      []*MediaStream_ProxyHeader   `protobuf:"bytes,4,rep,name=proxy_headers,json=proxyHeaders,proto3" json:"proxy_headers,omitempty"`
+	Name              string                       `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -529,6 +530,13 @@ func (x *MediaStream) GetProxyHeaders() []*MediaStream_ProxyHeader {
 		return x.ProxyHeaders
 	}
 	return nil
+}
+
+func (x *MediaStream) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
 }
 
 type SearchTitlesQueryResponse_SearchResult struct {
@@ -1020,12 +1028,13 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\aEpisode\x12%\n" +
 	"\x0eepisode_number\x18\x01 \x01(\tR\repisodeNumber\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12)\n" +
-	"\x10duration_seconds\x18\x03 \x01(\x04R\x0fdurationSeconds\"\xdf\x04\n" +
+	"\x10duration_seconds\x18\x03 \x01(\x04R\x0fdurationSeconds\"\xf3\x04\n" +
 	"\vMediaStream\x12.\n" +
 	"\x13master_playlist_url\x18\x01 \x01(\tR\x11masterPlaylistUrl\x12C\n" +
 	"\faudio_tracks\x18\x02 \x03(\v2 .title.v1.MediaStream.AudioTrackR\vaudioTracks\x12A\n" +
 	"\tsubtitles\x18\x03 \x03(\v2#.title.v1.MediaStream.SubtitleTrackR\tsubtitles\x12F\n" +
-	"\rproxy_headers\x18\x04 \x03(\v2!.title.v1.MediaStream.ProxyHeaderR\fproxyHeaders\x1a7\n" +
+	"\rproxy_headers\x18\x04 \x03(\v2!.title.v1.MediaStream.ProxyHeaderR\fproxyHeaders\x12\x12\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\x1a7\n" +
 	"\vProxyHeader\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\x1a\x89\x01\n" +
