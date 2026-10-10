@@ -18,9 +18,23 @@ header{position:sticky;top:0;z-index:2;padding:10px 12px;padding-top:max(10px,en
 .card img,.card i{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:10px;background:#262626}
 .card b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:6px;font-size:14px;font-weight:500}
 .card span{color:#888;font-size:13px}
-#msg{padding:24px 12px;color:#888;text-align:center}
+.card{position:relative}
+.card em{position:absolute;top:6px;left:6px;padding:2px 7px;border-radius:6px;background:#000b;color:#ddd;font:500 11px system-ui;font-style:normal}
+#ser{position:fixed;inset:0;z-index:4;overflow-y:auto;padding:0 12px 200px;background:#121212}
+#ser header{display:flex;align-items:center;gap:10px;margin:0 -12px;padding-left:4px}
+#ser h2{flex:1;margin:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:18px}
+#ser .btn{background:none;font-size:22px}
+#seasons{display:flex;gap:8px;overflow-x:auto;padding:4px 0 12px;scrollbar-width:none}
+.chip{flex:none;height:38px;padding:0 16px;border:0;border-radius:19px;background:#262626}
+.chip.on{background:#e8e8e8;color:#111}
+.ep{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 4px;border:0;border-bottom:1px solid #222;background:none;text-align:left}
+.ep b{width:32px;color:#888;font-weight:500;text-align:right}
+.ep span{flex:1}
+.ep small{color:#888}
+.ep.on,.ep.on b{color:#8ab4f8}
+#msg,.note{padding:24px 12px;color:#888;text-align:center}
 #msg:empty{display:none}
-#pl{position:fixed;left:0;right:0;bottom:0;z-index:3;padding:0 16px max(12px,env(safe-area-inset-bottom));background:#1e1e1e;border-radius:18px 18px 0 0;box-shadow:0 -4px 24px #000a}
+#pl{position:fixed;left:0;right:0;bottom:0;z-index:5;padding:0 16px max(12px,env(safe-area-inset-bottom));background:#1e1e1e;border-radius:18px 18px 0 0;box-shadow:0 -4px 24px #000a}
 #bar{display:flex;align-items:center;gap:12px;min-height:64px}
 #bar div{flex:1;min-width:0}
 #title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
@@ -38,10 +52,15 @@ select{flex:1;min-width:0;height:46px;padding:0 10px;border:0;border-radius:12px
 </style>
 </head>
 <body>
-<header><form id="f"><input id="q" type="search" placeholder="Поиск фильма" enterkeyhint="search" autocomplete="off"></form></header>
+<header><form id="f"><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"></form></header>
 <main id="grid"></main>
-<p id="msg">Найдите фильм и нажмите на него, чтобы запустить на ТВ</p>
+<p id="msg">Найдите фильм или сериал и нажмите на него, чтобы запустить на ТВ</p>
 <div id="toast"></div>
+<section id="ser" hidden>
+  <header><button class="btn" id="back">←</button><h2 id="stitle"></h2></header>
+  <div id="seasons"></div>
+  <div id="eps"></div>
+</section>
 <section id="pl" hidden>
   <div id="bar"><div><b id="title"></b><span id="st"></span></div><button class="btn" id="tg" data-c="toggle">▶</button></div>
   <div id="full">
@@ -56,6 +75,7 @@ select{flex:1;min-width:0;height:46px;padding:0 10px;border:0;border-radius:12px
     </div>
     <div class="row"><button class="btn" data-c="mute" id="mu">🔊</button><input type="range" id="vol" min="0" max="100" step="5"></div>
     <div class="row"><select id="audio"></select><select id="subs"></select></div>
+    <div class="row" id="eprow"><button class="btn" id="eplist" style="flex:1">Серии</button><button class="btn" id="next" style="flex:1">Следующая ⏭</button></div>
     <div class="row"><button class="btn" data-c="stop" style="flex:1">Остановить</button></div>
   </div>
 </section>
@@ -63,6 +83,8 @@ select{flex:1;min-width:0;height:46px;padding:0 10px;border:0;border-radius:12px
 const $ = id => document.getElementById(id);
 const STATES = { PLAYING: 'Играет', PAUSED: 'Пауза', BUFFERING: 'Загрузка…', IDLE: 'Остановлено' };
 let token = localStorage.token || '', st = null, drag = null, busy = false, toastTimer;
+let series = null, season = null;
+const catalogs = {};
 
 async function api(path, body) {
   const o = { headers: {} };
@@ -108,14 +130,15 @@ async function search(q) {
     const { results } = await api('search?q=' + encodeURIComponent(q));
     $('msg').textContent = results.length ? '' : 'Ничего не найдено';
     $('grid').replaceChildren(...results.map(m => {
-      // Posters sit behind the provider's anti-bot page and often fail to load.
+      // Placeholder for movies without a poster or when it fails to load.
       const ph = () => el('i', {}, (m.title || '?')[0]);
       const img = m.poster
         ? el('img', { src: m.poster, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer' })
         : ph();
       img.onerror = () => img.replaceWith(ph());
       const b = el('button', { className: 'card' }, img, el('b', {}, m.title), el('span', {}, m.year));
-      b.onclick = () => play(m);
+      if (m.type == 'series') b.append(el('em', {}, 'Сериал'));
+      b.onclick = () => m.type == 'series' ? openSeries(m) : play(m);
       return b;
     }));
   } catch (e) {
@@ -124,13 +147,96 @@ async function search(q) {
   }
 }
 
+// m: { id, title } plus season and episode for a series episode.
 async function play(m) {
-  render({ media: { state: 'BUFFERING' }, now: { title: m.title } });
+  const req = { id: m.id, title: m.title };
+  if (m.season != null) Object.assign(req, { season: String(m.season), episode: m.episode });
+  render({ media: { state: 'BUFFERING' }, now: req });
   try {
-    render(await api('play', { id: m.id, title: m.title }));
+    render(await api('play', req));
   } catch (e) {
     toast(e);
     poll();
+  }
+}
+
+async function catalog(id) {
+  return catalogs[id] ??= (await api('series?id=' + encodeURIComponent(id))).seasons;
+}
+
+async function openSeries(m) {
+  if ($('ser').hidden) history.pushState({ ser: 1 }, '');
+  series = { id: m.id, title: m.title, seasons: null };
+  $('stitle').textContent = m.title;
+  $('seasons').replaceChildren();
+  $('eps').replaceChildren(el('p', { className: 'note' }, 'Загружаю серии…'));
+  $('ser').hidden = false;
+  try {
+    series.seasons = await catalog(m.id);
+  } catch (e) {
+    $('eps').replaceChildren();
+    return toast(e);
+  }
+  const now = st?.now?.id == m.id ? st.now : null;
+  showSeason(series.seasons.find(s => s.season == now?.season) || series.seasons[0]);
+}
+
+function closeSeries() {
+  $('ser').hidden = true;
+  series = null;
+}
+
+function showSeason(s) {
+  season = s;
+  if (!s) return $('eps').replaceChildren(el('p', { className: 'note' }, 'Серий нет'));
+  $('seasons').replaceChildren(...series.seasons.map(x => {
+    const c = el('button', { className: 'chip' + (x == s ? ' on' : '') }, `${x.season} сезон`);
+    c.onclick = () => showSeason(x);
+    return c;
+  }));
+  $('seasons').querySelector('.on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  renderEpisodes(true);
+}
+
+// Called on every status poll; rebuilds the list only when the highlighted
+// episode changes so a tap in progress isn't lost.
+function renderEpisodes(force) {
+  if (!series?.seasons || !season) return;
+  const now = st?.now;
+  const key = `${series.id}|${season.season}|${now?.id}|${now?.season}|${now?.episode}`;
+  if (!force && $('eps').dataset.key == key) return;
+  $('eps').dataset.key = key;
+  const { id, title } = series, sn = season.season;
+  $('eps').replaceChildren(...season.episodes.map(e => {
+    const on = now?.id == series.id && now.season == season.season && now.episode == e.episode;
+    // Provider titles are usually just "<series> (N сезон) - M серия".
+    const generic = !e.title || /серия\s*$/i.test(e.title);
+    const b = el('button', { className: 'ep' + (on ? ' on' : '') },
+      ...(generic ? [el('span', {}, `${e.episode} серия`)] : [el('b', {}, e.episode), el('span', {}, e.title)]),
+      el('small', {}, e.duration ? Math.round(e.duration / 60) + ' мин' : ''));
+    b.onclick = () => {
+      history.back();
+      play({ id, title, season: sn, episode: e.episode });
+    };
+    return b;
+  }));
+}
+
+// Next episode of the series that is playing now, crossing into the next season.
+async function nextEpisode() {
+  const now = st?.now;
+  if (!now?.season) return;
+  try {
+    const seasons = await catalog(now.id);
+    const si = seasons.findIndex(s => s.season == now.season);
+    const eps = seasons[si]?.episodes || [];
+    const ei = eps.findIndex(e => e.episode == now.episode);
+    let s = seasons[si], e = eps[ei + 1];
+    if (!e) e = (s = seasons[si + 1])?.episodes[0];
+    if (!e) return toast('Это последняя серия');
+    play({ id: now.id, title: now.title, season: s.season, episode: e.episode });
+  } catch (e) {
+    toast(e);
   }
 }
 
@@ -155,7 +261,9 @@ function render(s) {
   $('pl').hidden = !m;
   if (!m) return;
   const playing = m.state == 'PLAYING' || m.state == 'BUFFERING';
-  $('title').textContent = s.now?.title || 'Chromecast';
+  const n = s.now;
+  $('title').textContent = n?.title ? n.title + (n.season != null ? ` · ${n.season}×${n.episode}` : '') : 'Chromecast';
+  $('eprow').hidden = n?.season == null;
   $('st').textContent = (STATES[m.state] || m.state) + (m.duration ? ` · ${fmt(m.time)} / ${fmt(m.duration)}` : '');
   $('tg').textContent = $('pp').textContent = playing ? '⏸' : '▶';
   if (drag != 'pos') {
@@ -169,6 +277,7 @@ function render(s) {
   const tr = m.tracks || [];
   fill($('audio'), tr.filter(t => t.type == 'AUDIO'), false);
   fill($('subs'), tr.filter(t => t.type == 'TEXT'), true);
+  if (series && n?.id == series.id) renderEpisodes();
 }
 
 async function cmd(c, arg) {
@@ -215,6 +324,10 @@ for (const id of ['pos', 'vol']) {
     cmd(id == 'pos' ? 'seek' : 'volume', r.value);
   };
 }
+$('back').onclick = () => history.back();
+window.onpopstate = closeSeries;
+$('eplist').onclick = () => st?.now && openSeries(st.now);
+$('next').onclick = nextEpisode;
 $('audio').onchange = e => cmd('audio', e.target.value);
 $('subs').onchange = e => cmd('subs', e.target.value);
 document.addEventListener('visibilitychange', poll);

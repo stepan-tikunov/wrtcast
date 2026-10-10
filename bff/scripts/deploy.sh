@@ -20,10 +20,11 @@ if [ "$(uci -q get uhttpd.cast)" != uhttpd ]; then
 	uci set uhttpd.cast.cgi_prefix='/cgi-bin'
 	uci add_list uhttpd.cast.alias='/api=/cgi-bin/castbff'
 	uci set uhttpd.cast.rfc1918_filter='1'
-	uci set uhttpd.cast.max_requests='6'
-	uci set uhttpd.cast.script_timeout='30'
-	uci commit uhttpd
 fi
+# The receiver fetches audio and video segments in parallel with UI polling.
+uci set uhttpd.cast.max_requests='10'
+uci set uhttpd.cast.script_timeout='60'
+uci commit uhttpd
 /etc/init.d/uhttpd reload
 REMOTE
 echo "deployed: http://${ROUTER#*@}:8088/api/status"
