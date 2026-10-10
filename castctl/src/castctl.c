@@ -17,6 +17,13 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <time.h>
+#include <poll.h>
+#include <netdb.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 
 #include <mbedtls/version.h>
 #include <mbedtls/net_sockets.h>
@@ -32,6 +39,8 @@
 #define LOAD_TIMEOUT_S 20 /* how long play waits for playback to start */
 #define MAX_MSG (64 * 1024)
 #define MAX_TRACKS 32
+#define MAX_DEVICES 32
+#define DISCOVER_MS 2000 /* default mDNS listening window */
 
 #define NS_CONN     "urn:x-cast:com.google.cast.tp.connection"
 #define NS_HEART    "urn:x-cast:com.google.cast.tp.heartbeat"
@@ -703,14 +712,341 @@ static void print_status(const struct app *a, const struct media *md)
 }
 
 /* ------------------------------------------------------------------ */
+/* Discovery: one-shot mDNS query for _googlecast._tcp.local           */
+
+/*
+ * The query is sent from an ephemeral port, so devices answer by unicast
+ * straight to our socket (RFC 6762 "legacy unicast"); nothing has to bind
+ * 5353 and no mDNS daemon is needed. It goes out of every IPv4 multicast
+ * interface: on a router the default multicast route points at the WAN.
+ */
+
+#define MDNS_ADDR "224.0.0.251"
+#define MDNS_PORT 5353
+#define CAST_SERVICE "_googlecast._tcp.local"
+
+enum { DNS_A = 1, DNS_PTR = 12, DNS_TXT = 16, DNS_SRV = 33 };
+
+struct device {
+	char instance[256]; /* PTR target, e.g. Chromecast-<id>._googlecast... */
+	char target[256];   /* SRV target host name */
+	char ip[INET_ADDRSTRLEN];
+	int port;
+	char name[128];     /* TXT fn= (friendly name) */
+	char model[64];     /* TXT md= */
+	char id[64];        /* TXT id= */
+};
+
+/*
+ * Reads a possibly compressed name at off into out (dotted, no trailing
+ * dot). Returns the offset just past the name in place, or -1.
+ */
+static int dns_name(const unsigned char *m, int len, int off, char *out,
+		    size_t cap)
+{
+	int end = -1, hops = 0;
+	size_t n = 0;
+
+	*out = 0;
+	while (off < len) {
+		int l = m[off];
+		if ((l & 0xc0) == 0xc0) {
+			if (off + 1 >= len || ++hops > 16)
+				return -1;
+			if (end < 0)
+				end = off + 2;
+			off = (l & 0x3f) << 8 | m[off + 1];
+			continue;
+		}
+		if (l & 0xc0)
+			return -1;
+		off++;
+		if (!l)
+			return end < 0 ? off : end;
+		if (off + l > len || n + l + 2 > cap)
+			return -1;
+		if (n)
+			out[n++] = '.';
+		memcpy(out + n, m + off, l);
+		n += l;
+		out[n] = 0;
+		off += l;
+	}
+	return -1;
+}
+
+static struct device *find_device(struct device *d, int n, const char *inst)
+{
+	for (int i = 0; i < n; i++)
+		if (!strcasecmp(d[i].instance, inst))
+			return &d[i];
+	return NULL;
+}
+
+/* Copies the value of "key=value" TXT string p (length l) if key matches. */
+static void txt_value(const unsigned char *p, int l, const char *key,
+		      char *out, size_t cap)
+{
+	size_t k = strlen(key);
+
+	if ((size_t)l <= k || memcmp(p, key, k) || p[k] != '=')
+		return;
+	l -= k + 1;
+	if ((size_t)l >= cap)
+		l = cap - 1;
+	memcpy(out, p + k + 1, l);
+	out[l] = 0;
+}
+
+static void parse_txt(struct device *d, const unsigned char *p, int len)
+{
+	for (int i = 0; i < len && i + 1 + p[i] <= len; i += 1 + p[i]) {
+		txt_value(p + i + 1, p[i], "fn", d->name, sizeof(d->name));
+		txt_value(p + i + 1, p[i], "md", d->model, sizeof(d->model));
+		txt_value(p + i + 1, p[i], "id", d->id, sizeof(d->id));
+	}
+}
+
+/*
+ * Folds one response into the device list. Records come in any order and
+ * across sections, so PTR creates the device and SRV/TXT/A fill it in;
+ * the sender address is the fallback when no A record is included.
+ */
+static int parse_mdns(const unsigned char *m, int len, const char *from,
+		      struct device *d, int n)
+{
+	char name[256], rdname[256];
+	int off = 12, count, i;
+
+	if (len < 12 || !(m[2] & 0x80)) /* not a response */
+		return n;
+	count = (m[6] << 8 | m[7]) + (m[8] << 8 | m[9]) + (m[10] << 8 | m[11]);
+	for (i = 0; i < (m[4] << 8 | m[5]); i++) { /* skip echoed questions */
+		if ((off = dns_name(m, len, off, name, sizeof(name))) < 0)
+			return n;
+		off += 4;
+	}
+	/* Two passes: PTRs first, so SRV/TXT/A can attach regardless of order. */
+	for (int pass = 0; pass < 2; pass++) {
+		int o = off;
+		for (i = 0; i < count; i++) {
+			int type, rdlen;
+			struct device *dev;
+			if ((o = dns_name(m, len, o, name, sizeof(name))) < 0 ||
+			    o + 10 > len)
+				break;
+			type = m[o] << 8 | m[o + 1];
+			rdlen = m[o + 8] << 8 | m[o + 9];
+			o += 10;
+			if (o + rdlen > len)
+				break;
+			if (pass == 0 && type == DNS_PTR &&
+			    !strcasecmp(name, CAST_SERVICE) &&
+			    dns_name(m, len, o, rdname, sizeof(rdname)) >= 0 &&
+			    !find_device(d, n, rdname) && n < MAX_DEVICES) {
+				memset(&d[n], 0, sizeof(d[n]));
+				snprintf(d[n].instance, sizeof(d[n].instance),
+					 "%s", rdname);
+				snprintf(d[n].ip, sizeof(d[n].ip), "%s", from);
+				n++;
+			} else if (pass == 1 && type == DNS_SRV && rdlen > 6 &&
+				   (dev = find_device(d, n, name))) {
+				dev->port = m[o + 4] << 8 | m[o + 5];
+				dns_name(m, len, o + 6, dev->target,
+					 sizeof(dev->target));
+			} else if (pass == 1 && type == DNS_TXT &&
+				   (dev = find_device(d, n, name))) {
+				parse_txt(dev, m + o, rdlen);
+			}
+			o += rdlen;
+		}
+	}
+	/* A records: match SRV targets of devices from this packet. */
+	for (i = 0; i < count; i++) {
+		int type, rdlen;
+		if ((off = dns_name(m, len, off, name, sizeof(name))) < 0 ||
+		    off + 10 > len)
+			break;
+		type = m[off] << 8 | m[off + 1];
+		rdlen = m[off + 8] << 8 | m[off + 9];
+		off += 10;
+		if (off + rdlen > len)
+			break;
+		if (type == DNS_A && rdlen == 4)
+			for (int j = 0; j < n; j++)
+				if (!strcasecmp(d[j].target, name))
+					inet_ntop(AF_INET, m + off, d[j].ip,
+						  sizeof(d[j].ip));
+		off += rdlen;
+	}
+	return n;
+}
+
+static void mdns_query(int fd)
+{
+	unsigned char q[64] = { 0, 0, 0, 0, 0, 1 }; /* id 0, 1 question */
+	size_t n = 12;
+	const char *label = CAST_SERVICE, *dot;
+	struct sockaddr_in to = { .sin_family = AF_INET,
+				  .sin_port = htons(MDNS_PORT) };
+	struct ifaddrs *ifs, *i;
+
+	do {
+		dot = strchr(label, '.');
+		size_t l = dot ? (size_t)(dot - label) : strlen(label);
+		q[n++] = l;
+		memcpy(q + n, label, l);
+		n += l;
+		label = dot + 1;
+	} while (dot);
+	q[n++] = 0;
+	q[n++] = 0; q[n++] = DNS_PTR;
+	q[n++] = 0x80; q[n++] = 1; /* class IN, unicast response requested */
+	inet_pton(AF_INET, MDNS_ADDR, &to.sin_addr);
+
+	if (getifaddrs(&ifs))
+		die("getifaddrs failed");
+	for (i = ifs; i; i = i->ifa_next) {
+		struct in_addr a;
+		if (!i->ifa_addr || i->ifa_addr->sa_family != AF_INET ||
+		    !(i->ifa_flags & IFF_UP) || !(i->ifa_flags & IFF_MULTICAST) ||
+		    (i->ifa_flags & IFF_LOOPBACK))
+			continue;
+		a = ((struct sockaddr_in *)i->ifa_addr)->sin_addr;
+		if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_IF, &a, sizeof(a)) ||
+		    sendto(fd, q, n, 0, (struct sockaddr *)&to, sizeof(to)) < 0) {
+			if (verbose)
+				fprintf(stderr, "mdns: send via %s failed\n",
+					i->ifa_name);
+		} else if (verbose) {
+			fprintf(stderr, "mdns: query via %s\n", i->ifa_name);
+		}
+	}
+	freeifaddrs(ifs);
+}
+
+static long now_ms(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return ts.tv_sec * 1000L + ts.tv_nsec / 1000000;
+}
+
+static int device_matches(const struct device *d, const char *want)
+{
+	return !strcasecmp(d->name, want) || !strcasecmp(d->id, want);
+}
+
+/*
+ * Collects devices that answer within ms milliseconds; with want set,
+ * returns as soon as a device with that name or id shows up.
+ */
+static int discover(struct device *d, int ms, const char *want)
+{
+	int fd = socket(AF_INET, SOCK_DGRAM, 0), n = 0;
+	unsigned char ttl = 255;
+	long start = now_ms(), resent = 0;
+
+	if (fd < 0)
+		die("socket failed");
+	setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
+	mdns_query(fd);
+	for (;;) {
+		long left = start + ms - now_ms();
+		struct pollfd p = { .fd = fd, .events = POLLIN };
+		unsigned char buf[9000];
+		struct sockaddr_in from;
+		socklen_t fl = sizeof(from);
+		char ip[INET_ADDRSTRLEN];
+		int len;
+
+		if (left <= 0)
+			break;
+		/* UDP is lossy: repeat the query once halfway through. */
+		if (!resent && left > ms / 2) {
+			if (poll(&p, 1, left - ms / 2) <= 0) {
+				resent = 1;
+				mdns_query(fd);
+				continue;
+			}
+		} else if (poll(&p, 1, left) <= 0) {
+			continue;
+		}
+		len = recvfrom(fd, buf, sizeof(buf), 0,
+			       (struct sockaddr *)&from, &fl);
+		if (len <= 0)
+			continue;
+		inet_ntop(AF_INET, &from.sin_addr, ip, sizeof(ip));
+		if (verbose)
+			fprintf(stderr, "mdns: %d bytes from %s\n", len, ip);
+		n = parse_mdns(buf, len, ip, d, n);
+		for (int i = 0; want && i < n; i++)
+			if (device_matches(&d[i], want))
+				goto out;
+	}
+out:
+	close(fd);
+	return n;
+}
+
+static void print_devices(const struct device *d, int n)
+{
+	char name[300], model[150], id[150];
+
+	printf("[");
+	for (int i = 0; i < n; i++) {
+		jescape(name, sizeof(name), d[i].name);
+		jescape(model, sizeof(model), d[i].model);
+		jescape(id, sizeof(id), d[i].id);
+		printf("%s{\"name\":%s,\"host\":\"%s\",\"port\":%d,"
+		       "\"model\":%s,\"id\":%s}", i ? "," : "", name, d[i].ip,
+		       d[i].port ? d[i].port : atoi(DEFAULT_PORT), model, id);
+	}
+	printf("]\n");
+}
+
+/*
+ * Lets -H take a friendly name ("Living Room TV") or device id: anything
+ * that does not resolve as a host is looked up via discovery.
+ */
+static void resolve_device(char *host, size_t cap, const char **port)
+{
+	static char portbuf[8];
+	struct addrinfo hints = { .ai_family = AF_UNSPEC }, *res;
+	struct device d[MAX_DEVICES];
+	int n;
+
+	if (!strchr(host, ' ') && !getaddrinfo(host, NULL, &hints, &res)) {
+		freeaddrinfo(res);
+		return;
+	}
+	n = discover(d, DISCOVER_MS, host);
+	for (int i = 0; i < n; i++) {
+		if (device_matches(&d[i], host)) {
+			snprintf(host, cap, "%s", d[i].ip);
+			snprintf(portbuf, sizeof(portbuf), "%d",
+				 d[i].port ? d[i].port : atoi(DEFAULT_PORT));
+			*port = portbuf;
+			return;
+		}
+	}
+	die("device \"%s\" not found", host);
+}
+
+/* ------------------------------------------------------------------ */
 /* Commands                                                            */
 
 static void usage(void)
 {
 	fprintf(stderr,
 "usage: castctl [-v] -H host[:port] <command> [args]\n"
+"       castctl [-v] discover [-t seconds]\n"
+"\n"
+"Host may also be a device's friendly name or id, found via mDNS.\n"
 "\n"
 "commands:\n"
+"  discover [-t seconds]               list Chromecasts on the local network\n"
+"                                      as JSON (listens 2 s by default)\n"
 "  play <url> [-t content-type] [-l]   load and play a stream (HLS by default;\n"
 "                                      -l marks it as a live stream); waits\n"
 "                                      until playback starts or fails\n"
@@ -954,7 +1290,8 @@ static void cmd_select_track(struct app *a, struct media *md, const char *type,
 
 int main(int argc, char **argv)
 {
-	char host[256], *port = DEFAULT_PORT, *colon;
+	char host[256], *colon;
+	const char *port = DEFAULT_PORT;
 	const char *h = getenv("CASTCTL_HOST");
 	const char *cmd;
 	struct app a;
@@ -970,9 +1307,24 @@ int main(int argc, char **argv)
 	}
 	argc -= optind;
 	argv += optind;
-	if (!h || !*h || argc < 1)
+	if (argc < 1)
 		usage();
 	cmd = argv[0];
+
+	if (!strcmp(cmd, "discover")) {
+		struct device d[MAX_DEVICES];
+		double t = DISCOVER_MS / 1000.0;
+		if (argc == 3 && !strcmp(argv[1], "-t"))
+			t = parse_seconds(argv[2]);
+		else if (argc != 1)
+			usage();
+		if (t <= 0 || t > 60)
+			die("timeout must be 0..60 seconds");
+		print_devices(d, discover(d, t * 1000, NULL));
+		return 0;
+	}
+	if (!h || !*h)
+		usage();
 
 	snprintf(host, sizeof(host), "%s", h);
 	if ((colon = strrchr(host, ':')) && !strchr(colon + 1, ']') &&
@@ -980,6 +1332,7 @@ int main(int argc, char **argv)
 		*colon = 0;
 		port = colon + 1;
 	}
+	resolve_device(host, sizeof(host), &port);
 
 	tls_connect(host, port);
 	virtual_connect(RECEIVER);
