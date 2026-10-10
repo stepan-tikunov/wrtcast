@@ -240,8 +240,10 @@ function with_now(st, dev) {
 		id: now.id, stream: now.stream, title: now.title, poster: now.poster,
 		season: now.season, episode: now.episode,
 	};
-	for (let t in st.media.tracks ?? [])
+	for (let t in st.media.tracks ?? []) {
 		t.label = now.labels?.[t.name] ?? t.name;
+		t.lang = replace(t.lang ?? '', /-x-.*$/, ''); // see unique_audio_langs
+	}
 	return st;
 }
 
@@ -300,10 +302,31 @@ function resolve(base, ref) {
 	return m[1] + m[2] + replace(m[3], /[^\/]*$/, '') + ref;
 }
 
+// Receivers switch audio by language, so of several dubs in one language
+// only the first is reachable. Such renditions get a private-use subtag
+// from their NAME (ru -> ru-x-rus1) to make every language distinct.
+function unique_audio_langs(lines) {
+	let count = {};
+	for (let l in lines) {
+		let m = match(l, /^#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="([^"]*)".*LANGUAGE="([^"]*)"/);
+		if (m)
+			count[m[1] + ' ' + m[2]] = (count[m[1] + ' ' + m[2]] ?? 0) + 1;
+	}
+	return map(lines, l => {
+		let m = match(l, /^#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="([^"]*)".*LANGUAGE="([^"]*)"/);
+		let name = match(l, /NAME="([^"]*)"/);
+		if (!m || count[m[1] + ' ' + m[2]] < 2 || !name)
+			return l;
+		let tag = substr(replace(name[1], /[^A-Za-z0-9]/g, ''), 0, 8);
+		return tag == '' ? l :
+			replace(l, /LANGUAGE="[^"]*"/, `LANGUAGE="${m[2]}-x-${tag}"`);
+	});
+}
+
 function rewrite_playlist(body, base) {
 	let fix = u => match(u, /^(data|skd):/) ? u : purl(resolve(base, u));
-	return join('\n', map(split(body, '\n'), line => {
-		let l = rtrim(line, '\r');
+	let lines = map(split(body, '\n'), line => rtrim(line, '\r'));
+	return join('\n', map(unique_audio_langs(lines), l => {
 		if (l == '')
 			return l;
 		if (substr(l, 0, 1) != '#')
