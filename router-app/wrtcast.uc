@@ -24,7 +24,7 @@ const REASONS = {
 };
 const MIME = {
 	m3u8: 'application/vnd.apple.mpegurl', m3u: 'application/vnd.apple.mpegurl',
-	ts: 'video/mp2t', aac: 'audio/aac', mp4: 'video/mp4', m4s: 'video/iso.segment',
+	ts: 'video/mp2t', aac: 'audio/aac', mp4: 'video/mp4', m4s: 'video/mp4',
 	m4a: 'audio/mp4', vtt: 'text/vtt', webvtt: 'text/vtt', key: 'application/octet-stream',
 	jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
 };
@@ -226,7 +226,10 @@ function streams(id, season, episode) {
 		`?season_number=${season}&episode_number=${urlenc(episode)}`));
 	return map(r.streams ?? [], (s, i) => ({
 		index: i,
+		name: s.name || `Плеер ${i + 1}`,
 		url: s.masterPlaylistUrl,
+		// Headers the CDN requires (e.g. Origin), as "Name: value" lines.
+		headers: join('\n', map(s.proxyHeaders ?? [], h => `${h.name}: ${h.value}`)),
 		audio: map(s.audioTracks ?? [], a => ({
 			id: a.id, name: a.name, lang: a.language, default: !!a.default,
 		})),
@@ -261,6 +264,8 @@ function with_now(st, dev) {
 		id: now.id, stream: now.stream, title: now.title, poster: now.poster,
 		season: now.season, episode: now.episode,
 		quality: now.quality ?? 'auto', qualities: now.qualities ?? [],
+		source: now.source ?? null,
+		sources: map(now.streams ?? [], s => s.name),
 	};
 	for (let t in st.media.tracks ?? []) {
 		t.label = now.labels?.[t.name] ?? t.name;
@@ -276,10 +281,21 @@ function with_now(st, dev) {
 // extension. Playlists are rewritten so every URI points back at the proxy;
 // everything else is streamed through.
 
-function fetch_cmd(url) {
+// Per-stream upstream headers travel in the proxy URL (&h=, "Name: value"
+// lines) and are inherited by every URL a rewritten playlist points to.
+function valid_headers(h) {
+	let lines = split(h ?? '', '\n');
+	return h != null && h != '' && length(lines) <= 8 &&
+		length(filter(lines, l => length(l) > 512 ||
+			!match(l, /^[A-Za-z0-9-]{1,40}: [ -~]+$/))) == 0;
+}
+
+function fetch_cmd(url, h) {
 	let cmd = `uclient-fetch -q -T 20 -U ${shq(USER_AGENT)}`;
-	for (let h in (type(HEADERS) == 'array' ? HEADERS : [HEADERS]))
-		cmd += ' --header=' + shq(h);
+	for (let x in (type(HEADERS) == 'array' ? HEADERS : [HEADERS]))
+		cmd += ' --header=' + shq(x);
+	for (let x in (valid_headers(h) ? split(h, '\n') : []))
+		cmd += ' --header=' + shq(x);
 	return `${cmd} -O - ${shq(url)} 2>/dev/null`;
 }
 
@@ -305,10 +321,11 @@ function ext(name) {
 
 // Proxy path for an upstream URL; root-relative unless a base is given.
 // The name defaults to the upstream file name.
-function purl(u, base, name) {
+function purl(u, base, name, h) {
 	let m = match(u, /^[^?#]*\/([^\/?#]*)/);
 	name = replace(name ?? m?.[1] ?? '', /[^A-Za-z0-9._-]/g, '') || 'file';
-	return `${base ?? ''}/api/p/${name}?u=${urlenc(u)}`;
+	return `${base ?? ''}/api/p/${name}?u=${urlenc(u)}` +
+		(valid_headers(h) ? `&h=${urlenc(h)}` : '');
 }
 
 function resolve(base, ref) {
@@ -351,13 +368,22 @@ function unique_audio_langs(lines) {
 // through the proxy, often settles on the lowest one. A quality is chosen by
 // trimming the master playlist to the variants of one width (&q=<width>).
 
-const quality_label = w => w >= 3200 ? '2160p' : w >= 1700 ? '1080p' :
-	w >= 1200 ? '720p' : w >= 800 ? '480p' : w >= 560 ? '360p' : '240p';
+const quality_label = w => w >= 3200 ? '2160p' : w >= 2400 ? '1440p' :
+	w >= 1700 ? '1080p' : w >= 1200 ? '720p' : w >= 800 ? '480p' :
+	w >= 560 ? '360p' : '240p';
+
+// Chromecasts before Ultra and Google TV decode only H.264 and VP8, so
+// AV1/VP9/HEVC variants (offered next to H.264 ones by some sources) can't
+// be chosen.
+const playable = codecs => !match(codecs ?? '', /(av01|vp09|vp9|hvc1|hev1|dvh1)/);
 
 // [{ label, width }] of a master playlist, best first, one per label.
-function qualities(master) {
-	let body = run(fetch_cmd(master)).out, seen = {}, list = [];
-	for (let m in match(body, /RESOLUTION=([0-9]+)x[0-9]+/g) ?? []) {
+function qualities(master, h) {
+	let body = run(fetch_cmd(master, h)).out, seen = {}, list = [];
+	for (let inf in match(body, /#EXT-X-STREAM-INF:[^\n]*/g) ?? []) {
+		let m = match(inf[0], /RESOLUTION=([0-9]+)x[0-9]+/);
+		if (!m || !playable(match(inf[0], /CODECS="([^"]*)"/)?.[1]))
+			continue;
 		let w = +m[1], l = quality_label(w);
 		if (!seen[l]) {
 			seen[l] = true;
@@ -367,15 +393,25 @@ function qualities(master) {
 	return sort(list, (a, b) => b.width - a.width);
 }
 
-function keep_width(lines, q) {
-	let width = l => +(match(l, /RESOLUTION=([0-9]+)x/)?.[1] ?? 0);
-	if (!length(filter(lines, l => substr(l, 0, 18) == '#EXT-X-STREAM-INF:' &&
-	    width(l) == q)))
+// Whether a master's media playlists use fragmented MP4 (#EXT-X-MAP); the
+// receiver assumes MPEG-TS segments unless told.
+function is_fmp4(master, h) {
+	let body = run(fetch_cmd(master, h)).out;
+	let child = match(body, /\n([^#\n][^\n]*)/);
+	return !!child && index(run(fetch_cmd(resolve(master, trim(child[1])), h)).out,
+		'#EXT-X-MAP') >= 0;
+}
+
+// Drops the variants (#EXT-X-STREAM-INF and its URI line) that fail keep,
+// unless that would leave none.
+function keep_variants(lines, keep) {
+	let inf = l => substr(l, 0, 18) == '#EXT-X-STREAM-INF:';
+	if (!length(filter(lines, l => inf(l) && keep(l))))
 		return lines;
 	let out = [], skip = false;
 	for (let l in lines) {
-		if (substr(l, 0, 18) == '#EXT-X-STREAM-INF:') {
-			skip = width(l) != q;
+		if (inf(l)) {
+			skip = !keep(l);
 			if (!skip)
 				push(out, l);
 		} else if (skip && l != '' && substr(l, 0, 1) != '#') {
@@ -387,11 +423,12 @@ function keep_width(lines, q) {
 	return out;
 }
 
-function rewrite_playlist(body, base, q) {
-	let fix = u => match(u, /^(data|skd):/) ? u : purl(resolve(base, u));
+function rewrite_playlist(body, base, q, h) {
+	let fix = u => match(u, /^(data|skd):/) ? u : purl(resolve(base, u), null, null, h);
 	let lines = map(split(body, '\n'), line => rtrim(line, '\r'));
+	lines = keep_variants(lines, l => playable(match(l, /CODECS="([^"]*)"/)?.[1]));
 	if (q)
-		lines = keep_width(lines, q);
+		lines = keep_variants(lines, l => +(match(l, /RESOLUTION=([0-9]+)x/)?.[1] ?? 0) == q);
 	return join('\n', map(unique_audio_langs(lines), l => {
 		if (l == '')
 			return l;
@@ -408,12 +445,14 @@ function media_head(code, mime) {
 	       substr(mime, 0, 6) == 'image/' ? 'max-age=86400' : 'no-store');
 }
 
-function proxy(name, u, q) {
+function proxy(name, u, q, h) {
 	let url = proxy_target(u);
 	if (!url)
 		fail(400, 'bad url');
+	if (h != null && !valid_headers(h))
+		fail(400, 'bad headers');
 	let e = ext(name);
-	let pipe = popen(fetch_cmd(url));
+	let pipe = popen(fetch_cmd(url, h));
 	if (!pipe)
 		fail(502, 'popen failed');
 
@@ -422,7 +461,7 @@ function proxy(name, u, q) {
 		if (pipe.close() != 0 || substr(body, 0, 7) != '#EXTM3U')
 			fail(502, 'upstream playlist fetch failed');
 		media_head(200, MIME[e]);
-		print(rewrite_playlist(body, url, match(q ?? '', /^[0-9]{1,5}$/) ? +q : null), '\n');
+		print(rewrite_playlist(body, url, match(q ?? '', /^[0-9]{1,5}$/) ? +q : null, h), '\n');
 		exit(0);
 	}
 
@@ -471,7 +510,17 @@ const routes = {
 		};
 	},
 
-	'GET /streams': p => ({ streams: streams(title_id(p)) }),
+	'GET /streams': p => {
+		let season = null, episode = null;
+		if (p.season != null) {
+			if (!match(p.season, /^[0-9]{1,4}$/) ||
+			    !match(p.episode ?? '', /^[0-9A-Za-z._-]{1,16}$/))
+				fail(400, 'invalid season or episode');
+			season = +p.season;
+			episode = p.episode;
+		}
+		return { streams: streams(title_id(p), season, episode) };
+	},
 
 	'GET /title': p => {
 		let r = api(`/v1/titles/${title_id(p)}`);
@@ -514,9 +563,10 @@ const routes = {
 		return with_now(castctl(dev, 'status'), dev);
 	},
 
-	// play also switches the quality of what is on: with reuse=1 it takes the
-	// stream from the last play of the same title instead of title-api, and
-	// start/audio/subs restore the position and tracks.
+	// play also switches the quality or the source of what is on: with
+	// reuse=1 it takes the streams from the last play of the same title if
+	// they are still fresh (title-api keeps synthetic masters for 10 min),
+	// and start/audio/subs restore the position and tracks.
 	'POST /play': p => {
 		let id = title_id(p), season = null, episode = null;
 		if (p.season != null || p.episode != null) {
@@ -535,25 +585,35 @@ const routes = {
 			fail(400, 'invalid quality');
 		if (p.style != null && !valid_style(p.style))
 			fail(400, 'invalid subtitle style');
+		if (p.source != null && (length(p.source) > 100 || match(p.source, /[\x00-\x1f]/)))
+			fail(400, 'invalid source');
 		let dev = device(p);
-		let n = +(p.stream ?? 0);
 		let last = json(readfile(state_file(dev)) ?? 'null');
-		let src, subs, audio, quals;
-		if (p.reuse == '1' && last?.src && last.subs != null && last.id == id &&
-		    last.stream == n && last.season == season && last.episode == episode) {
-			src = last.src;
-			subs = last.subs ?? [];
-			audio = last.audio ?? [];
-			quals = last.variants ?? [];
+		let list, fetched;
+		if (p.reuse == '1' && last?.streams && last.id == id &&
+		    last.season == season && last.episode == episode &&
+		    time() - last.fetched < 480) {
+			list = last.streams;
+			fetched = last.fetched;
 		} else {
-			let s = streams(id, season, episode)[n];
-			if (!s || !s.url)
-				fail(404, 'stream not found');
-			src = s.url;
-			subs = filter(s.subs, t => t.url);
-			audio = s.audio;
-			quals = qualities(src);
+			list = streams(id, season, episode);
+			fetched = time();
 		}
+		// The source is picked by name, so a preference survives episodes
+		// whose stream order differs; stream=<n> is the fallback.
+		let n = 0;
+		for (let i, x in list)
+			if (p.source != null ? x.name == p.source : i == +(p.stream ?? 0))
+				n = i;
+		let s = list[n];
+		if (!s || !s.url)
+			fail(404, 'stream not found');
+		let h = s.headers ?? '';
+		if (s.variants == null) {
+			s.variants = qualities(s.url, h);
+			s.fmp4 = is_fmp4(s.url, h);
+		}
+		let quals = s.variants;
 		// The best quality unless asked otherwise; a missing one falls back
 		// to the best below it.
 		let quality = p.quality ?? quals[0]?.label ?? 'auto', width = null;
@@ -563,18 +623,23 @@ const routes = {
 			quality = v?.label ?? 'auto';
 			width = v?.width;
 		}
-		let url = PROXY ? purl(src, public_base()) + (width ? `&q=${width}` : '') : src;
+		let url = PROXY ? purl(s.url, public_base(), null, h) +
+			(width ? `&q=${width}` : '') : s.url;
 		// Subtitles are separate WebVTT files, not part of the HLS manifest,
 		// so they are side-loaded; the receiver names them "sub<id>".
 		let args = ['play', url], labels = {};
 		if (+(p.start ?? 0) > 0)
 			push(args, '-p', p.start);
-		for (let t in subs) {
-			push(args, '-s', PROXY ? purl(t.url, public_base()) : t.url,
+		if (s.fmp4)
+			push(args, '-f', 'fmp4');
+		for (let t in s.subs) {
+			if (!t.url)
+				continue;
+			push(args, '-s', PROXY ? purl(t.url, public_base(), null, h) : t.url,
 			     t.lang || 'und', 'sub' + t.id);
 			labels['sub' + t.id] = t.name;
 		}
-		for (let t in audio)
+		for (let t in s.audio)
 			labels[t.id] = t.name;
 		if (p.style != null)
 			push(args, '-y', p.style);
@@ -583,9 +648,9 @@ const routes = {
 			if (p[k] != null)
 				st = castctl_try(dev, k, p[k]) ?? st;
 		writefile(state_file(dev), sprintf('%J', {
-			id, stream: n, url, src, subs, audio, title: p.title ?? null, season,
-			episode, labels, quality, variants: quals,
-			qualities: map(quals, v => v.label),
+			id, stream: n, source: s.name, url, title: p.title ?? null, season,
+			episode, labels, quality, qualities: map(quals, v => v.label),
+			streams: list, fetched,
 			// Only our own proxy paths, so the UI never loads arbitrary URLs.
 			poster: length(p.poster ?? '') <= 4096 &&
 				match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
@@ -619,7 +684,7 @@ if (pm) {
 	if (getenv('REQUEST_METHOD') != 'GET')
 		fail(405, 'method not allowed');
 	let qs = parse_form(getenv('QUERY_STRING'), {});
-	proxy(pm[1], qs.u, qs.q);
+	proxy(pm[1], qs.u, qs.q, qs.h);
 }
 
 let p = params();
