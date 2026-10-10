@@ -1,14 +1,23 @@
 package provider
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"sync"
 	"time"
 )
 
+var ErrMasterNotFound = errors.New("master playlist not found")
+
+// storedMaster is either a ready playlist or a recipe for one: alternative
+// sources are only resolved when a player asks for them, so listing the
+// sources of a title costs no CDN requests.
 type storedMaster struct {
+	mu        *sync.Mutex
 	body      []byte
+	resolve   func(context.Context) ([]byte, error)
 	expiresAt time.Time
 }
 
@@ -16,14 +25,22 @@ type masterStore struct {
 	mu      sync.Mutex
 	ttl     time.Duration
 	limit   int
-	entries map[string]storedMaster
+	entries map[string]*storedMaster
 }
 
 func newMasterStore(ttl time.Duration, limit int) *masterStore {
-	return &masterStore{ttl: ttl, limit: limit, entries: make(map[string]storedMaster)}
+	return &masterStore{ttl: ttl, limit: limit, entries: make(map[string]*storedMaster)}
 }
 
 func (store *masterStore) put(body []byte) string {
+	return store.add(&storedMaster{body: append([]byte(nil), body...)})
+}
+
+func (store *masterStore) putLazy(resolve func(context.Context) ([]byte, error)) string {
+	return store.add(&storedMaster{resolve: resolve})
+}
+
+func (store *masterStore) add(entry *storedMaster) string {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	now := time.Now()
@@ -41,20 +58,32 @@ func (store *masterStore) put(body []byte) string {
 	random := make([]byte, 16)
 	_, _ = rand.Read(random)
 	id := hex.EncodeToString(random)
-	store.entries[id] = storedMaster{body: append([]byte(nil), body...), expiresAt: now.Add(store.ttl)}
+	entry.mu = &sync.Mutex{}
+	entry.expiresAt = now.Add(store.ttl)
+	store.entries[id] = entry
 	return id
 }
 
-func (store *masterStore) get(id string) ([]byte, bool) {
+func (store *masterStore) get(ctx context.Context, id string) ([]byte, error) {
 	store.mu.Lock()
-	defer store.mu.Unlock()
-	now := time.Now()
-	store.cleanup(now)
+	store.cleanup(time.Now())
 	entry, ok := store.entries[id]
+	store.mu.Unlock()
 	if !ok {
-		return nil, false
+		return nil, ErrMasterNotFound
 	}
-	return append([]byte(nil), entry.body...), true
+	// Concurrent requests for one master wait for a single resolution; a
+	// failed one is retried by the next request.
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	if entry.body == nil {
+		body, err := entry.resolve(ctx)
+		if err != nil {
+			return nil, err
+		}
+		entry.body, entry.resolve = body, nil
+	}
+	return append([]byte(nil), entry.body...), nil
 }
 
 func (store *masterStore) cleanup(now time.Time) {
@@ -65,4 +94,6 @@ func (store *masterStore) cleanup(now time.Time) {
 	}
 }
 
-func (c *Client) MasterPlaylist(id string) ([]byte, bool) { return c.masters.get(id) }
+func (c *Client) MasterPlaylist(ctx context.Context, id string) ([]byte, error) {
+	return c.masters.get(ctx, id)
+}

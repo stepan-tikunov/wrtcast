@@ -11,6 +11,7 @@ import { cursor } from 'uci';
 
 const STATE = '/tmp/wrtcast.now.';         // + host key; what /play started
 const SUBS = '/tmp/wrtcast.subs.';         // + host key; subtitle URLs for /sub
+const LIST = '/tmp/wrtcast.list.';         // + host key; streams of the last /play
 const DEVICES = '/tmp/wrtcast.devices.json'; // last discovery result
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const COMMANDS = {
@@ -275,7 +276,7 @@ function with_now(st, dev) {
 	if (now.qualities == null && PROXY) {
 		let u = match(now.url, /[?&]u=([^&]*)/);
 		now.src = u ? urldec(u[1]) : null;
-		let v = now.src && proxy_target(now.src) ? qualities(now.src) : [];
+		let v = (now.src && proxy_target(now.src) ? qualities(now.src) : null) ?? [];
 		now.variants = v;
 		now.qualities = map(v, x => x.label);
 		now.quality = 'auto';
@@ -399,8 +400,11 @@ const quality_label = w => w >= 3200 ? '2160p' : w >= 2400 ? '1440p' :
 const playable = codecs => !match(codecs ?? '', /(av01|vp09|vp9|hvc1|hev1|dvh1)/);
 
 // [{ label, width }] of a master playlist, best first, one per label.
+// null when the master itself can't be fetched.
 function qualities(master, h) {
-	let body = run(fetch_cmd(master, h)).out, seen = {}, list = [];
+	let r = run(fetch_cmd(master, h)), body = r.out, seen = {}, list = [];
+	if (r.code != 0)
+		return null;
 	for (let inf in match(body, /#EXT-X-STREAM-INF:[^\n]*/g) ?? []) {
 		let m = match(inf[0], /RESOLUTION=([0-9]+)x[0-9]+/);
 		if (!m || !playable(match(inf[0], /CODECS="([^"]*)"/)?.[1]))
@@ -617,8 +621,19 @@ const routes = {
 			list = last.streams;
 			fetched = last.fetched;
 		} else {
-			list = streams(id, season, episode);
-			fetched = time();
+			// The list of the last title asked for, so trying another source
+			// after a failure doesn't ask the provider again.
+			let c = json(readfile(LIST + state_key(dev)) ?? 'null');
+			if (c?.streams && c.id == id && c.season == season &&
+			    c.episode == episode && time() - c.fetched < 600) {
+				list = c.streams;
+				fetched = c.fetched;
+			} else {
+				list = streams(id, season, episode);
+				fetched = time();
+				writefile(LIST + state_key(dev), sprintf('%J',
+					{ id, season, episode, streams: list, fetched }));
+			}
 		}
 		// The source is picked by name, so a preference survives episodes
 		// whose stream order differs; stream=<n> is the fallback.
@@ -631,7 +646,13 @@ const routes = {
 			fail(404, 'stream not found');
 		let h = s.headers ?? '';
 		if (s.variants == null) {
-			s.variants = qualities(s.url, h);
+			// title-api assembles a source's master on first request; a
+			// source the CDN rejects fails here instead of on the TV.
+			let v = qualities(s.url, h);
+			if (v == null)
+				reply(502, { error: 'source unavailable', source: s.name,
+					sources: map(list, x => x.name) });
+			s.variants = v;
 			s.fmp4 = is_fmp4(s.url, h);
 		}
 		let quals = s.variants;

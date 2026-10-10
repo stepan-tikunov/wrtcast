@@ -114,7 +114,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .sheet h2 span{flex:1}
 /* A sheet over the player dims the player too. */
 #shade.top{z-index:7}
-#devlist .dev{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;padding:8px 4px;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
+#devlist .dev,#srclist .dev{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;padding:8px 4px;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
 .dev span{flex:1;min-width:0}
 .dev b{display:block;font-weight:550}
 .dev small{color:var(--mu)}
@@ -123,6 +123,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .dev i{width:10px;height:10px;border-radius:50%;background:var(--ac);visibility:hidden}
 .dev.on i{visibility:visible}
 #devlist .note{padding:24px}
+#srclist .dev:disabled{opacity:.45}
 .pick{display:flex;gap:6px}
 .pick select{flex:1;min-width:0}
 #styb{flex:none;width:46px;height:46px;border-radius:14px;background:var(--s2);font-weight:700;font-size:15px}
@@ -255,6 +256,12 @@ svg.spring{animation:spring .3s ease-out}
   <h2><span>Где смотреть</span><button class="ib" id="devscan" aria-label="Обновить"><svg><use href="#i-refresh"/></svg></button></h2>
   <div id="devlist"></div>
 </section>
+<section id="srcs" class="sheet" hidden>
+  <div class="handle"></div>
+  <h2><span>Источник недоступен</span></h2>
+  <p class="note">Выберите другой:</p>
+  <div id="srclist"></div>
+</section>
 <section id="sty" class="sheet" hidden>
   <div class="handle"></div>
   <h2><span>Вид субтитров</span><button class="ib" id="stycollapse" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button></h2>
@@ -280,7 +287,7 @@ let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF defaul
 let devices = null;     // last /devices answer
 let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null = receiver default
 localStorage.removeItem('subStyle'); // older format with colors
-const SHEETS = { dev: 'devs', sty: 'sty' }; // layer name -> bottom sheet
+const SHEETS = { dev: 'devs', sty: 'sty', src: 'srcs' }; // layer name -> bottom sheet
 
 // Requests that talk to the TV carry the chosen device.
 const withDevice = path => device ? path + (path.includes('?') ? '&' : '?') + 'device=' + encodeURIComponent(device) : path;
@@ -299,7 +306,7 @@ async function api(path, body) {
     localStorage.token = token;
     return api(path, body);
   }
-  if (!r.ok) throw new Error(j.error || r.status);
+  if (!r.ok) throw Object.assign(new Error(j.error || r.status), { body: j });
   return j;
 }
 
@@ -570,9 +577,28 @@ async function play(m) {
     while (layers.includes('det')) await closeTop();
   } catch (e) {
     pending = null;
-    toast('Не удалось запустить: ' + e.message);
     refresh();
+    // Sources are resolved one at a time; when the chosen one is rejected,
+    // offer the others instead of failing outright.
+    const { source: bad, sources } = e.body || {};
+    if (sources?.some(n => n != bad)) chooseSource(m, bad, sources);
+    else toast('Не удалось запустить: ' + e.message);
   }
+}
+
+function chooseSource(m, bad, sources) {
+  $('srclist').replaceChildren(...sources.map((n, i) => {
+    const b = el('button', { className: 'dev', disabled: n == bad },
+      el('span', {}, el('b', {}, n), n == bad ? el('small', {}, 'не открылся') : ''));
+    b.style.setProperty('--i', i);
+    b.onclick = async () => {
+      await closeTop();
+      localStorage.source = n;
+      play({ ...m, source: n });
+    };
+    return b;
+  }));
+  openLayer('src');
 }
 
 // Plays the episode next to the current one (dir = 1 or -1), crossing

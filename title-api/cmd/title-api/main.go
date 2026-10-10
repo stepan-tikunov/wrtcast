@@ -132,14 +132,18 @@ func run() error {
 }
 
 type masterPlaylistSource interface {
-	MasterPlaylist(id string) ([]byte, bool)
+	MasterPlaylist(ctx context.Context, id string) ([]byte, error)
 }
 
 func masterPlaylistHandler(source masterPlaylistSource) runtime.HandlerFunc {
-	return func(response http.ResponseWriter, _ *http.Request, pathParams map[string]string) {
-		body, ok := source.MasterPlaylist(pathParams["id"])
-		if !ok {
-			http.Error(response, "master playlist not found", http.StatusNotFound)
+	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
+		body, err := source.MasterPlaylist(request.Context(), pathParams["id"])
+		if errors.Is(err, provider.ErrMasterNotFound) {
+			http.Error(response, err.Error(), http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(response, err.Error(), http.StatusBadGateway)
 			return
 		}
 		response.Header().Set("Content-Type", "application/vnd.apple.mpegurl")

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -78,7 +79,8 @@ func TestAlternativePlayerFallback(t *testing.T) {
 }
 
 // The CDN sometimes rejects every freshly signed link (403 token_decrypt);
-// a new playback request a moment later gets links that work.
+// a new playback request a moment later gets links that work. Sources are
+// listed without CDN requests and only the requested one is resolved.
 func TestAlternativePlayerRetriesRejectedLinks(t *testing.T) {
 	t.Parallel()
 
@@ -96,12 +98,17 @@ func TestAlternativePlayerRetriesRejectedLinks(t *testing.T) {
 	cdnURL = cdn.URL
 	player := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		if request.Method == http.MethodPost {
+			// The token is single-use, as on the real player.
+			if request.FormValue("token") != fmt.Sprintf("tok%d", playbacks) {
+				response.WriteHeader(http.StatusNotFound)
+				return
+			}
 			playbacks++
 			_, _ = fmt.Fprintf(response, `{"hlsSource":[{"label":"(Russian) Dub","quality":{"720":"%s/720.m3u8?sig=%d"}}]}`, cdnURL, playbacks)
 			return
 		}
-		_, _ = response.Write([]byte(`<meta name="viewporti" content="abc">
-<script>const userParam = { token: 'tok' }; const fileList = JSON.parse('{"type":"movie","active":{"id":7,"translation":"Dub"},"all":{}}');</script>`))
+		_, _ = fmt.Fprintf(response, `<meta name="viewporti" content="abc">
+<script>const userParam = { token: 'tok%d' }; const fileList = JSON.parse('{"type":"movie","active":{"id":7,"translation":"Dub"},"all":{}}');</script>`, playbacks)
 	}))
 	defer player.Close()
 
@@ -109,8 +116,14 @@ func TestAlternativePlayerRetriesRejectedLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	streams, err := client.alternativeStreams(context.Background(), player.URL+"/?token_movie=abc", 0, "")
-	if err != nil || len(streams) != 1 || playbacks != 2 {
+	ctx := context.Background()
+	streams, err := client.alternativeStreams(ctx, player.URL+"/?token_movie=abc", 0, "")
+	if err != nil || len(streams) != 1 || playbacks != 1 {
 		t.Fatalf("streams = %+v, err = %v after %d playback requests", streams, err, playbacks)
+	}
+	id := strings.TrimSuffix(strings.TrimPrefix(streams[0].MasterPlaylistURL, "https://api.example.com/v1/media/"), "/master.m3u8")
+	master, err := client.MasterPlaylist(ctx, id)
+	if err != nil || !strings.Contains(string(master), "media.m3u8") || playbacks != 2 {
+		t.Fatalf("master = %q, err = %v after %d playback requests", master, err, playbacks)
 	}
 }

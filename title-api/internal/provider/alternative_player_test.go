@@ -68,7 +68,9 @@ func TestPlayerChallenge(t *testing.T) {
 
 func TestAlternativePlaybackStreams(t *testing.T) {
 	t.Parallel()
+	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		requests++
 		_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720\nmedia.m3u8\n"))
 	}))
 	defer server.Close()
@@ -92,7 +94,11 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 	}{Kind: "captions", Label: "Russian", Source: "https://cdn.example/sub.vtt", Language: "rus", Default: true})
 
 	playerURL, _ := url.Parse("https://player.example/")
-	streams := client.alternativePlaybackStreams(context.Background(), server.Client(), playerURL, playback)
+	player := &alternativePlayer{client: server.Client(), playerURL: playerURL}
+	streams := client.alternativePlaybackStreams(player, 7, playback)
+	if requests != 0 {
+		t.Fatalf("listing sources made %d CDN requests", requests)
+	}
 	if len(streams) != 1 || streams[0].Name != "(Russian) Dub" ||
 		streams[0].AudioTracks[0].Name != "(Russian) Dub" ||
 		streams[0].AudioTracks[0].Language != "ru" || len(streams[0].Subtitles) != 1 ||
@@ -101,8 +107,8 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 		t.Fatalf("unexpected streams: %+v", streams)
 	}
 	id := strings.Split(strings.TrimSuffix(streams[0].MasterPlaylistURL, "/master.m3u8"), "/")
-	master, ok := client.MasterPlaylist(id[len(id)-1])
-	if !ok || !strings.Contains(string(master), server.URL+"/720/media.m3u8") {
+	master, err := client.MasterPlaylist(context.Background(), id[len(id)-1])
+	if err != nil || requests != 1 || !strings.Contains(string(master), server.URL+"/720/media.m3u8") {
 		t.Fatalf("unexpected synthetic master: %q", master)
 	}
 }

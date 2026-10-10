@@ -168,27 +168,15 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 		return nil, err
 	}
 
-	// The CDN now and then rejects every freshly signed link at once (403,
-	// X-VD: token_decrypt) and accepts new ones a few seconds later.
-	var sources int
-	for attempt, delay := range []time.Duration{0, time.Second, 3 * time.Second} {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(delay):
-			}
-		}
-		playback, err := c.requestAlternativePlayback(ctx, player, file.ID)
-		if err != nil {
-			return nil, err
-		}
-		if streams := c.alternativePlaybackStreams(ctx, player.client, player.playerURL, playback); len(streams) > 0 {
-			return streams, nil
-		}
-		sources = len(playback.HLSSource)
+	playback, err := c.requestAlternativePlayback(ctx, player, file.ID)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("no variant of %d sources resolved", sources)
+	streams := c.alternativePlaybackStreams(player, file.ID, playback)
+	if len(streams) == 0 {
+		return nil, fmt.Errorf("none of %d sources has a quality", len(playback.HLSSource))
+	}
+	return streams, nil
 }
 
 func (c *Client) requestAlternativePlayback(ctx context.Context, player *alternativePlayer, fileID int64) (alternativePlayback, error) {
@@ -295,12 +283,10 @@ func (catalog alternativeCatalog) selectedFile(season int32, episode string) (al
 	return catalog.Active, nil
 }
 
-func (c *Client) alternativePlaybackStreams(
-	ctx context.Context,
-	client *http.Client,
-	playerURL *url.URL,
-	playback alternativePlayback,
-) []MovieStream {
+// alternativePlaybackStreams lists every source without touching the CDN:
+// each master is assembled only when a player first asks for it, so starting
+// a title costs requests for the chosen source alone.
+func (c *Client) alternativePlaybackStreams(player *alternativePlayer, fileID int64, playback alternativePlayback) []MovieStream {
 	subtitles := make([]SubtitleTrack, 0, len(playback.Tracks))
 	for index, track := range playback.Tracks {
 		if track.Source == "" {
@@ -308,40 +294,67 @@ func (c *Client) alternativePlaybackStreams(
 		}
 		subtitles = append(subtitles, SubtitleTrack{ID: strconv.Itoa(index + 1), Name: track.Label, Language: track.Language, PlaylistURL: track.Source})
 	}
-	streams := make([]MovieStream, len(playback.HLSSource))
-	var wait sync.WaitGroup
-	for index := range playback.HLSSource {
-		index := index
-		wait.Add(1)
-		go func() {
-			defer wait.Done()
-			source := playback.HLSSource[index]
-			master := c.syntheticMaster(ctx, client, playerURL, source.Quality)
-			if len(master) == 0 {
-				return
-			}
-			id := c.masters.put(master)
-			streams[index] = MovieStream{
-				Name:              strings.TrimSpace(source.Label),
-				MasterPlaylistURL: c.mediaBaseURL + "/v1/media/" + id + "/master.m3u8",
-				AudioTracks:       []AudioTrack{{ID: "alternative", Name: strings.TrimSpace(source.Label), Language: languageFromLabel(source.Label), Default: true}},
-				Subtitles:         subtitles,
-				ProxyHeaders: []ProxyHeader{{
-					Name:  "Origin",
-					Value: playerURL.Scheme + "://" + playerURL.Host,
-				}},
-			}
-		}()
-	}
-	wait.Wait()
-	result := streams[:0]
-	for _, stream := range streams {
-		if stream.MasterPlaylistURL != "" {
-			result = append(result, stream)
+	streams := make([]MovieStream, 0, len(playback.HLSSource))
+	for _, source := range playback.HLSSource {
+		if len(source.Quality) == 0 {
+			continue
 		}
+		label := strings.TrimSpace(source.Label)
+		id := c.masters.putLazy(c.alternativeMaster(player, fileID, source.Label, source.Quality))
+		streams = append(streams, MovieStream{
+			Name:              label,
+			MasterPlaylistURL: c.mediaBaseURL + "/v1/media/" + id + "/master.m3u8",
+			AudioTracks:       []AudioTrack{{ID: "alternative", Name: label, Language: languageFromLabel(source.Label), Default: true}},
+			Subtitles:         subtitles,
+			ProxyHeaders: []ProxyHeader{{
+				Name:  "Origin",
+				Value: player.playerURL.Scheme + "://" + player.playerURL.Host,
+			}},
+		})
 	}
-	streams = result
 	return streams
+}
+
+// alternativeMaster resolves one source's qualities into a master. The CDN
+// now and then rejects every freshly signed link at once (403, X-VD:
+// token_decrypt) and accepts new ones later, so a failed attempt asks the
+// player to sign the source again. Its token is single-use, which takes a
+// fresh copy of the player page.
+func (c *Client) alternativeMaster(
+	player *alternativePlayer,
+	fileID int64,
+	label string,
+	qualities map[string]string,
+) func(context.Context) ([]byte, error) {
+	return func(ctx context.Context) ([]byte, error) {
+		for attempt, delay := range []time.Duration{0, time.Second, 3 * time.Second} {
+			if attempt > 0 {
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-time.After(delay):
+				}
+				fresh, err := c.loadAlternativePlayer(ctx, player.playerURL.String())
+				if err != nil {
+					return nil, err
+				}
+				playback, err := c.requestAlternativePlayback(ctx, fresh, fileID)
+				if err != nil {
+					return nil, err
+				}
+				player = fresh
+				for _, source := range playback.HLSSource {
+					if source.Label == label {
+						qualities = source.Quality
+					}
+				}
+			}
+			if master := c.syntheticMaster(ctx, player.client, player.playerURL, qualities); len(master) > 0 {
+				return master, nil
+			}
+		}
+		return nil, fmt.Errorf("no quality of %q resolved", strings.TrimSpace(label))
+	}
 }
 
 func (c *Client) syntheticMaster(ctx context.Context, client *http.Client, playerURL *url.URL, qualities map[string]string) []byte {
