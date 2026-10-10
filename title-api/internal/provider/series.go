@@ -128,7 +128,7 @@ func (c *Client) EpisodeStreams(
 		return nil, fmt.Errorf("%w: season and episode are required", ErrEpisodeNotFound)
 	}
 
-	current, embedURLs, err := c.movieEmbeds(ctx, externalMovieID)
+	current, movieHTML, embedURLs, err := c.movieDocument(ctx, externalMovieID)
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +179,19 @@ func (c *Client) EpisodeStreams(
 			continue
 		}
 		streams = append(streams, stream)
+	}
+	for _, playerURL := range alternativePlayerURLs(movieHTML, c.baseURL.Scheme) {
+		alternative, alternativeErr := c.alternativeStreams(ctx, playerURL, seasonNumber, episodeNumber)
+		if errors.Is(alternativeErr, ErrEpisodeNotFound) {
+			continue
+		}
+		if alternativeErr != nil {
+			streamErrors = append(streamErrors, fmt.Errorf("%s: %w", playerURL, alternativeErr))
+			continue
+		}
+		episodeFound = true
+		seriesEmbeds++
+		streams = append(streams, alternative...)
 	}
 	if len(streams) > 0 {
 		return streams, nil

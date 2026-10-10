@@ -13,11 +13,12 @@ import (
 )
 
 var (
-	embedURLPattern  = regexp.MustCompile(`(?i)(?:https?:)?//[a-z0-9.-]+(?::[0-9]+)?/embed/movie/[0-9]+`)
-	hlsPattern       = regexp.MustCompile(`(?s)["']?hls["']?\s*:\s*"((?:\\.|[^"])*)"`)
-	markerPattern    = regexp.MustCompile(`(?s)var\s+lok\s*=\s*1\s*,\s*[a-zA-Z0-9_$]+\s*=\s*"((?:\\.|[^"])*)"`)
-	audioNames       = regexp.MustCompile(`(?s)["']?names["']?\s*:\s*(\[[^]]*\])`)
-	subtitlesPattern = regexp.MustCompile(`(?s)["']?cc["']?\s*:\s*(\[[^]]*\])`)
+	embedURLPattern          = regexp.MustCompile(`(?i)(?:https?:)?//[a-z0-9.-]+(?::[0-9]+)?/embed/movie/[0-9]+`)
+	alternativePlayerPattern = regexp.MustCompile(`(?i)(?:https?:)?(?:\\?/){2}[a-z0-9.-]+(?::[0-9]+)?(?:\\?/)\?(?:token_movie=[a-f0-9]+(?:&amp;|&)token=[a-f0-9]+|token=[a-f0-9]+(?:&amp;|&)token_movie=[a-f0-9]+)`)
+	hlsPattern               = regexp.MustCompile(`(?s)["']?hls["']?\s*:\s*"((?:\\.|[^"])*)"`)
+	markerPattern            = regexp.MustCompile(`(?s)var\s+lok\s*=\s*1\s*,\s*[a-zA-Z0-9_$]+\s*=\s*"((?:\\.|[^"])*)"`)
+	audioNames               = regexp.MustCompile(`(?s)["']?names["']?\s*:\s*(\[[^]]*\])`)
+	subtitlesPattern         = regexp.MustCompile(`(?s)["']?cc["']?\s*:\s*(\[[^]]*\])`)
 )
 
 type MovieStream struct {
@@ -48,7 +49,7 @@ type embedSubtitleEntry struct {
 }
 
 func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieStream, error) {
-	current, embedURLs, err := c.movieEmbeds(ctx, externalMovieID)
+	current, movieHTML, embedURLs, err := c.movieDocument(ctx, externalMovieID)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +69,16 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 		}
 		streams = append(streams, stream)
 	}
+	for _, playerURL := range alternativePlayerURLs(movieHTML, c.baseURL.Scheme) {
+		alternative, alternativeErr := c.alternativeStreams(ctx, playerURL, 0, "")
+		if alternativeErr != nil {
+			streamErrors = append(streamErrors, fmt.Errorf("%s: %w", playerURL, alternativeErr))
+			continue
+		}
+		streams = append(streams, alternative...)
+	}
 	if len(streams) == 0 {
-		if seriesEmbeds == len(embedURLs) {
+		if len(embedURLs) > 0 && seriesEmbeds == len(embedURLs) {
 			return nil, ErrNotMovie
 		}
 		return nil, fmt.Errorf("no playable embed found: %w", errors.Join(streamErrors...))
@@ -111,7 +120,7 @@ func (c *Client) movieDocument(ctx context.Context, externalMovieID string) (*se
 	}
 
 	embedURLs := uniqueEmbedURLs(embedURLPattern.FindAllString(string(movieHTML), -1), c.baseURL.Scheme)
-	if len(embedURLs) == 0 {
+	if len(embedURLs) == 0 && len(alternativePlayerURLs(movieHTML, c.baseURL.Scheme)) == 0 {
 		return nil, nil, nil, errors.New("embed URL not found in movie page")
 	}
 	return current, movieHTML, embedURLs, nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -129,5 +130,27 @@ func TestRealTitleService(t *testing.T) {
 			len(titleDetails.GetSeasons()) == 0 {
 			t.Fatalf("unexpected %s details: %+v", test.title, titleDetails)
 		}
+	}
+
+	arcaneSeason := int32(1)
+	arcaneEpisode := "1"
+	arcane, err := client.GetPlaybackStreams(ctx, &titlev1.GetPlaybackStreamsQuery{
+		TitleId:       providerClient.ExternalTitleID("43222"),
+		SeasonNumber:  &arcaneSeason,
+		EpisodeNumber: &arcaneEpisode,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	alternativeFound := false
+	for _, stream := range arcane.GetStreams() {
+		for _, audio := range stream.GetAudioTracks() {
+			if strings.Contains(audio.GetName(), "2160p") {
+				alternativeFound = true
+			}
+		}
+	}
+	if !alternativeFound {
+		t.Fatal("Arcane has no 2160p stream from the alternative player")
 	}
 }
