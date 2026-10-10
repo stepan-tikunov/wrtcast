@@ -1049,13 +1049,16 @@ static void usage(void)
 "commands:\n"
 "  discover [-t seconds]               list Chromecasts on the local network\n"
 "                                      as JSON (listens 2 s by default)\n"
-"  play <url> [-t content-type] [-l] [-p seconds] [-s url lang name]...\n"
-"       [-y style]                     load and play a stream (HLS by default)\n"
+"  play <url> [-t content-type] [-l] [-p seconds] [-f segment-format]\n"
+"       [-s url lang name]... [-y style]\n"
+"                                      load and play a stream (HLS by default)\n"
 "                                      and wait until playback starts or\n"
 "                                      fails; -l: live stream; -p: start\n"
-"                                      position; -s: add a WebVTT subtitle\n"
-"                                      track (off until chosen with \"subs\");\n"
-"                                      -y: subtitle style as in substyle\n"
+"                                      position; -f: HLS segment format\n"
+"                                      (fmp4, aac, ...; MPEG-TS by default);\n"
+"                                      -s: add a WebVTT subtitle track (off\n"
+"                                      until chosen with \"subs\"); -y:\n"
+"                                      subtitle style as in substyle\n"
 "  pause | resume                      pause / resume playback\n"
 "  stop                                stop media\n"
 "  quit                                close the app on the device\n"
@@ -1283,7 +1286,7 @@ static void cmd_play(int argc, char **argv)
 	char url[4200], ctype[200];
 	const char *content_type = "application/x-mpegURL";
 	const char *stream_type = "BUFFERED";
-	const char *src = NULL, *style = NULL;
+	const char *src = NULL, *style = NULL, *segfmt = NULL;
 	double start = 0;
 	char *subs[MAX_SUBS * 3];
 	int nsubs = 0;
@@ -1302,6 +1305,8 @@ static void cmd_play(int argc, char **argv)
 			style = argv[++i];
 		else if (!strcmp(argv[i], "-p") && i + 1 < argc)
 			start = parse_seconds(argv[++i]);
+		else if (!strcmp(argv[i], "-f") && i + 1 < argc)
+			segfmt = argv[++i];
 		else if (!strcmp(argv[i], "-s") && i + 3 < argc) {
 			if (nsubs == MAX_SUBS)
 				die("at most %d subtitle tracks", MAX_SUBS);
@@ -1326,6 +1331,16 @@ static void cmd_play(int argc, char **argv)
 		     "\"media\":{\"contentId\":%s,\"contentType\":%s,"
 		     "\"streamType\":\"%s\"",
 		     start, url, ctype, stream_type);
+	/* HLS segments are assumed to be MPEG-TS unless told otherwise. */
+	if (segfmt) {
+		if (strspn(segfmt, "abcdefghijklmnopqrstuvwxyz0123456789_") != strlen(segfmt))
+			die("bad segment format \"%s\"", segfmt);
+		n += snprintf(body + n, sizeof(body) - n,
+			      ",\"hlsSegmentFormat\":\"%s\"", segfmt);
+		if (!strcmp(segfmt, "fmp4"))
+			n += snprintf(body + n, sizeof(body) - n,
+				      ",\"hlsVideoSegmentFormat\":\"fmp4\"");
+	}
 	n = append_subs(body, n, sizeof(body) - 2, subs, nsubs);
 	if (style) {
 		char st[512];

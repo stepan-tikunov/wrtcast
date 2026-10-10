@@ -114,6 +114,7 @@ castctl полезен и без остального проекта, напри
 castctl discover                                     # [{"name":"Living Room TV","host":"192.168.1.50",...}]
 castctl -H "Living Room TV" play https://example.com/stream.m3u8
 castctl -H "Living Room TV" play https://example.com/stream.m3u8 -s https://example.com/ru.vtt ru "Русские"
+castctl -H "Living Room TV" play https://example.com/fmp4.m3u8 -f fmp4 -p 600   # fMP4-сегменты, с 10-й минуты
 castctl -H 192.168.1.50 status                       # JSON: приложение, громкость, состояние, дорожки
 castctl -H 192.168.1.50 pause | resume | stop | quit
 castctl -H 192.168.1.50 seek 600 | ff 30 | rew 10   # секунды
