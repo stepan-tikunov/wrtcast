@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -162,21 +163,45 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 	if err != nil {
 		return nil, err
 	}
-	client, playerURL, viewport, token := player.client, player.playerURL, player.viewport, player.token
 	file, err := player.catalog.selectedFile(season, episode)
 	if err != nil {
 		return nil, err
 	}
 
+	// The CDN now and then rejects every freshly signed link at once (403,
+	// X-VD: token_decrypt) and accepts new ones a few seconds later.
+	var sources int
+	for attempt, delay := range []time.Duration{0, time.Second, 3 * time.Second} {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		playback, err := c.requestAlternativePlayback(ctx, player, file.ID)
+		if err != nil {
+			return nil, err
+		}
+		if streams := c.alternativePlaybackStreams(ctx, player.client, player.playerURL, playback); len(streams) > 0 {
+			return streams, nil
+		}
+		sources = len(playback.HLSSource)
+	}
+	return nil, fmt.Errorf("no variant of %d sources resolved", sources)
+}
+
+func (c *Client) requestAlternativePlayback(ctx context.Context, player *alternativePlayer, fileID int64) (alternativePlayback, error) {
+	client, playerURL, viewport, token := player.client, player.playerURL, player.viewport, player.token
 	fingerprint := make([]byte, 32)
 	if _, err := rand.Read(fingerprint); err != nil {
-		return nil, fmt.Errorf("create player fingerprint: %w", err)
+		return alternativePlayback{}, fmt.Errorf("create player fingerprint: %w", err)
 	}
 	form := url.Values{"token": {token}, "av1": {"true"}, "autoplay": {"0"}, "audio": {""}, "subtitle": {""}}
-	endpoint := playerURL.ResolveReference(&url.URL{Path: "/bnsi/movies/" + strconv.FormatInt(file.ID, 10)})
+	endpoint := playerURL.ResolveReference(&url.URL{Path: "/bnsi/movies/" + strconv.FormatInt(fileID, 10)})
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), strings.NewReader(form.Encode()))
 	if err != nil {
-		return nil, err
+		return alternativePlayback{}, err
 	}
 	request.Header.Set("User-Agent", c.userAgent)
 	request.Header.Set("Accept", "application/json, text/plain, */*")
@@ -186,24 +211,20 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 	request.Header.Set("Borth", hex.EncodeToString(fingerprint)+"|"+playerChallenge(viewport))
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("request playback: %w", err)
+		return alternativePlayback{}, fmt.Errorf("request playback: %w", err)
 	}
 	body, err := readAlternativeResponse(response)
 	if err != nil {
-		return nil, fmt.Errorf("request playback: %w", err)
+		return alternativePlayback{}, fmt.Errorf("request playback: %w", err)
 	}
 	var playback alternativePlayback
 	if err := json.Unmarshal(body, &playback); err != nil {
-		return nil, fmt.Errorf("decode playback: %w", err)
+		return alternativePlayback{}, fmt.Errorf("decode playback: %w", err)
 	}
 	if len(playback.HLSSource) == 0 {
-		return nil, fmt.Errorf("playback has no HLS sources: %.200s", body)
+		return alternativePlayback{}, fmt.Errorf("playback has no HLS sources: %.200s", body)
 	}
-	streams := c.alternativePlaybackStreams(ctx, client, playerURL, playback)
-	if len(streams) == 0 {
-		return nil, fmt.Errorf("no variant of %d sources resolved", len(playback.HLSSource))
-	}
-	return streams, nil
+	return playback, nil
 }
 
 func readAlternativeResponse(response *http.Response) ([]byte, error) {

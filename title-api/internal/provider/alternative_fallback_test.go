@@ -76,3 +76,41 @@ func TestAlternativePlayerFallback(t *testing.T) {
 		t.Fatalf("movie media type = %v, %v", mediaType, err)
 	}
 }
+
+// The CDN sometimes rejects every freshly signed link (403 token_decrypt);
+// a new playback request a moment later gets links that work.
+func TestAlternativePlayerRetriesRejectedLinks(t *testing.T) {
+	t.Parallel()
+
+	var cdnURL string
+	playbacks := 0
+	cdn := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Query().Get("sig") != "2" {
+			response.Header().Set("X-VD", "token_decrypt")
+			response.WriteHeader(http.StatusForbidden)
+			return
+		}
+		_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720\nmedia.m3u8\n"))
+	}))
+	defer cdn.Close()
+	cdnURL = cdn.URL
+	player := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodPost {
+			playbacks++
+			_, _ = fmt.Fprintf(response, `{"hlsSource":[{"label":"(Russian) Dub","quality":{"720":"%s/720.m3u8?sig=%d"}}]}`, cdnURL, playbacks)
+			return
+		}
+		_, _ = response.Write([]byte(`<meta name="viewporti" content="abc">
+<script>const userParam = { token: 'tok' }; const fileList = JSON.parse('{"type":"movie","active":{"id":7,"translation":"Dub"},"all":{}}');</script>`))
+	}))
+	defer player.Close()
+
+	client, err := NewClient(Config{BaseURL: "https://example.com", MediaBaseURL: "https://api.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	streams, err := client.alternativeStreams(context.Background(), player.URL+"/?token_movie=abc", 0, "")
+	if err != nil || len(streams) != 1 || playbacks != 2 {
+		t.Fatalf("streams = %+v, err = %v after %d playback requests", streams, err, playbacks)
+	}
+}
