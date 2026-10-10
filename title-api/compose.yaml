@@ -1,0 +1,21 @@
+# Reachable only through WireGuard: the HTTP gateway listens on the server's
+# wg address and gRPC on loopback, nothing is published on public interfaces.
+# Host networking lets the process bind the wg address directly; if wg is not
+# up yet, the listen fails and Docker restarts the container until it is.
+#
+# Outgoing requests (provider site, posters, stream resolution) go through
+# EGRESS_PROXY, a SOCKS5 proxy on the home router behind the same tunnel, so
+# the provider and its CDN see the home IP that later fetches the segments.
+# Leave it empty to go out directly from the server.
+#
+#   WG_ADDR=10.0.0.1 EGRESS_PROXY=socks5://10.0.0.2:1080 docker compose up -d --build
+services:
+  title-api:
+    build: .
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      HTTP_ADDR: ${WG_ADDR:?set WG_ADDR to the server's WireGuard address}:50052
+      GRPC_ADDR: 127.0.0.1:50051
+      HTTPS_PROXY: ${EGRESS_PROXY:-}
+      HTTP_PROXY: ${EGRESS_PROXY:-}
