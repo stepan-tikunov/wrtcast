@@ -159,6 +159,50 @@ func (s *Server) GetEpisodeStreams(
 	return &moviev1.GetEpisodeStreamsQueryResponse{Streams: mediaStreams(streams)}, nil
 }
 
+func (s *Server) GetTitleMetadata(
+	ctx context.Context,
+	query *moviev1.GetTitleMetadataQuery,
+) (*moviev1.GetTitleMetadataQueryResponse, error) {
+	if query.GetMovieId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "movie_id is required")
+	}
+
+	metadata, err := s.client.TitleMetadata(ctx, query.GetMovieId())
+	if err != nil {
+		if errors.Is(err, provider.ErrInvalidMovieID) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Unavailable, err.Error())
+	}
+
+	response := &moviev1.GetTitleMetadataQueryResponse{
+		MovieId:       metadata.MovieID,
+		Title:         metadata.Title,
+		OriginalTitle: metadata.OriginalTitle,
+		Year:          metadata.Year,
+		Description:   metadata.Description,
+		PosterLink:    metadata.PosterURL,
+		MediaType:     mediaType(metadata.MediaType),
+		Quality:       metadata.Quality,
+		Countries:     metadata.Countries,
+		Genres:        metadata.Genres,
+		Directors:     metadata.Directors,
+		Actors:        metadata.Actors,
+		Ratings: make(
+			[]*moviev1.GetTitleMetadataQueryResponse_Rating,
+			0,
+			len(metadata.Ratings),
+		),
+	}
+	for _, rating := range metadata.Ratings {
+		response.Ratings = append(response.Ratings, &moviev1.GetTitleMetadataQueryResponse_Rating{
+			Source: rating.Source,
+			Value:  rating.Value,
+		})
+	}
+	return response, nil
+}
+
 func mediaStreams(streams []provider.MovieStream) []*moviev1.MediaStream {
 	response := make([]*moviev1.MediaStream, 0, len(streams))
 	for _, stream := range streams {

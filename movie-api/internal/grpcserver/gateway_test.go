@@ -82,6 +82,30 @@ func (gatewayTestService) GetEpisodeStreams(
 	}, nil
 }
 
+func (gatewayTestService) GetTitleMetadata(
+	_ context.Context,
+	query *moviev1.GetTitleMetadataQuery,
+) (*moviev1.GetTitleMetadataQueryResponse, error) {
+	return &moviev1.GetTitleMetadataQueryResponse{
+		MovieId:       query.GetMovieId(),
+		Title:         "Аркейн",
+		OriginalTitle: "Arcane: League of Legends",
+		Year:          "2021",
+		Description:   "Описание",
+		PosterLink:    "https://cdn.example/arcane.jpg",
+		MediaType:     moviev1.MediaType_MEDIA_TYPE_SERIES,
+		Quality:       "HD 720, 1080",
+		Countries:     []string{"США"},
+		Genres:        []string{"Мультфильмы", "Netflix"},
+		Directors:     []string{"Pascal Charrue"},
+		Actors:        []string{"Хейли Стайнфелд"},
+		Ratings: []*moviev1.GetTitleMetadataQueryResponse_Rating{
+			{Source: "kinopoisk", Value: 9.2},
+			{Source: "imdb", Value: 9.0},
+		},
+	}, nil
+}
+
 func TestHTTPAnnotation(t *testing.T) {
 	t.Parallel()
 	mux := runtime.NewServeMux()
@@ -211,5 +235,42 @@ func TestSearchMoviesHTTPAnnotation(t *testing.T) {
 	if len(body.Results) != 1 || body.Results[0].MovieID != "67c18f3642185" ||
 		body.Results[0].MovieTitle != "Дюна" || body.Results[0].MediaType != "MEDIA_TYPE_MOVIE" {
 		t.Fatalf("unexpected response: %s", response.Body.String())
+	}
+}
+
+func TestTitleMetadataHTTPAnnotation(t *testing.T) {
+	t.Parallel()
+	mux := runtime.NewServeMux()
+	if err := moviev1.RegisterMovieServiceHandlerServer(
+		context.Background(),
+		mux,
+		gatewayTestService{},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/v1/titles/67c18f3643222", nil)
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+
+	var body struct {
+		MovieID   string `json:"movieId"`
+		Title     string `json:"title"`
+		MediaType string `json:"mediaType"`
+		Ratings   []struct {
+			Source string  `json:"source"`
+			Value  float64 `json:"value"`
+		} `json:"ratings"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.MovieID != "67c18f3643222" || body.Title != "Аркейн" ||
+		body.MediaType != "MEDIA_TYPE_SERIES" || len(body.Ratings) != 2 ||
+		body.Ratings[0].Source != "kinopoisk" || body.Ratings[0].Value != 9.2 {
+		t.Fatalf("unexpected metadata response: %s", response.Body.String())
 	}
 }

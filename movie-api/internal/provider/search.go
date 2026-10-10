@@ -140,10 +140,17 @@ func mediaTypeFromLink(link string) MediaType {
 		return MediaTypeUnspecified
 	}
 	segments := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(segments) > 1 && strings.Contains(strings.ToLower(segments[len(segments)-2]), "serial") {
+	if len(segments) < 2 {
+		return MediaTypeUnspecified
+	}
+	category := strings.ToLower(segments[len(segments)-2])
+	if strings.Contains(category, "serial") {
 		return MediaTypeSeries
 	}
-	return MediaTypeMovie
+	if strings.Contains(category, "film") {
+		return MediaTypeMovie
+	}
+	return MediaTypeUnspecified
 }
 
 func movieSiteID(link string) string {

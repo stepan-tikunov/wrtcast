@@ -439,6 +439,190 @@ func (x *GetEpisodeStreamsQueryResponse) GetStreams() []*MediaStream {
 	return nil
 }
 
+type GetTitleMetadataQuery struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MovieId       string                 `protobuf:"bytes,1,opt,name=movie_id,json=movieId,proto3" json:"movie_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTitleMetadataQuery) Reset() {
+	*x = GetTitleMetadataQuery{}
+	mi := &file_api_movie_v1_movie_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTitleMetadataQuery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTitleMetadataQuery) ProtoMessage() {}
+
+func (x *GetTitleMetadataQuery) ProtoReflect() protoreflect.Message {
+	mi := &file_api_movie_v1_movie_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTitleMetadataQuery.ProtoReflect.Descriptor instead.
+func (*GetTitleMetadataQuery) Descriptor() ([]byte, []int) {
+	return file_api_movie_v1_movie_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetTitleMetadataQuery) GetMovieId() string {
+	if x != nil {
+		return x.MovieId
+	}
+	return ""
+}
+
+type GetTitleMetadataQueryResponse struct {
+	state         protoimpl.MessageState                  `protogen:"open.v1"`
+	MovieId       string                                  `protobuf:"bytes,1,opt,name=movie_id,json=movieId,proto3" json:"movie_id,omitempty"`
+	Title         string                                  `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	OriginalTitle string                                  `protobuf:"bytes,3,opt,name=original_title,json=originalTitle,proto3" json:"original_title,omitempty"`
+	Year          string                                  `protobuf:"bytes,4,opt,name=year,proto3" json:"year,omitempty"`
+	Description   string                                  `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	PosterLink    string                                  `protobuf:"bytes,6,opt,name=poster_link,json=posterLink,proto3" json:"poster_link,omitempty"`
+	MediaType     MediaType                               `protobuf:"varint,7,opt,name=media_type,json=mediaType,proto3,enum=movie.v1.MediaType" json:"media_type,omitempty"`
+	Quality       string                                  `protobuf:"bytes,8,opt,name=quality,proto3" json:"quality,omitempty"`
+	Countries     []string                                `protobuf:"bytes,9,rep,name=countries,proto3" json:"countries,omitempty"`
+	Genres        []string                                `protobuf:"bytes,10,rep,name=genres,proto3" json:"genres,omitempty"`
+	Directors     []string                                `protobuf:"bytes,11,rep,name=directors,proto3" json:"directors,omitempty"`
+	Actors        []string                                `protobuf:"bytes,12,rep,name=actors,proto3" json:"actors,omitempty"`
+	Ratings       []*GetTitleMetadataQueryResponse_Rating `protobuf:"bytes,13,rep,name=ratings,proto3" json:"ratings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTitleMetadataQueryResponse) Reset() {
+	*x = GetTitleMetadataQueryResponse{}
+	mi := &file_api_movie_v1_movie_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTitleMetadataQueryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTitleMetadataQueryResponse) ProtoMessage() {}
+
+func (x *GetTitleMetadataQueryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_movie_v1_movie_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTitleMetadataQueryResponse.ProtoReflect.Descriptor instead.
+func (*GetTitleMetadataQueryResponse) Descriptor() ([]byte, []int) {
+	return file_api_movie_v1_movie_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetTitleMetadataQueryResponse) GetMovieId() string {
+	if x != nil {
+		return x.MovieId
+	}
+	return ""
+}
+
+func (x *GetTitleMetadataQueryResponse) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *GetTitleMetadataQueryResponse) GetOriginalTitle() string {
+	if x != nil {
+		return x.OriginalTitle
+	}
+	return ""
+}
+
+func (x *GetTitleMetadataQueryResponse) GetYear() string {
+	if x != nil {
+		return x.Year
+	}
+	return ""
+}
+
+func (x *GetTitleMetadataQueryResponse) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *GetTitleMetadataQueryResponse) GetPosterLink() string {
+	if x != nil {
+		return x.PosterLink
+	}
+	return ""
+}
+
+func (x *GetTitleMetadataQueryResponse) GetMediaType() MediaType {
+	if x != nil {
+		return x.MediaType
+	}
+	return MediaType_MEDIA_TYPE_UNSPECIFIED
+}
+
+func (x *GetTitleMetadataQueryResponse) GetQuality() string {
+	if x != nil {
+		return x.Quality
+	}
+	return ""
+}
+
+func (x *GetTitleMetadataQueryResponse) GetCountries() []string {
+	if x != nil {
+		return x.Countries
+	}
+	return nil
+}
+
+func (x *GetTitleMetadataQueryResponse) GetGenres() []string {
+	if x != nil {
+		return x.Genres
+	}
+	return nil
+}
+
+func (x *GetTitleMetadataQueryResponse) GetDirectors() []string {
+	if x != nil {
+		return x.Directors
+	}
+	return nil
+}
+
+func (x *GetTitleMetadataQueryResponse) GetActors() []string {
+	if x != nil {
+		return x.Actors
+	}
+	return nil
+}
+
+func (x *GetTitleMetadataQueryResponse) GetRatings() []*GetTitleMetadataQueryResponse_Rating {
+	if x != nil {
+		return x.Ratings
+	}
+	return nil
+}
+
 type MediaStream struct {
 	state             protoimpl.MessageState       `protogen:"open.v1"`
 	MasterPlaylistUrl string                       `protobuf:"bytes,1,opt,name=master_playlist_url,json=masterPlaylistUrl,proto3" json:"master_playlist_url,omitempty"`
@@ -450,7 +634,7 @@ type MediaStream struct {
 
 func (x *MediaStream) Reset() {
 	*x = MediaStream{}
-	mi := &file_api_movie_v1_movie_proto_msgTypes[8]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -462,7 +646,7 @@ func (x *MediaStream) String() string {
 func (*MediaStream) ProtoMessage() {}
 
 func (x *MediaStream) ProtoReflect() protoreflect.Message {
-	mi := &file_api_movie_v1_movie_proto_msgTypes[8]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -475,7 +659,7 @@ func (x *MediaStream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream.ProtoReflect.Descriptor instead.
 func (*MediaStream) Descriptor() ([]byte, []int) {
-	return file_api_movie_v1_movie_proto_rawDescGZIP(), []int{8}
+	return file_api_movie_v1_movie_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *MediaStream) GetMasterPlaylistUrl() string {
@@ -512,7 +696,7 @@ type SearchMoviesQueryResponse_SearchResult struct {
 
 func (x *SearchMoviesQueryResponse_SearchResult) Reset() {
 	*x = SearchMoviesQueryResponse_SearchResult{}
-	mi := &file_api_movie_v1_movie_proto_msgTypes[9]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -524,7 +708,7 @@ func (x *SearchMoviesQueryResponse_SearchResult) String() string {
 func (*SearchMoviesQueryResponse_SearchResult) ProtoMessage() {}
 
 func (x *SearchMoviesQueryResponse_SearchResult) ProtoReflect() protoreflect.Message {
-	mi := &file_api_movie_v1_movie_proto_msgTypes[9]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -585,7 +769,7 @@ type GetSeriesQueryResponse_Season struct {
 
 func (x *GetSeriesQueryResponse_Season) Reset() {
 	*x = GetSeriesQueryResponse_Season{}
-	mi := &file_api_movie_v1_movie_proto_msgTypes[10]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -597,7 +781,7 @@ func (x *GetSeriesQueryResponse_Season) String() string {
 func (*GetSeriesQueryResponse_Season) ProtoMessage() {}
 
 func (x *GetSeriesQueryResponse_Season) ProtoReflect() protoreflect.Message {
-	mi := &file_api_movie_v1_movie_proto_msgTypes[10]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -638,7 +822,7 @@ type GetSeriesQueryResponse_Season_Episode struct {
 
 func (x *GetSeriesQueryResponse_Season_Episode) Reset() {
 	*x = GetSeriesQueryResponse_Season_Episode{}
-	mi := &file_api_movie_v1_movie_proto_msgTypes[11]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -650,7 +834,7 @@ func (x *GetSeriesQueryResponse_Season_Episode) String() string {
 func (*GetSeriesQueryResponse_Season_Episode) ProtoMessage() {}
 
 func (x *GetSeriesQueryResponse_Season_Episode) ProtoReflect() protoreflect.Message {
-	mi := &file_api_movie_v1_movie_proto_msgTypes[11]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -687,6 +871,58 @@ func (x *GetSeriesQueryResponse_Season_Episode) GetDurationSeconds() uint64 {
 	return 0
 }
 
+type GetTitleMetadataQueryResponse_Rating struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Source        string                 `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
+	Value         float64                `protobuf:"fixed64,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTitleMetadataQueryResponse_Rating) Reset() {
+	*x = GetTitleMetadataQueryResponse_Rating{}
+	mi := &file_api_movie_v1_movie_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTitleMetadataQueryResponse_Rating) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTitleMetadataQueryResponse_Rating) ProtoMessage() {}
+
+func (x *GetTitleMetadataQueryResponse_Rating) ProtoReflect() protoreflect.Message {
+	mi := &file_api_movie_v1_movie_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTitleMetadataQueryResponse_Rating.ProtoReflect.Descriptor instead.
+func (*GetTitleMetadataQueryResponse_Rating) Descriptor() ([]byte, []int) {
+	return file_api_movie_v1_movie_proto_rawDescGZIP(), []int{9, 0}
+}
+
+func (x *GetTitleMetadataQueryResponse_Rating) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *GetTitleMetadataQueryResponse_Rating) GetValue() float64 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
 type MediaStream_AudioTrack struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -700,7 +936,7 @@ type MediaStream_AudioTrack struct {
 
 func (x *MediaStream_AudioTrack) Reset() {
 	*x = MediaStream_AudioTrack{}
-	mi := &file_api_movie_v1_movie_proto_msgTypes[12]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -712,7 +948,7 @@ func (x *MediaStream_AudioTrack) String() string {
 func (*MediaStream_AudioTrack) ProtoMessage() {}
 
 func (x *MediaStream_AudioTrack) ProtoReflect() protoreflect.Message {
-	mi := &file_api_movie_v1_movie_proto_msgTypes[12]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -725,7 +961,7 @@ func (x *MediaStream_AudioTrack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream_AudioTrack.ProtoReflect.Descriptor instead.
 func (*MediaStream_AudioTrack) Descriptor() ([]byte, []int) {
-	return file_api_movie_v1_movie_proto_rawDescGZIP(), []int{8, 0}
+	return file_api_movie_v1_movie_proto_rawDescGZIP(), []int{10, 0}
 }
 
 func (x *MediaStream_AudioTrack) GetId() string {
@@ -776,7 +1012,7 @@ type MediaStream_SubtitleTrack struct {
 
 func (x *MediaStream_SubtitleTrack) Reset() {
 	*x = MediaStream_SubtitleTrack{}
-	mi := &file_api_movie_v1_movie_proto_msgTypes[13]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -788,7 +1024,7 @@ func (x *MediaStream_SubtitleTrack) String() string {
 func (*MediaStream_SubtitleTrack) ProtoMessage() {}
 
 func (x *MediaStream_SubtitleTrack) ProtoReflect() protoreflect.Message {
-	mi := &file_api_movie_v1_movie_proto_msgTypes[13]
+	mi := &file_api_movie_v1_movie_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -801,7 +1037,7 @@ func (x *MediaStream_SubtitleTrack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream_SubtitleTrack.ProtoReflect.Descriptor instead.
 func (*MediaStream_SubtitleTrack) Descriptor() ([]byte, []int) {
-	return file_api_movie_v1_movie_proto_rawDescGZIP(), []int{8, 1}
+	return file_api_movie_v1_movie_proto_rawDescGZIP(), []int{10, 1}
 }
 
 func (x *MediaStream_SubtitleTrack) GetId() string {
@@ -877,7 +1113,29 @@ const file_api_movie_v1_movie_proto_rawDesc = "" +
 	"\rseason_number\x18\x02 \x01(\x05R\fseasonNumber\x12%\n" +
 	"\x0eepisode_number\x18\x03 \x01(\tR\repisodeNumber\"Q\n" +
 	"\x1eGetEpisodeStreamsQueryResponse\x12/\n" +
-	"\astreams\x18\x01 \x03(\v2\x15.movie.v1.MediaStreamR\astreams\"\xde\x03\n" +
+	"\astreams\x18\x01 \x03(\v2\x15.movie.v1.MediaStreamR\astreams\"2\n" +
+	"\x15GetTitleMetadataQuery\x12\x19\n" +
+	"\bmovie_id\x18\x01 \x01(\tR\amovieId\"\x8a\x04\n" +
+	"\x1dGetTitleMetadataQueryResponse\x12\x19\n" +
+	"\bmovie_id\x18\x01 \x01(\tR\amovieId\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12%\n" +
+	"\x0eoriginal_title\x18\x03 \x01(\tR\roriginalTitle\x12\x12\n" +
+	"\x04year\x18\x04 \x01(\tR\x04year\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x1f\n" +
+	"\vposter_link\x18\x06 \x01(\tR\n" +
+	"posterLink\x122\n" +
+	"\n" +
+	"media_type\x18\a \x01(\x0e2\x13.movie.v1.MediaTypeR\tmediaType\x12\x18\n" +
+	"\aquality\x18\b \x01(\tR\aquality\x12\x1c\n" +
+	"\tcountries\x18\t \x03(\tR\tcountries\x12\x16\n" +
+	"\x06genres\x18\n" +
+	" \x03(\tR\x06genres\x12\x1c\n" +
+	"\tdirectors\x18\v \x03(\tR\tdirectors\x12\x16\n" +
+	"\x06actors\x18\f \x03(\tR\x06actors\x12H\n" +
+	"\aratings\x18\r \x03(\v2..movie.v1.GetTitleMetadataQueryResponse.RatingR\aratings\x1a6\n" +
+	"\x06Rating\x12\x16\n" +
+	"\x06source\x18\x01 \x01(\tR\x06source\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value\"\xde\x03\n" +
 	"\vMediaStream\x12.\n" +
 	"\x13master_playlist_url\x18\x01 \x01(\tR\x11masterPlaylistUrl\x12C\n" +
 	"\faudio_tracks\x18\x02 \x03(\v2 .movie.v1.MediaStream.AudioTrackR\vaudioTracks\x12A\n" +
@@ -898,12 +1156,13 @@ const file_api_movie_v1_movie_proto_rawDesc = "" +
 	"\tMediaType\x12\x1a\n" +
 	"\x16MEDIA_TYPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10MEDIA_TYPE_MOVIE\x10\x01\x12\x15\n" +
-	"\x11MEDIA_TYPE_SERIES\x10\x022\xad\x04\n" +
+	"\x11MEDIA_TYPE_SERIES\x10\x022\xaa\x05\n" +
 	"\fMovieService\x12k\n" +
 	"\fSearchMovies\x12\x1b.movie.v1.SearchMoviesQuery\x1a#.movie.v1.SearchMoviesQueryResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/movies:search\x12\x8c\x01\n" +
 	"\x13GetStreamsByMovieID\x12\".movie.v1.GetStreamsByMovieIDQuery\x1a*.movie.v1.GetStreamsByMovieIDQueryResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/v1/movies/{movie_id}/streams\x12f\n" +
 	"\tGetSeries\x12\x18.movie.v1.GetSeriesQuery\x1a .movie.v1.GetSeriesQueryResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/series/{movie_id}\x12\xb8\x01\n" +
-	"\x11GetEpisodeStreams\x12 .movie.v1.GetEpisodeStreamsQuery\x1a(.movie.v1.GetEpisodeStreamsQueryResponse\"W\x82\xd3\xe4\x93\x02Q\x12O/v1/series/{movie_id}/seasons/{season_number}/episodes/{episode_number}/streamsB Z\x1emovie-api/api/movie/v1;moviev1b\x06proto3"
+	"\x11GetEpisodeStreams\x12 .movie.v1.GetEpisodeStreamsQuery\x1a(.movie.v1.GetEpisodeStreamsQueryResponse\"W\x82\xd3\xe4\x93\x02Q\x12O/v1/series/{movie_id}/seasons/{season_number}/episodes/{episode_number}/streams\x12{\n" +
+	"\x10GetTitleMetadata\x12\x1f.movie.v1.GetTitleMetadataQuery\x1a'.movie.v1.GetTitleMetadataQueryResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/titles/{movie_id}B Z\x1emovie-api/api/movie/v1;moviev1b\x06proto3"
 
 var (
 	file_api_movie_v1_movie_proto_rawDescOnce sync.Once
@@ -918,7 +1177,7 @@ func file_api_movie_v1_movie_proto_rawDescGZIP() []byte {
 }
 
 var file_api_movie_v1_movie_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_movie_v1_movie_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_api_movie_v1_movie_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_api_movie_v1_movie_proto_goTypes = []any{
 	(MediaType)(0),                                 // 0: movie.v1.MediaType
 	(*SearchMoviesQuery)(nil),                      // 1: movie.v1.SearchMoviesQuery
@@ -929,35 +1188,42 @@ var file_api_movie_v1_movie_proto_goTypes = []any{
 	(*GetSeriesQueryResponse)(nil),                 // 6: movie.v1.GetSeriesQueryResponse
 	(*GetEpisodeStreamsQuery)(nil),                 // 7: movie.v1.GetEpisodeStreamsQuery
 	(*GetEpisodeStreamsQueryResponse)(nil),         // 8: movie.v1.GetEpisodeStreamsQueryResponse
-	(*MediaStream)(nil),                            // 9: movie.v1.MediaStream
-	(*SearchMoviesQueryResponse_SearchResult)(nil), // 10: movie.v1.SearchMoviesQueryResponse.SearchResult
-	(*GetSeriesQueryResponse_Season)(nil),          // 11: movie.v1.GetSeriesQueryResponse.Season
-	(*GetSeriesQueryResponse_Season_Episode)(nil),  // 12: movie.v1.GetSeriesQueryResponse.Season.Episode
-	(*MediaStream_AudioTrack)(nil),                 // 13: movie.v1.MediaStream.AudioTrack
-	(*MediaStream_SubtitleTrack)(nil),              // 14: movie.v1.MediaStream.SubtitleTrack
+	(*GetTitleMetadataQuery)(nil),                  // 9: movie.v1.GetTitleMetadataQuery
+	(*GetTitleMetadataQueryResponse)(nil),          // 10: movie.v1.GetTitleMetadataQueryResponse
+	(*MediaStream)(nil),                            // 11: movie.v1.MediaStream
+	(*SearchMoviesQueryResponse_SearchResult)(nil), // 12: movie.v1.SearchMoviesQueryResponse.SearchResult
+	(*GetSeriesQueryResponse_Season)(nil),          // 13: movie.v1.GetSeriesQueryResponse.Season
+	(*GetSeriesQueryResponse_Season_Episode)(nil),  // 14: movie.v1.GetSeriesQueryResponse.Season.Episode
+	(*GetTitleMetadataQueryResponse_Rating)(nil),   // 15: movie.v1.GetTitleMetadataQueryResponse.Rating
+	(*MediaStream_AudioTrack)(nil),                 // 16: movie.v1.MediaStream.AudioTrack
+	(*MediaStream_SubtitleTrack)(nil),              // 17: movie.v1.MediaStream.SubtitleTrack
 }
 var file_api_movie_v1_movie_proto_depIdxs = []int32{
-	10, // 0: movie.v1.SearchMoviesQueryResponse.results:type_name -> movie.v1.SearchMoviesQueryResponse.SearchResult
-	9,  // 1: movie.v1.GetStreamsByMovieIDQueryResponse.streams:type_name -> movie.v1.MediaStream
-	11, // 2: movie.v1.GetSeriesQueryResponse.seasons:type_name -> movie.v1.GetSeriesQueryResponse.Season
-	9,  // 3: movie.v1.GetEpisodeStreamsQueryResponse.streams:type_name -> movie.v1.MediaStream
-	13, // 4: movie.v1.MediaStream.audio_tracks:type_name -> movie.v1.MediaStream.AudioTrack
-	14, // 5: movie.v1.MediaStream.subtitles:type_name -> movie.v1.MediaStream.SubtitleTrack
-	0,  // 6: movie.v1.SearchMoviesQueryResponse.SearchResult.media_type:type_name -> movie.v1.MediaType
-	12, // 7: movie.v1.GetSeriesQueryResponse.Season.episodes:type_name -> movie.v1.GetSeriesQueryResponse.Season.Episode
-	1,  // 8: movie.v1.MovieService.SearchMovies:input_type -> movie.v1.SearchMoviesQuery
-	3,  // 9: movie.v1.MovieService.GetStreamsByMovieID:input_type -> movie.v1.GetStreamsByMovieIDQuery
-	5,  // 10: movie.v1.MovieService.GetSeries:input_type -> movie.v1.GetSeriesQuery
-	7,  // 11: movie.v1.MovieService.GetEpisodeStreams:input_type -> movie.v1.GetEpisodeStreamsQuery
-	2,  // 12: movie.v1.MovieService.SearchMovies:output_type -> movie.v1.SearchMoviesQueryResponse
-	4,  // 13: movie.v1.MovieService.GetStreamsByMovieID:output_type -> movie.v1.GetStreamsByMovieIDQueryResponse
-	6,  // 14: movie.v1.MovieService.GetSeries:output_type -> movie.v1.GetSeriesQueryResponse
-	8,  // 15: movie.v1.MovieService.GetEpisodeStreams:output_type -> movie.v1.GetEpisodeStreamsQueryResponse
-	12, // [12:16] is the sub-list for method output_type
-	8,  // [8:12] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	12, // 0: movie.v1.SearchMoviesQueryResponse.results:type_name -> movie.v1.SearchMoviesQueryResponse.SearchResult
+	11, // 1: movie.v1.GetStreamsByMovieIDQueryResponse.streams:type_name -> movie.v1.MediaStream
+	13, // 2: movie.v1.GetSeriesQueryResponse.seasons:type_name -> movie.v1.GetSeriesQueryResponse.Season
+	11, // 3: movie.v1.GetEpisodeStreamsQueryResponse.streams:type_name -> movie.v1.MediaStream
+	0,  // 4: movie.v1.GetTitleMetadataQueryResponse.media_type:type_name -> movie.v1.MediaType
+	15, // 5: movie.v1.GetTitleMetadataQueryResponse.ratings:type_name -> movie.v1.GetTitleMetadataQueryResponse.Rating
+	16, // 6: movie.v1.MediaStream.audio_tracks:type_name -> movie.v1.MediaStream.AudioTrack
+	17, // 7: movie.v1.MediaStream.subtitles:type_name -> movie.v1.MediaStream.SubtitleTrack
+	0,  // 8: movie.v1.SearchMoviesQueryResponse.SearchResult.media_type:type_name -> movie.v1.MediaType
+	14, // 9: movie.v1.GetSeriesQueryResponse.Season.episodes:type_name -> movie.v1.GetSeriesQueryResponse.Season.Episode
+	1,  // 10: movie.v1.MovieService.SearchMovies:input_type -> movie.v1.SearchMoviesQuery
+	3,  // 11: movie.v1.MovieService.GetStreamsByMovieID:input_type -> movie.v1.GetStreamsByMovieIDQuery
+	5,  // 12: movie.v1.MovieService.GetSeries:input_type -> movie.v1.GetSeriesQuery
+	7,  // 13: movie.v1.MovieService.GetEpisodeStreams:input_type -> movie.v1.GetEpisodeStreamsQuery
+	9,  // 14: movie.v1.MovieService.GetTitleMetadata:input_type -> movie.v1.GetTitleMetadataQuery
+	2,  // 15: movie.v1.MovieService.SearchMovies:output_type -> movie.v1.SearchMoviesQueryResponse
+	4,  // 16: movie.v1.MovieService.GetStreamsByMovieID:output_type -> movie.v1.GetStreamsByMovieIDQueryResponse
+	6,  // 17: movie.v1.MovieService.GetSeries:output_type -> movie.v1.GetSeriesQueryResponse
+	8,  // 18: movie.v1.MovieService.GetEpisodeStreams:output_type -> movie.v1.GetEpisodeStreamsQueryResponse
+	10, // 19: movie.v1.MovieService.GetTitleMetadata:output_type -> movie.v1.GetTitleMetadataQueryResponse
+	15, // [15:20] is the sub-list for method output_type
+	10, // [10:15] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_api_movie_v1_movie_proto_init() }
@@ -971,7 +1237,7 @@ func file_api_movie_v1_movie_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_movie_v1_movie_proto_rawDesc), len(file_api_movie_v1_movie_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   14,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

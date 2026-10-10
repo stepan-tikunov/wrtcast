@@ -108,4 +108,25 @@ func TestRealMovieService(t *testing.T) {
 		episodeStreams.GetStreams()[0].GetMasterPlaylistUrl() == "" {
 		t.Fatal("selected episode has no streams")
 	}
+
+	for _, test := range []struct {
+		siteID string
+		title  string
+	}{
+		{siteID: "43222", title: "Аркейн"},
+		{siteID: "54016", title: "Евангелион"},
+	} {
+		metadata, err := moviev1.NewMovieServiceClient(connection).GetTitleMetadata(
+			ctx,
+			&moviev1.GetTitleMetadataQuery{MovieId: client.ExternalMovieID(test.siteID)},
+		)
+		if err != nil {
+			t.Fatalf("GetTitleMetadata(%s): %v", test.title, err)
+		}
+		if metadata.GetTitle() != test.title ||
+			metadata.GetMediaType() != moviev1.MediaType_MEDIA_TYPE_SERIES ||
+			metadata.GetDescription() == "" || len(metadata.GetRatings()) == 0 {
+			t.Fatalf("unexpected %s metadata: %+v", test.title, metadata)
+		}
+	}
 }

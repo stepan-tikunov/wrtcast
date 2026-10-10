@@ -147,6 +147,12 @@ func TestClientSearch(t *testing.T) {
     <img src="https://cdn.example/prophecy.jpg" alt="Дюна: Пророчество">
     <div class="th-title">Дюна: Пророчество</div><span class="year">2024</span>
   </a>
+</div>
+<div class="th-item">
+  <a href="/mult/43222-arkejn-2021.html">
+    <img src="/uploads/arcane.jpg" alt="Аркейн">
+    <div class="th-title">Аркейн</div><span class="year">2021</span>
+  </a>
 </div>`, serverURL)
 		default:
 			response.WriteHeader(http.StatusNotFound)
@@ -169,8 +175,8 @@ func TestClientSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 2 {
-		t.Fatalf("got %d results, want 2: %+v", len(results), results)
+	if len(results) != 3 {
+		t.Fatalf("got %d results, want 3: %+v", len(results), results)
 	}
 	if results[0].MovieID != client.ExternalMovieID("42185") || results[0].Title != "Дюна" ||
 		results[0].Year != "2021" || results[0].PosterURL != serverURL+"/uploads/dune.jpg" ||
@@ -179,6 +185,9 @@ func TestClientSearch(t *testing.T) {
 	}
 	if results[1].PosterURL != "https://cdn.example/prophecy.jpg" || results[1].MediaType != MediaTypeSeries {
 		t.Fatalf("unexpected second result: %+v", results[1])
+	}
+	if results[2].MediaType != MediaTypeUnspecified {
+		t.Fatalf("ambiguous animated title type = %v, want unspecified", results[2].MediaType)
 	}
 }
 

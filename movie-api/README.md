@@ -55,8 +55,26 @@ curl --get --data-urlencode 'query=Дюна' \
 ```
 
 Search results contain the external movie ID, title, year, absolute poster URL,
-and `mediaType` (`MEDIA_TYPE_MOVIE` or `MEDIA_TYPE_SERIES`). Up to 30 results
-are returned by the provider's first search page.
+and a cheap path-based `mediaType` hint. Ambiguous categories such as animation
+and anime return `MEDIA_TYPE_UNSPECIFIED`; use title metadata for the authoritative
+type. Up to 30 results are returned by the provider's first search page.
+
+Title metadata is available over HTTP and gRPC:
+
+```sh
+curl 'http://localhost:8080/v1/titles/67c18f3643222'
+
+grpcurl -plaintext \
+  -d '{"movie_id":"67c18f3643222"}' \
+  localhost:50051 \
+  movie.v1.MovieService/GetTitleMetadata
+```
+
+`GetTitleMetadata` returns the title, original title, year, description, poster,
+quality, countries, genres, directors, actors, Kinopoisk/IMDb ratings, and an
+authoritative `mediaType`. The type is detected from the actual player payload:
+a seasonal playlist is a series even when its catalog URL is under animation or
+anime, while a single HLS source is a movie.
 
 For a series, first request its season and episode catalog. The catalog contains
 metadata only, so it does not expose signed URLs that may expire before playback:

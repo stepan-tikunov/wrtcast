@@ -76,4 +76,9 @@ func TestMediaTypeMismatchStatuses(t *testing.T) {
 	if code := status.Code(err); code != codes.NotFound {
 		t.Fatalf("GetEpisodeStreams(missing) code = %s, want %s: %v", code, codes.NotFound, err)
 	}
+
+	_, err = service.GetTitleMetadata(ctx, &moviev1.GetTitleMetadataQuery{MovieId: "wrong-prefix-1"})
+	if code := status.Code(err); code != codes.InvalidArgument {
+		t.Fatalf("GetTitleMetadata(invalid ID) code = %s, want %s: %v", code, codes.InvalidArgument, err)
+	}
 }

@@ -23,6 +23,7 @@ const (
 	MovieService_GetStreamsByMovieID_FullMethodName = "/movie.v1.MovieService/GetStreamsByMovieID"
 	MovieService_GetSeries_FullMethodName           = "/movie.v1.MovieService/GetSeries"
 	MovieService_GetEpisodeStreams_FullMethodName   = "/movie.v1.MovieService/GetEpisodeStreams"
+	MovieService_GetTitleMetadata_FullMethodName    = "/movie.v1.MovieService/GetTitleMetadata"
 )
 
 // MovieServiceClient is the client API for MovieService service.
@@ -33,6 +34,7 @@ type MovieServiceClient interface {
 	GetStreamsByMovieID(ctx context.Context, in *GetStreamsByMovieIDQuery, opts ...grpc.CallOption) (*GetStreamsByMovieIDQueryResponse, error)
 	GetSeries(ctx context.Context, in *GetSeriesQuery, opts ...grpc.CallOption) (*GetSeriesQueryResponse, error)
 	GetEpisodeStreams(ctx context.Context, in *GetEpisodeStreamsQuery, opts ...grpc.CallOption) (*GetEpisodeStreamsQueryResponse, error)
+	GetTitleMetadata(ctx context.Context, in *GetTitleMetadataQuery, opts ...grpc.CallOption) (*GetTitleMetadataQueryResponse, error)
 }
 
 type movieServiceClient struct {
@@ -83,6 +85,16 @@ func (c *movieServiceClient) GetEpisodeStreams(ctx context.Context, in *GetEpiso
 	return out, nil
 }
 
+func (c *movieServiceClient) GetTitleMetadata(ctx context.Context, in *GetTitleMetadataQuery, opts ...grpc.CallOption) (*GetTitleMetadataQueryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTitleMetadataQueryResponse)
+	err := c.cc.Invoke(ctx, MovieService_GetTitleMetadata_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MovieServiceServer is the server API for MovieService service.
 // All implementations must embed UnimplementedMovieServiceServer
 // for forward compatibility.
@@ -91,6 +103,7 @@ type MovieServiceServer interface {
 	GetStreamsByMovieID(context.Context, *GetStreamsByMovieIDQuery) (*GetStreamsByMovieIDQueryResponse, error)
 	GetSeries(context.Context, *GetSeriesQuery) (*GetSeriesQueryResponse, error)
 	GetEpisodeStreams(context.Context, *GetEpisodeStreamsQuery) (*GetEpisodeStreamsQueryResponse, error)
+	GetTitleMetadata(context.Context, *GetTitleMetadataQuery) (*GetTitleMetadataQueryResponse, error)
 	mustEmbedUnimplementedMovieServiceServer()
 }
 
@@ -112,6 +125,9 @@ func (UnimplementedMovieServiceServer) GetSeries(context.Context, *GetSeriesQuer
 }
 func (UnimplementedMovieServiceServer) GetEpisodeStreams(context.Context, *GetEpisodeStreamsQuery) (*GetEpisodeStreamsQueryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetEpisodeStreams not implemented")
+}
+func (UnimplementedMovieServiceServer) GetTitleMetadata(context.Context, *GetTitleMetadataQuery) (*GetTitleMetadataQueryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTitleMetadata not implemented")
 }
 func (UnimplementedMovieServiceServer) mustEmbedUnimplementedMovieServiceServer() {}
 func (UnimplementedMovieServiceServer) testEmbeddedByValue()                      {}
@@ -206,6 +222,24 @@ func _MovieService_GetEpisodeStreams_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MovieService_GetTitleMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTitleMetadataQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MovieServiceServer).GetTitleMetadata(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MovieService_GetTitleMetadata_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MovieServiceServer).GetTitleMetadata(ctx, req.(*GetTitleMetadataQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MovieService_ServiceDesc is the grpc.ServiceDesc for MovieService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +262,10 @@ var MovieService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetEpisodeStreams",
 			Handler:    _MovieService_GetEpisodeStreams_Handler,
+		},
+		{
+			MethodName: "GetTitleMetadata",
+			Handler:    _MovieService_GetTitleMetadata_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

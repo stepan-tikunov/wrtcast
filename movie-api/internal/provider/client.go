@@ -78,35 +78,43 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 }
 
 func (c *Client) movieEmbeds(ctx context.Context, externalMovieID string) (*session, []string, error) {
-	siteMovieID, err := c.parseExternalMovieID(externalMovieID)
+	current, _, embedURLs, err := c.movieDocument(ctx, externalMovieID)
 	if err != nil {
 		return nil, nil, err
+	}
+	return current, embedURLs, nil
+}
+
+func (c *Client) movieDocument(ctx context.Context, externalMovieID string) (*session, []byte, []string, error) {
+	siteMovieID, err := c.parseExternalMovieID(externalMovieID)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	current, err := c.currentSession()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	movieHTML, err := c.moviePage(ctx, current, siteMovieID)
 	if errors.Is(err, errAntiBotChallenge) {
 		if refreshErr := c.refreshIfStale(ctx, current.generation); refreshErr != nil {
-			return nil, nil, fmt.Errorf("refresh rejected anti-bot session: %w", refreshErr)
+			return nil, nil, nil, fmt.Errorf("refresh rejected anti-bot session: %w", refreshErr)
 		}
 		current, err = c.currentSession()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		movieHTML, err = c.moviePage(ctx, current, siteMovieID)
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	embedURLs := uniqueEmbedURLs(embedURLPattern.FindAllString(string(movieHTML), -1), c.baseURL.Scheme)
 	if len(embedURLs) == 0 {
-		return nil, nil, errors.New("embed URL not found in movie page")
+		return nil, nil, nil, errors.New("embed URL not found in movie page")
 	}
-	return current, embedURLs, nil
+	return current, movieHTML, embedURLs, nil
 }
 
 func (c *Client) streamFromEmbed(ctx context.Context, current *session, embedURL string) (MovieStream, error) {

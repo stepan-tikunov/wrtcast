@@ -30,6 +30,12 @@ service MovieService {
       get: "/v1/series/{movie_id}/seasons/{season_number}/episodes/{episode_number}/streams"
     };
   }
+
+  rpc GetTitleMetadata(GetTitleMetadataQuery) returns (GetTitleMetadataQueryResponse) {
+    option (google.api.http) = {
+      get: "/v1/titles/{movie_id}"
+    };
+  }
 }
 
 enum MediaType {
@@ -89,6 +95,31 @@ message GetEpisodeStreamsQuery {
 
 message GetEpisodeStreamsQueryResponse {
   repeated MediaStream streams = 1;
+}
+
+message GetTitleMetadataQuery {
+  string movie_id = 1;
+}
+
+message GetTitleMetadataQueryResponse {
+  message Rating {
+    string source = 1;
+    double value = 2;
+  }
+
+  string movie_id = 1;
+  string title = 2;
+  string original_title = 3;
+  string year = 4;
+  string description = 5;
+  string poster_link = 6;
+  MediaType media_type = 7;
+  string quality = 8;
+  repeated string countries = 9;
+  repeated string genres = 10;
+  repeated string directors = 11;
+  repeated string actors = 12;
+  repeated Rating ratings = 13;
 }
 
 message MediaStream {
