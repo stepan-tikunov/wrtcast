@@ -156,7 +156,7 @@ function with_now(st) {
 	if (!now || !st.media || st.media.url != now.url)
 		return st;
 	st.now = {
-		id: now.id, stream: now.stream, title: now.title,
+		id: now.id, stream: now.stream, title: now.title, poster: now.poster,
 		season: now.season, episode: now.episode,
 	};
 	for (let t in st.media.tracks ?? [])
@@ -340,6 +340,9 @@ const routes = {
 			labels[t.id] = t.name;
 		writefile(STATE, sprintf('%J', {
 			id, stream: n, url, title: p.title ?? null, season, episode, labels,
+			// Only our own proxy paths, so the UI never loads arbitrary URLs.
+			poster: length(p.poster ?? '') <= 4096 &&
+				match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
 		}));
 		return with_now(st);
 	},

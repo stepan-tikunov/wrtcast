@@ -30,14 +30,34 @@ Configuration (`/etc/config/castbff`):
 
 ## Web UI
 
-`www/index.html` (~14 KB, ~5 KB gzipped, no dependencies) is served at
-`http://192.168.1.1:8088/`. Search at the top, a grid of cards below; tapping a
-card starts the movie; a series card opens a season/episode picker. The bottom
-player sheet has the timeline, ±10/30 s,
-volume, audio and subtitle selection, and for series "Episodes" and "Next"
-(which crosses into the next season). Status is polled every 2 s while the tab
-is visible. If a token is configured, the page asks for it once and keeps it in
-`localStorage`.
+`www/index.html` (~29 KB, ~10 KB gzipped, no dependencies) is served at
+`http://192.168.1.1:8088/`.
+
+- Search at the top; the last results are restored instantly from
+  `localStorage`. Cards show "Сериал" and "На ТВ" badges.
+- Tapping a card opens a details page instead of starting playback right away:
+  a movie has a "Смотреть на ТВ" button, a series has season chips and an
+  episode list with the current episode highlighted.
+- While `/api/play` is running (~9 s), the mini player shows the new movie
+  with a spinner, repeated taps are ignored, and status polls don't overwrite
+  it. The playback controls (timeline, tracks, buttons) are hidden until the
+  new status arrives, since they would still describe the previous movie.
+- The mini player has a poster, a progress line and play/pause. Tapping it
+  opens the full player over a dimmed backdrop: timeline with elapsed and
+  remaining time, ±10 s, volume, audio and subtitle selection. For series the
+  transport row gets previous/next episode buttons (crossing season
+  boundaries) and there is an "Серии" button for the episode list.
+- The phone's back button closes the player and the details page.
+- Play/pause updates instantly. Status is polled every 2 s while the tab is
+  visible, and the position between polls is extrapolated so the timer ticks
+  every second. A lost connection is reported once, not on every poll.
+- If a token is configured, the page asks for it once and keeps it in
+  `localStorage`.
+- Motion is CSS-only: skeleton cards while searching, staggered cards and
+  episodes, posters fading in, the details page sliding in and out, the
+  player sheet expanding (`grid-template-rows` 0fr→1fr) over a fading
+  backdrop, a springy play/pause icon. All of it is disabled under
+  `prefers-reduced-motion`.
 
 ## API
 
@@ -49,9 +69,9 @@ All responses are JSON. Errors return `{"error": "..."}` with status 400, 401,
 | `GET /api/search?q=` | `{results:[{id,title,year,type,poster}]}`, `type` is `movie` or `series`, `q` ≥ 3 chars |
 | `GET /api/streams?id=` | `{streams:[{index,url,audio:[{id,name,lang,default}],subs:[{id,name,lang,forced}]}]}` |
 | `GET /api/series?id=` | `{seasons:[{season,episodes:[{episode,title,duration}]}]}` |
-| `POST /api/play` `id`, `stream`=0, `title`?, `season`+`episode`? | fetches fresh streams of the movie (or of the episode when `season`/`episode` are given), runs `castctl play`, returns status |
+| `POST /api/play` `id`, `stream`=0, `title`?, `poster`?, `season`+`episode`? | fetches fresh streams of the movie (or of the episode when `season`/`episode` are given), runs `castctl play`, returns status |
 | `POST /api/cmd` `c`, `arg`? | `pause resume stop quit mute unmute` · `seek ff rew volume` (number) · `audio subs` (id/lang/name/`off`) |
-| `GET /api/status` | `castctl status`; when the stream was started via `/api/play`, adds `now:{id,stream,title,season,episode}` and a movie-api `label` to each track |
+| `GET /api/status` | `castctl status`; when the stream was started via `/api/play`, adds `now:{id,stream,title,poster,season,episode}` and a movie-api `label` to each track |
 
 | `GET /api/p/<name>?u=<url>` | media proxy, see below |
 
