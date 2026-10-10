@@ -83,7 +83,7 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
 | `GET /api/search?q=` | `{results:[{id,title,year,poster}]}`, `q` — не меньше 3 символов |
 | `GET /api/streams?id=` | `{streams:[{index,url,audio:[{id,name,lang,default}],subs:[{id,name,lang,forced}]}]}` |
 | `GET /api/title?id=` | `{id,title,original,year,description,poster,type,quality,countries,genres,directors,actors,ratings:[{source,value}],duration,seasons}`; `type` — `movie` или `series`, `seasons` (`[{season,episodes:[{episode,title,duration}]}]`) у фильмов `null`; разделы сайта и годы из `genres` убираются |
-| `POST /api/play` `id`, `stream`=0, `title`?, `poster`?, `season`+`episode`? | получает свежие потоки фильма (или серии, если переданы `season`/`episode`), запускает `castctl play`, возвращает статус |
+| `POST /api/play` `id`, `stream`=0, `title`?, `poster`?, `season`+`episode`? | получает свежие потоки фильма (или серии, если переданы `season`/`episode`), запускает `castctl play`, возвращает статус. Субтитры title-api — отдельные WebVTT-файлы вне HLS-манифеста, поэтому они передаются ТВ в `LOAD` (`castctl play -s`) через прокси и выключены, пока их не выберут |
 | `POST /api/cmd` `c`, `arg`? | `pause resume stop quit mute unmute` · `seek ff rew volume` (число) · `audio subs` (id/язык/название/`off`) |
 | `GET /api/devices` `refresh`? | `{devices:[{id,name,model,host,port}],default}`: `castctl discover`, кэш на 60 с, если не передан `refresh=1`; `default` — id устройства из `cast_host` |
 | `GET /api/status` | `castctl status`; если поток запущен через `/api/play`, добавляет `now:{id,stream,title,poster,season,episode}` и к каждой дорожке `label` из title-api; всегда добавляет `device:{id,name}` |

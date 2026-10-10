@@ -215,8 +215,10 @@ function streams(id, season, episode) {
 		audio: map(s.audioTracks ?? [], a => ({
 			id: a.id, name: a.name, lang: a.language, default: !!a.default,
 		})),
+		// Provider names end with the track number ("Рус. полные - 5").
 		subs: map(s.subtitles ?? [], t => ({
-			id: t.id, name: t.name, lang: t.language, forced: !!t.forced,
+			id: t.id, name: replace(t.name ?? '', / +- +[0-9]+$/, ''),
+			lang: t.language, forced: !!t.forced, url: t.playlistUrl,
 		})),
 	}));
 }
@@ -434,9 +436,18 @@ const routes = {
 		if (!s || !s.url)
 			fail(404, 'stream not found');
 		let url = PROXY ? purl(s.url, public_base()) : s.url;
-		let st = castctl(dev, 'play', url);
-		let labels = {};
-		for (let t in [...s.audio, ...s.subs])
+		// Subtitles are separate WebVTT files, not part of the HLS manifest,
+		// so they are side-loaded; the receiver names them "sub<id>".
+		let args = ['play', url], labels = {};
+		for (let t in s.subs) {
+			if (!t.url)
+				continue;
+			push(args, '-s', PROXY ? purl(t.url, public_base()) : t.url,
+			     t.lang || 'und', 'sub' + t.id);
+			labels['sub' + t.id] = t.name;
+		}
+		let st = castctl(dev, ...args);
+		for (let t in s.audio)
 			labels[t.id] = t.name;
 		writefile(state_file(dev), sprintf('%J', {
 			id, stream: n, url, title: p.title ?? null, season, episode, labels,
