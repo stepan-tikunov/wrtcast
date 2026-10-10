@@ -131,6 +131,8 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .opt{margin:0 0 8px}
 .opt label{display:flex;justify-content:space-between;margin:0 2px;color:var(--mu);font-size:12px}
 .opt b{color:var(--tx);font-weight:500;font-variant-numeric:tabular-nums}
+#styfont{display:flex;gap:6px;margin:6px 0 10px}
+#styfont .chip{flex:1;height:36px;padding:0 8px}
 #styreset{display:block;margin:4px auto 0;padding:8px 16px;border:0;background:none;color:var(--mu);font-size:14px}
 #devname{display:flex;align-items:center;gap:6px;margin:8px auto 0;padding:6px 12px;border:0;border-radius:16px;background:none;color:var(--mu);font-size:14px}
 #devname svg{width:18px;height:18px}
@@ -258,6 +260,7 @@ svg.spring{animation:spring .3s ease-out}
   <div id="stypv"><span>Сны — это послания из глубины.</span></div>
   <div class="opt"><label for="stysize">Размер<b id="stysizev"></b></label><input type="range" id="stysize" min="0.5" max="2.5" step="0.1"></div>
   <div class="opt"><label for="stybg">Фон<b id="stybgv"></b></label><input type="range" id="stybg" min="0" max="100" step="5"></div>
+  <div class="opt"><label>Шрифт</label><div id="styfont"></div></div>
   <button id="styreset">Сбросить</button>
 </section>
 <div id="toast"></div>
@@ -548,7 +551,7 @@ async function play(m) {
   if (pending) return;
   const req = { id: m.id, title: m.title };
   if (m.poster) req.poster = m.poster;
-  if (subStyle) req.style = styleSpec(subStyle); // the receiver resets it on every load
+  req.style = styleSpec(subStyle || {}); // the receiver resets it on every load
   if (m.season != null) Object.assign(req, { season: String(m.season), episode: m.episode });
   pending = req;
   refresh();
@@ -766,19 +769,34 @@ function selectDevice(id) {
 
 // The receiver ignores colors and edges for side-loaded WebVTT, so only the
 // size and the opacity of the black background behind the text are offered.
-const STYLE_DEFAULT = { size: 1, bg: 0 };
-const styleSpec = s => `size=${s.size},bg=#000000` +
-  Math.round(s.bg * 2.55).toString(16).padStart(2, '0').toUpperCase();
+// The receiver ignores colors and edges for side-loaded WebVTT, so only the
+// size, the opacity of the black background and the font are offered. Size
+// and background stay at the receiver's defaults until changed; the font is
+// always sent, since the receiver's default one is monospaced.
+const FONTS = [['sans', 'Обычный', 'system-ui,sans-serif'], ['mono', 'Моноширинный', 'ui-monospace,monospace']];
+const styleSpec = s => [
+  s.size != null && `size=${s.size}`,
+  s.bg != null && 'bg=#000000' + Math.round(s.bg * 2.55).toString(16).padStart(2, '0').toUpperCase(),
+  `font=${FONTS.some(f => f[0] == s.font) ? s.font : 'sans'}`,
+].filter(Boolean).join(',');
 
 // Preview and labels follow the sliders; the TV gets the value on release.
-function renderStyle(s = { ...STYLE_DEFAULT, ...subStyle }) {
-  $('stysize').value = s.size;
-  $('stybg').value = s.bg;
-  $('stysizev').textContent = Math.round(s.size * 100) + '%';
-  $('stybgv').textContent = s.bg ? s.bg + '%' : 'нет';
+function renderStyle(s = subStyle || {}) {
+  const size = s.size ?? 1, bg = s.bg ?? 0;
+  const font = FONTS.some(f => f[0] == s.font) ? s.font : 'sans';
+  $('stysize').value = size;
+  $('stybg').value = bg;
+  $('stysizev').textContent = Math.round(size * 100) + '%';
+  $('stybgv').textContent = bg ? bg + '%' : 'нет';
+  $('styfont').replaceChildren(...FONTS.map(([v, label]) => {
+    const c = el('button', { className: 'chip' + (v == font ? ' on' : '') }, label);
+    c.onclick = () => setStyle({ ...subStyle, font: v });
+    return c;
+  }));
   const pv = $('stypv').firstChild.style;
-  pv.fontSize = 15 * s.size + 'px';
-  pv.background = `rgba(0,0,0,${s.bg / 100})`;
+  pv.fontSize = 15 * size + 'px';
+  pv.background = `rgba(0,0,0,${bg / 100})`;
+  pv.fontFamily = FONTS.find(f => f[0] == font)[2];
   $('styreset').hidden = !subStyle;
 }
 
@@ -788,7 +806,7 @@ function setStyle(s) {
   if (s) localStorage.subs = JSON.stringify(s);
   else localStorage.removeItem('subs');
   renderStyle();
-  if (st?.media) cmd('substyle', styleSpec(s || STYLE_DEFAULT));
+  if (st?.media) cmd('substyle', styleSpec(s || {}));
 }
 
 // ---- wiring -------------------------------------------------------------
@@ -849,7 +867,7 @@ $('styb').onclick = () => {
 };
 $('styreset').onclick = () => setStyle(null);
 $('stycollapse').onclick = closeTop;
-const sliderStyle = () => ({ size: +$('stysize').value, bg: +$('stybg').value });
+const sliderStyle = () => ({ ...subStyle, size: +$('stysize').value, bg: +$('stybg').value });
 $('stysize').oninput = $('stybg').oninput = () => renderStyle(sliderStyle());
 $('stysize').onchange = $('stybg').onchange = () => setStyle(sliderStyle());
 $('next').onclick = () => stepEpisode(1);
