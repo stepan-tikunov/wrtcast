@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	moviev1 "movie-api/api/movie/v1"
-	"movie-api/internal/grpcserver"
-	"movie-api/internal/provider"
+	titlev1 "title-api/api/title/v1"
+	"title-api/internal/grpcserver"
+	"title-api/internal/provider"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
@@ -68,14 +68,14 @@ func run() error {
 
 	service := grpcserver.New(client)
 	grpcServer := grpc.NewServer()
-	moviev1.RegisterMovieServiceServer(grpcServer, service)
+	titlev1.RegisterTitleServiceServer(grpcServer, service)
 	healthServer := health.NewServer()
-	healthServer.SetServingStatus("movie.v1.MovieService", grpc_health_v1.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus("title.v1.TitleService", grpc_health_v1.HealthCheckResponse_SERVING)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 	reflection.Register(grpcServer)
 
 	gateway := runtime.NewServeMux()
-	if err := moviev1.RegisterMovieServiceHandlerServer(ctx, gateway, service); err != nil {
+	if err := titlev1.RegisterTitleServiceHandlerServer(ctx, gateway, service); err != nil {
 		_ = grpcListener.Close()
 		_ = httpListener.Close()
 		return err
@@ -91,7 +91,7 @@ func run() error {
 	}
 
 	log.Printf(
-		"gRPC server listening on %s; HTTP gateway listening on %s; movie_id prefix for %s is %s",
+		"gRPC server listening on %s; HTTP gateway listening on %s; title_id prefix for %s is %s",
 		grpcAddress,
 		httpAddress,
 		baseURL,

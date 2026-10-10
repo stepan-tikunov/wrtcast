@@ -79,7 +79,7 @@ video.m3u8
 		t.Fatal(err)
 	}
 
-	seriesID := client.ExternalMovieID("20973")
+	seriesID := client.ExternalTitleID("20973")
 	seasons, err := client.Series(ctx, seriesID)
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +110,7 @@ video.m3u8
 		t.Fatalf("series Streams() error = %v, want ErrNotMovie", err)
 	}
 
-	movieID := client.ExternalMovieID("42185")
+	movieID := client.ExternalTitleID("42185")
 	if _, err := client.Series(ctx, movieID); !errors.Is(err, ErrNotSeries) {
 		t.Fatalf("movie Series() error = %v, want ErrNotSeries", err)
 	}

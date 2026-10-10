@@ -20,11 +20,11 @@ var (
 var ErrInvalidSearchQuery = errors.New("invalid search query")
 
 type SearchResult struct {
-	MovieID   string
-	Title     string
-	Year      string
-	PosterURL string
-	MediaType MediaType
+	TitleID         string
+	Title           string
+	Year            string
+	PosterURL       string
+	DurationSeconds uint64
 }
 
 func (c *Client) Search(ctx context.Context, query string) ([]SearchResult, error) {
@@ -124,33 +124,13 @@ func parseSearchResults(body []byte, baseURL *url.URL, domainPrefix string) ([]S
 		}
 
 		results = append(results, SearchResult{
-			MovieID:   domainPrefix + siteID,
+			TitleID:   domainPrefix + siteID,
 			Title:     title,
 			Year:      year,
 			PosterURL: poster,
-			MediaType: mediaTypeFromLink(attribute(anchor, "href")),
 		})
 	})
 	return results, nil
-}
-
-func mediaTypeFromLink(link string) MediaType {
-	parsed, err := url.Parse(strings.TrimSpace(link))
-	if err != nil {
-		return MediaTypeUnspecified
-	}
-	segments := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(segments) < 2 {
-		return MediaTypeUnspecified
-	}
-	category := strings.ToLower(segments[len(segments)-2])
-	if strings.Contains(category, "serial") {
-		return MediaTypeSeries
-	}
-	if strings.Contains(category, "film") {
-		return MediaTypeMovie
-	}
-	return MediaTypeUnspecified
 }
 
 func movieSiteID(link string) string {

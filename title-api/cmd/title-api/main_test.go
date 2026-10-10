@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"movie-api/internal/provider"
+	"title-api/internal/provider"
 )
 
 func TestAllowAllOrigins(t *testing.T) {
@@ -17,7 +17,7 @@ func TestAllowAllOrigins(t *testing.T) {
 		response.WriteHeader(http.StatusOK)
 	}))
 
-	request := httptest.NewRequest(http.MethodGet, "/v1/movies/movie-id/streams", nil)
+	request := httptest.NewRequest(http.MethodGet, "/v1/titles/title-id/playback-streams", nil)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
@@ -37,7 +37,7 @@ func TestAllowAllOriginsHandlesPreflight(t *testing.T) {
 		called = true
 	}))
 
-	request := httptest.NewRequest(http.MethodOptions, "/v1/movies/movie-id/streams", nil)
+	request := httptest.NewRequest(http.MethodOptions, "/v1/titles/title-id/playback-streams", nil)
 	request.Header.Set("Origin", "https://example.com")
 	request.Header.Set("Access-Control-Request-Method", http.MethodGet)
 	response := httptest.NewRecorder()

@@ -21,7 +21,7 @@ import (
 const defaultUserAgent = "Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 " +
 	"(KHTML, like Gecko) Chrome/90.0.4430.225 Safari/537.36 CrKey/1.56.500000"
 
-var ErrInvalidMovieID = errors.New("invalid movie ID")
+var ErrInvalidTitleID = errors.New("invalid movie ID")
 
 type Config struct {
 	BaseURL         string
@@ -84,7 +84,7 @@ func (c *Client) DomainPrefix() string {
 	return c.domainPrefix
 }
 
-func (c *Client) ExternalMovieID(siteMovieID string) string {
+func (c *Client) ExternalTitleID(siteMovieID string) string {
 	return c.domainPrefix + siteMovieID
 }
 

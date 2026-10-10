@@ -1,4 +1,4 @@
-module movie-api
+module title-api
 
 go 1.26.0
 

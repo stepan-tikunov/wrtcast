@@ -93,7 +93,7 @@ video-2.m3u8
 		t.Fatalf("Start(): %v", err)
 	}
 
-	movieID := client.ExternalMovieID("42185")
+	movieID := client.ExternalTitleID("42185")
 	streams, err := client.Streams(ctx, movieID)
 	if err != nil {
 		t.Fatalf("Streams() before refresh: %v", err)
@@ -178,16 +178,12 @@ func TestClientSearch(t *testing.T) {
 	if len(results) != 3 {
 		t.Fatalf("got %d results, want 3: %+v", len(results), results)
 	}
-	if results[0].MovieID != client.ExternalMovieID("42185") || results[0].Title != "Дюна" ||
-		results[0].Year != "2021" || results[0].PosterURL != serverURL+"/uploads/dune.jpg" ||
-		results[0].MediaType != MediaTypeMovie {
+	if results[0].TitleID != client.ExternalTitleID("42185") || results[0].Title != "Дюна" ||
+		results[0].Year != "2021" || results[0].PosterURL != serverURL+"/uploads/dune.jpg" {
 		t.Fatalf("unexpected first result: %+v", results[0])
 	}
-	if results[1].PosterURL != "https://cdn.example/prophecy.jpg" || results[1].MediaType != MediaTypeSeries {
+	if results[1].PosterURL != "https://cdn.example/prophecy.jpg" {
 		t.Fatalf("unexpected second result: %+v", results[1])
-	}
-	if results[2].MediaType != MediaTypeUnspecified {
-		t.Fatalf("ambiguous animated title type = %v, want unspecified", results[2].MediaType)
 	}
 }
 

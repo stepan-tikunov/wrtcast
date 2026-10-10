@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package title.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "title-api/api/title/v1;titlev1";
+
+service TitleService {
+  rpc SearchTitles(SearchTitlesQuery) returns (SearchTitlesQueryResponse) {
+    option (google.api.http) = {
+      get: "/v1/search"
+    };
+  }
+
+  rpc GetPlaybackStreams(GetPlaybackStreamsQuery) returns (GetPlaybackStreamsQueryResponse) {
+    option (google.api.http) = {
+      get: "/v1/titles/{title_id}/playback-streams"
+    };
+  }
+
+  rpc GetTitleDetails(GetTitleDetailsQuery) returns (GetTitleDetailsQueryResponse) {
+    option (google.api.http) = {
+      get: "/v1/titles/{title_id}"
+    };
+  }
+}
+
+enum MediaType {
+  MEDIA_TYPE_UNSPECIFIED = 0;
+  MEDIA_TYPE_MOVIE = 1;
+  MEDIA_TYPE_SERIES = 2;
+}
+
+message SearchTitlesQuery {
+  string query = 1;
+}
+
+message SearchTitlesQueryResponse {
+  message SearchResult {
+    string title_id = 1;
+    string title = 2;
+    string year = 3;
+    string poster_link = 4;
+    uint64 duration_seconds = 5;
+  }
+
+  repeated SearchResult results = 1;
+}
+
+message GetPlaybackStreamsQuery {
+  string title_id = 1;
+  optional int32 season_number = 2;
+  optional string episode_number = 3;
+}
+
+message GetPlaybackStreamsQueryResponse {
+  repeated MediaStream streams = 1;
+}
+
+message GetTitleDetailsQuery {
+  string title_id = 1;
+}
+
+message GetTitleDetailsQueryResponse {
+  message Rating {
+    string source = 1;
+    double value = 2;
+  }
+
+  message Season {
+    message Episode {
+      string episode_number = 1;
+      string title = 2;
+      uint64 duration_seconds = 3;
+    }
+
+    int32 season_number = 1;
+    repeated Episode episodes = 2;
+  }
+
+  string title_id = 1;
+  string title = 2;
+  string original_title = 3;
+  string year = 4;
+  string description = 5;
+  string poster_link = 6;
+  MediaType media_type = 7;
+  string quality = 8;
+  repeated string countries = 9;
+  repeated string genres = 10;
+  repeated string directors = 11;
+  repeated string actors = 12;
+  repeated Rating ratings = 13;
+  uint64 duration_seconds = 14;
+  repeated Season seasons = 15;
+}
+
+message MediaStream {
+  message AudioTrack {
+    string id = 1;
+    string name = 2;
+    string language = 3;
+    bool default = 4;
+    string playlist_url = 5;
+  }
+
+  message SubtitleTrack {
+    string id = 1;
+    string name = 2;
+    string language = 3;
+    bool forced = 4;
+    string playlist_url = 5;
+  }
+
+  string master_playlist_url = 1;
+  repeated AudioTrack audio_tracks = 2;
+  repeated SubtitleTrack subtitles = 3;
+}

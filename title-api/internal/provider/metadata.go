@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -13,20 +14,23 @@ import (
 
 var ErrMediaTypeUnknown = errors.New("media type could not be determined")
 
+var titleDurationPattern = regexp.MustCompile(`(?s)["']?duration["']?\s*:\s*([0-9]+)`)
+
 type TitleMetadata struct {
-	MovieID       string
-	Title         string
-	OriginalTitle string
-	Year          string
-	Description   string
-	PosterURL     string
-	MediaType     MediaType
-	Quality       string
-	Countries     []string
-	Genres        []string
-	Directors     []string
-	Actors        []string
-	Ratings       []Rating
+	TitleID         string
+	Title           string
+	OriginalTitle   string
+	Year            string
+	Description     string
+	PosterURL       string
+	MediaType       MediaType
+	Quality         string
+	Countries       []string
+	Genres          []string
+	Directors       []string
+	Actors          []string
+	Ratings         []Rating
+	DurationSeconds uint64
 }
 
 type Rating struct {
@@ -44,8 +48,8 @@ func (c *Client) TitleMetadata(ctx context.Context, externalMovieID string) (Tit
 	if err != nil {
 		return TitleMetadata{}, fmt.Errorf("parse title metadata: %w", err)
 	}
-	metadata.MovieID = externalMovieID
-	metadata.MediaType, err = c.mediaTypeFromEmbeds(ctx, current, embedURLs)
+	metadata.TitleID = externalMovieID
+	metadata.MediaType, metadata.DurationSeconds, err = c.mediaTypeFromEmbeds(ctx, current, embedURLs)
 	if err != nil {
 		return TitleMetadata{}, err
 	}
@@ -56,8 +60,9 @@ func (c *Client) mediaTypeFromEmbeds(
 	ctx context.Context,
 	current *session,
 	embedURLs []string,
-) (MediaType, error) {
+) (MediaType, uint64, error) {
 	hasMovie := false
+	var durationSeconds uint64
 	fetchErrors := make([]error, 0)
 	for _, embedURL := range embedURLs {
 		embedHTML, _, err := c.get(ctx, current, embedURL, c.baseURL.String()+"/")
@@ -66,19 +71,24 @@ func (c *Client) mediaTypeFromEmbeds(
 			continue
 		}
 		if containsSeriesPlaylist(embedHTML) {
-			return MediaTypeSeries, nil
+			return MediaTypeSeries, 0, nil
 		}
 		if hlsPattern.FindSubmatch(embedHTML) != nil {
 			hasMovie = true
+			if match := titleDurationPattern.FindSubmatch(embedHTML); len(match) == 2 {
+				if duration, parseErr := strconv.ParseUint(string(match[1]), 10, 64); parseErr == nil {
+					durationSeconds = duration
+				}
+			}
 		}
 	}
 	if hasMovie {
-		return MediaTypeMovie, nil
+		return MediaTypeMovie, durationSeconds, nil
 	}
 	if len(fetchErrors) > 0 {
-		return MediaTypeUnspecified, fmt.Errorf("inspect player embeds: %w", errors.Join(fetchErrors...))
+		return MediaTypeUnspecified, 0, fmt.Errorf("inspect player embeds: %w", errors.Join(fetchErrors...))
 	}
-	return MediaTypeUnspecified, ErrMediaTypeUnknown
+	return MediaTypeUnspecified, 0, ErrMediaTypeUnknown
 }
 
 func parseTitleMetadata(body []byte, baseURL *url.URL) (TitleMetadata, error) {

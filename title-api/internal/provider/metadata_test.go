@@ -34,7 +34,7 @@ func TestClientTitleMetadataDeterminesTypeFromPlayer(t *testing.T) {
 				response.WriteHeader(http.StatusNotFound)
 			}
 		case "/embed/movie/42185":
-			_, _ = response.Write([]byte(`makePlayer({source:{hls:"https://cdn.example/movie/master.m3u8"}})`))
+			_, _ = response.Write([]byte(`makePlayer({source:{hls:"https://cdn.example/movie/master.m3u8",duration:9360}})`))
 		case "/embed/movie/43222":
 			_, _ = response.Write([]byte(`makePlayer({playlist:{seasons:[{"season":1,"episodes":[]},{"season":2,"episodes":[]}]}})`))
 		case "/embed/movie/54016":
@@ -68,12 +68,15 @@ func TestClientTitleMetadataDeterminesTypeFromPlayer(t *testing.T) {
 		{siteID: "54016", mediaType: MediaTypeSeries, title: "Евангелион"},
 	}
 	for _, test := range tests {
-		metadata, err := client.TitleMetadata(ctx, client.ExternalMovieID(test.siteID))
+		metadata, err := client.TitleMetadata(ctx, client.ExternalTitleID(test.siteID))
 		if err != nil {
 			t.Fatalf("TitleMetadata(%s): %v", test.siteID, err)
 		}
 		if metadata.MediaType != test.mediaType || metadata.Title != test.title {
 			t.Fatalf("TitleMetadata(%s) = %+v", test.siteID, metadata)
+		}
+		if test.mediaType == MediaTypeMovie && metadata.DurationSeconds != 9360 {
+			t.Fatalf("movie duration = %d, want 9360", metadata.DurationSeconds)
 		}
 		if metadata.Description != "Описание тайтла" || metadata.PosterURL != serverURL+"/poster.jpg" ||
 			metadata.Quality != "HD 720, 1080" || len(metadata.Genres) != 2 ||
@@ -82,7 +85,7 @@ func TestClientTitleMetadataDeterminesTypeFromPlayer(t *testing.T) {
 			t.Fatalf("incomplete metadata for %s: %+v", test.siteID, metadata)
 		}
 	}
-	if _, err := client.TitleMetadata(ctx, client.ExternalMovieID("999")); !errors.Is(err, ErrMediaTypeUnknown) {
+	if _, err := client.TitleMetadata(ctx, client.ExternalTitleID("999")); !errors.Is(err, ErrMediaTypeUnknown) {
 		t.Fatalf("TitleMetadata(unknown) error = %v, want ErrMediaTypeUnknown", err)
 	}
 }

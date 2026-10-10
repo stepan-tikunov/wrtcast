@@ -86,7 +86,7 @@ func (c *Client) movieEmbeds(ctx context.Context, externalMovieID string) (*sess
 }
 
 func (c *Client) movieDocument(ctx context.Context, externalMovieID string) (*session, []byte, []string, error) {
-	siteMovieID, err := c.parseExternalMovieID(externalMovieID)
+	siteMovieID, err := c.parseExternalTitleID(externalMovieID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -212,16 +212,16 @@ func (c *Client) moviePage(ctx context.Context, current *session, siteMovieID st
 	return body, nil
 }
 
-func (c *Client) parseExternalMovieID(movieID string) (string, error) {
+func (c *Client) parseExternalTitleID(movieID string) (string, error) {
 	if !strings.HasPrefix(movieID, c.domainPrefix) {
-		return "", fmt.Errorf("%w: expected domain prefix %s", ErrInvalidMovieID, c.domainPrefix)
+		return "", fmt.Errorf("%w: expected domain prefix %s", ErrInvalidTitleID, c.domainPrefix)
 	}
 	siteMovieID := strings.TrimPrefix(movieID, c.domainPrefix)
 	if siteMovieID == "" {
-		return "", fmt.Errorf("%w: site movie ID is empty", ErrInvalidMovieID)
+		return "", fmt.Errorf("%w: site movie ID is empty", ErrInvalidTitleID)
 	}
 	if _, err := strconv.ParseUint(siteMovieID, 10, 64); err != nil {
-		return "", fmt.Errorf("%w: site movie ID must be decimal", ErrInvalidMovieID)
+		return "", fmt.Errorf("%w: site movie ID must be decimal", ErrInvalidTitleID)
 	}
 	return siteMovieID, nil
 }
