@@ -80,6 +80,11 @@ func run() error {
 		_ = httpListener.Close()
 		return err
 	}
+	if err := gateway.HandlePath(http.MethodGet, "/v1/posters", posterHandler(client)); err != nil {
+		_ = grpcListener.Close()
+		_ = httpListener.Close()
+		return err
+	}
 	httpServer := &http.Server{
 		Handler:           allowAllOrigins(gateway),
 		ReadHeaderTimeout: 10 * time.Second,
@@ -124,6 +129,31 @@ func envOrDefault(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+type posterSource interface {
+	Poster(ctx context.Context, rawURL string) ([]byte, string, error)
+}
+
+// posterHandler serves GET /v1/posters?url=<poster URL>. Poster images are
+// behind the provider's anti-bot challenge, so they are fetched with the
+// service's session; this is plain HTTP because the response is binary.
+func posterHandler(source posterSource) runtime.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request, _ map[string]string) {
+		body, contentType, err := source.Poster(request.Context(), request.URL.Query().Get("url"))
+		switch {
+		case errors.Is(err, provider.ErrInvalidPosterURL):
+			http.Error(response, err.Error(), http.StatusBadRequest)
+			return
+		case err != nil:
+			log.Printf("poster: %v", err)
+			http.Error(response, "poster unavailable", http.StatusBadGateway)
+			return
+		}
+		response.Header().Set("Content-Type", contentType)
+		response.Header().Set("Cache-Control", "public, max-age=86400")
+		_, _ = response.Write(body)
+	}
 }
 
 func allowAllOrigins(next http.Handler) http.Handler {

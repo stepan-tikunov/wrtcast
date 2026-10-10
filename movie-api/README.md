@@ -54,11 +54,42 @@ curl --get --data-urlencode 'query=Дюна' \
   'http://localhost:8080/v1/movies:search'
 ```
 
-Search results contain the external movie ID, title, year, and absolute poster
-URL. Up to 30 results are returned by the provider's first search page.
+Search results contain the external movie ID, title, year, absolute poster URL,
+and `mediaType` (`MEDIA_TYPE_MOVIE` or `MEDIA_TYPE_SERIES`). Up to 30 results
+are returned by the provider's first search page.
+
+For a series, first request its season and episode catalog. The catalog contains
+metadata only, so it does not expose signed URLs that may expire before playback:
+
+```sh
+curl 'http://localhost:8080/v1/series/67c18f3620973'
+```
+
+After the viewer selects an episode, request fresh streams for that episode:
+
+```sh
+curl 'http://localhost:8080/v1/series/67c18f3620973/seasons/8/episodes/1/streams'
+```
+
+The equivalent gRPC methods are `GetSeries` and `GetEpisodeStreams`. Passing a
+movie ID to either series method returns gRPC `FAILED_PRECONDITION` (HTTP 400).
+Passing a series ID to `GetStreamsByMovieID` returns the same type-mismatch
+status instead of selecting an arbitrary episode. A missing episode returns
+gRPC `NOT_FOUND` (HTTP 404).
 
 The HTTP gateway allows requests from any origin (`Access-Control-Allow-Origin: *`)
 and handles CORS preflight requests.
+
+Poster images on the provider site are behind the same anti-bot challenge, so
+they are served through the service's session:
+
+```sh
+curl --get --data-urlencode 'url=<moviePosterLink>' \
+  'http://localhost:8080/v1/posters' -o poster.jpg
+```
+
+Only URLs on the provider host are accepted (`400` otherwise); upstream failures
+return `502`.
 
 Signed media URLs are generated for the Chromecast receiver User-Agent because
 the CDN validates the same User-Agent on HLS segment requests. Override it for a

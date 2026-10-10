@@ -24,6 +24,7 @@ type SearchResult struct {
 	Title     string
 	Year      string
 	PosterURL string
+	MediaType MediaType
 }
 
 func (c *Client) Search(ctx context.Context, query string) ([]SearchResult, error) {
@@ -127,9 +128,22 @@ func parseSearchResults(body []byte, baseURL *url.URL, domainPrefix string) ([]S
 			Title:     title,
 			Year:      year,
 			PosterURL: poster,
+			MediaType: mediaTypeFromLink(attribute(anchor, "href")),
 		})
 	})
 	return results, nil
+}
+
+func mediaTypeFromLink(link string) MediaType {
+	parsed, err := url.Parse(strings.TrimSpace(link))
+	if err != nil {
+		return MediaTypeUnspecified
+	}
+	segments := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(segments) > 1 && strings.Contains(strings.ToLower(segments[len(segments)-2]), "serial") {
+		return MediaTypeSeries
+	}
+	return MediaTypeMovie
 }
 
 func movieSiteID(link string) string {

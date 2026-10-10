@@ -18,6 +18,24 @@ service MovieService {
       get: "/v1/movies/{movie_id}/streams"
     };
   }
+
+  rpc GetSeries(GetSeriesQuery) returns (GetSeriesQueryResponse) {
+    option (google.api.http) = {
+      get: "/v1/series/{movie_id}"
+    };
+  }
+
+  rpc GetEpisodeStreams(GetEpisodeStreamsQuery) returns (GetEpisodeStreamsQueryResponse) {
+    option (google.api.http) = {
+      get: "/v1/series/{movie_id}/seasons/{season_number}/episodes/{episode_number}/streams"
+    };
+  }
+}
+
+enum MediaType {
+  MEDIA_TYPE_UNSPECIFIED = 0;
+  MEDIA_TYPE_MOVIE = 1;
+  MEDIA_TYPE_SERIES = 2;
 }
 
 message SearchMoviesQuery {
@@ -30,6 +48,7 @@ message SearchMoviesQueryResponse {
     string movie_title = 2;
     string movie_year = 3;
     string movie_poster_link = 4;
+    MediaType media_type = 5;
   }
 
   repeated SearchResult results = 1;
@@ -40,27 +59,56 @@ message GetStreamsByMovieIDQuery {
 }
 
 message GetStreamsByMovieIDQueryResponse {
-  message MovieStream {
-    message AudioTrack {
-      string id = 1;
-      string name = 2;
-      string language = 3;
-      bool default = 4;
-      string playlist_url = 5;
+  repeated MediaStream streams = 1;
+}
+
+message GetSeriesQuery {
+  string movie_id = 1;
+}
+
+message GetSeriesQueryResponse {
+  message Season {
+    message Episode {
+      string episode_number = 1;
+      string title = 2;
+      uint64 duration_seconds = 3;
     }
 
-    message SubtitleTrack {
-      string id = 1;
-      string name = 2;
-      string language = 3;
-      bool forced = 4;
-      string playlist_url = 5;
-    }
-
-    string master_playlist_url = 1;
-    repeated AudioTrack audio_tracks = 2;
-    repeated SubtitleTrack subtitles = 3;
+    int32 season_number = 1;
+    repeated Episode episodes = 2;
   }
 
-  repeated MovieStream streams = 1;
+  repeated Season seasons = 1;
+}
+
+message GetEpisodeStreamsQuery {
+  string movie_id = 1;
+  int32 season_number = 2;
+  string episode_number = 3;
+}
+
+message GetEpisodeStreamsQueryResponse {
+  repeated MediaStream streams = 1;
+}
+
+message MediaStream {
+  message AudioTrack {
+    string id = 1;
+    string name = 2;
+    string language = 3;
+    bool default = 4;
+    string playlist_url = 5;
+  }
+
+  message SubtitleTrack {
+    string id = 1;
+    string name = 2;
+    string language = 3;
+    bool forced = 4;
+    string playlist_url = 5;
+  }
+
+  string master_playlist_url = 1;
+  repeated AudioTrack audio_tracks = 2;
+  repeated SubtitleTrack subtitles = 3;
 }

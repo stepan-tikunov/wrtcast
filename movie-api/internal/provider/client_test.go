@@ -173,10 +173,11 @@ func TestClientSearch(t *testing.T) {
 		t.Fatalf("got %d results, want 2: %+v", len(results), results)
 	}
 	if results[0].MovieID != client.ExternalMovieID("42185") || results[0].Title != "Дюна" ||
-		results[0].Year != "2021" || results[0].PosterURL != serverURL+"/uploads/dune.jpg" {
+		results[0].Year != "2021" || results[0].PosterURL != serverURL+"/uploads/dune.jpg" ||
+		results[0].MediaType != MediaTypeMovie {
 		t.Fatalf("unexpected first result: %+v", results[0])
 	}
-	if results[1].PosterURL != "https://cdn.example/prophecy.jpg" {
+	if results[1].PosterURL != "https://cdn.example/prophecy.jpg" || results[1].MediaType != MediaTypeSeries {
 		t.Fatalf("unexpected second result: %+v", results[1])
 	}
 }

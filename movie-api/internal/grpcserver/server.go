@@ -45,6 +45,7 @@ func (s *Server) SearchMovies(
 			MovieTitle:      result.Title,
 			MovieYear:       result.Year,
 			MoviePosterLink: result.PosterURL,
+			MediaType:       mediaType(result.MediaType),
 		})
 	}
 	return response, nil
@@ -63,22 +64,113 @@ func (s *Server) GetStreamsByMovieID(
 		if errors.Is(err, provider.ErrInvalidMovieID) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
+		if errors.Is(err, provider.ErrNotMovie) {
+			return nil, status.Error(codes.FailedPrecondition, err.Error())
+		}
 		return nil, status.Error(codes.Unavailable, err.Error())
 	}
 
 	response := &moviev1.GetStreamsByMovieIDQueryResponse{
-		Streams: make([]*moviev1.GetStreamsByMovieIDQueryResponse_MovieStream, 0, len(streams)),
+		Streams: mediaStreams(streams),
 	}
+	return response, nil
+}
+
+func (s *Server) GetSeries(
+	ctx context.Context,
+	query *moviev1.GetSeriesQuery,
+) (*moviev1.GetSeriesQueryResponse, error) {
+	if query.GetMovieId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "movie_id is required")
+	}
+
+	seasons, err := s.client.Series(ctx, query.GetMovieId())
+	if err != nil {
+		switch {
+		case errors.Is(err, provider.ErrInvalidMovieID):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case errors.Is(err, provider.ErrNotSeries):
+			return nil, status.Error(codes.FailedPrecondition, err.Error())
+		default:
+			return nil, status.Error(codes.Unavailable, err.Error())
+		}
+	}
+
+	response := &moviev1.GetSeriesQueryResponse{
+		Seasons: make([]*moviev1.GetSeriesQueryResponse_Season, 0, len(seasons)),
+	}
+	for _, season := range seasons {
+		seasonResponse := &moviev1.GetSeriesQueryResponse_Season{
+			SeasonNumber: season.Number,
+			Episodes: make(
+				[]*moviev1.GetSeriesQueryResponse_Season_Episode,
+				0,
+				len(season.Episodes),
+			),
+		}
+		for _, episode := range season.Episodes {
+			seasonResponse.Episodes = append(
+				seasonResponse.Episodes,
+				&moviev1.GetSeriesQueryResponse_Season_Episode{
+					EpisodeNumber:   episode.Number,
+					Title:           episode.Title,
+					DurationSeconds: episode.DurationSeconds,
+				},
+			)
+		}
+		response.Seasons = append(response.Seasons, seasonResponse)
+	}
+	return response, nil
+}
+
+func (s *Server) GetEpisodeStreams(
+	ctx context.Context,
+	query *moviev1.GetEpisodeStreamsQuery,
+) (*moviev1.GetEpisodeStreamsQueryResponse, error) {
+	if query.GetMovieId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "movie_id is required")
+	}
+	if query.GetSeasonNumber() < 0 {
+		return nil, status.Error(codes.InvalidArgument, "season_number must not be negative")
+	}
+	if query.GetEpisodeNumber() == "" {
+		return nil, status.Error(codes.InvalidArgument, "episode_number is required")
+	}
+
+	streams, err := s.client.EpisodeStreams(
+		ctx,
+		query.GetMovieId(),
+		query.GetSeasonNumber(),
+		query.GetEpisodeNumber(),
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, provider.ErrInvalidMovieID):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case errors.Is(err, provider.ErrNotSeries):
+			return nil, status.Error(codes.FailedPrecondition, err.Error())
+		case errors.Is(err, provider.ErrEpisodeNotFound):
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Unavailable, err.Error())
+		}
+	}
+
+	return &moviev1.GetEpisodeStreamsQueryResponse{Streams: mediaStreams(streams)}, nil
+}
+
+func mediaStreams(streams []provider.MovieStream) []*moviev1.MediaStream {
+	response := make([]*moviev1.MediaStream, 0, len(streams))
 	for _, stream := range streams {
-		movieStream := &moviev1.GetStreamsByMovieIDQueryResponse_MovieStream{
+		movieStream := &moviev1.MediaStream{
 			MasterPlaylistUrl: stream.MasterPlaylistURL,
 			AudioTracks: make(
-				[]*moviev1.GetStreamsByMovieIDQueryResponse_MovieStream_AudioTrack,
+				[]*moviev1.MediaStream_AudioTrack,
 				0,
 				len(stream.AudioTracks),
 			),
 			Subtitles: make(
-				[]*moviev1.GetStreamsByMovieIDQueryResponse_MovieStream_SubtitleTrack,
+				[]*moviev1.MediaStream_SubtitleTrack,
 				0,
 				len(stream.Subtitles),
 			),
@@ -86,7 +178,7 @@ func (s *Server) GetStreamsByMovieID(
 		for _, track := range stream.AudioTracks {
 			movieStream.AudioTracks = append(
 				movieStream.AudioTracks,
-				&moviev1.GetStreamsByMovieIDQueryResponse_MovieStream_AudioTrack{
+				&moviev1.MediaStream_AudioTrack{
 					Id:          track.ID,
 					Name:        track.Name,
 					Language:    track.Language,
@@ -98,7 +190,7 @@ func (s *Server) GetStreamsByMovieID(
 		for _, subtitle := range stream.Subtitles {
 			movieStream.Subtitles = append(
 				movieStream.Subtitles,
-				&moviev1.GetStreamsByMovieIDQueryResponse_MovieStream_SubtitleTrack{
+				&moviev1.MediaStream_SubtitleTrack{
 					Id:          subtitle.ID,
 					Name:        subtitle.Name,
 					Language:    subtitle.Language,
@@ -107,7 +199,18 @@ func (s *Server) GetStreamsByMovieID(
 				},
 			)
 		}
-		response.Streams = append(response.Streams, movieStream)
+		response = append(response, movieStream)
 	}
-	return response, nil
+	return response
+}
+
+func mediaType(value provider.MediaType) moviev1.MediaType {
+	switch value {
+	case provider.MediaTypeMovie:
+		return moviev1.MediaType_MEDIA_TYPE_MOVIE
+	case provider.MediaTypeSeries:
+		return moviev1.MediaType_MEDIA_TYPE_SERIES
+	default:
+		return moviev1.MediaType_MEDIA_TYPE_UNSPECIFIED
+	}
 }

@@ -42,40 +42,26 @@ type SubtitleTrack struct {
 	PlaylistURL string
 }
 
+type embedSubtitleEntry struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
+}
+
 func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieStream, error) {
-	siteMovieID, err := c.parseExternalMovieID(externalMovieID)
+	current, embedURLs, err := c.movieEmbeds(ctx, externalMovieID)
 	if err != nil {
 		return nil, err
-	}
-
-	current, err := c.currentSession()
-	if err != nil {
-		return nil, err
-	}
-	movieHTML, err := c.moviePage(ctx, current, siteMovieID)
-	if errors.Is(err, errAntiBotChallenge) {
-		if refreshErr := c.refreshIfStale(ctx, current.generation); refreshErr != nil {
-			return nil, fmt.Errorf("refresh rejected anti-bot session: %w", refreshErr)
-		}
-		current, err = c.currentSession()
-		if err != nil {
-			return nil, err
-		}
-		movieHTML, err = c.moviePage(ctx, current, siteMovieID)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	embedURLs := uniqueEmbedURLs(embedURLPattern.FindAllString(string(movieHTML), -1), c.baseURL.Scheme)
-	if len(embedURLs) == 0 {
-		return nil, errors.New("embed URL not found in movie page")
 	}
 
 	streams := make([]MovieStream, 0, len(embedURLs))
 	streamErrors := make([]error, 0)
+	seriesEmbeds := 0
 	for _, embedURL := range embedURLs {
 		stream, streamErr := c.streamFromEmbed(ctx, current, embedURL)
+		if errors.Is(streamErr, ErrNotMovie) {
+			seriesEmbeds++
+			continue
+		}
 		if streamErr != nil {
 			streamErrors = append(streamErrors, fmt.Errorf("%s: %w", embedURL, streamErr))
 			continue
@@ -83,9 +69,44 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 		streams = append(streams, stream)
 	}
 	if len(streams) == 0 {
+		if seriesEmbeds == len(embedURLs) {
+			return nil, ErrNotMovie
+		}
 		return nil, fmt.Errorf("no playable embed found: %w", errors.Join(streamErrors...))
 	}
 	return streams, nil
+}
+
+func (c *Client) movieEmbeds(ctx context.Context, externalMovieID string) (*session, []string, error) {
+	siteMovieID, err := c.parseExternalMovieID(externalMovieID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	current, err := c.currentSession()
+	if err != nil {
+		return nil, nil, err
+	}
+	movieHTML, err := c.moviePage(ctx, current, siteMovieID)
+	if errors.Is(err, errAntiBotChallenge) {
+		if refreshErr := c.refreshIfStale(ctx, current.generation); refreshErr != nil {
+			return nil, nil, fmt.Errorf("refresh rejected anti-bot session: %w", refreshErr)
+		}
+		current, err = c.currentSession()
+		if err != nil {
+			return nil, nil, err
+		}
+		movieHTML, err = c.moviePage(ctx, current, siteMovieID)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	embedURLs := uniqueEmbedURLs(embedURLPattern.FindAllString(string(movieHTML), -1), c.baseURL.Scheme)
+	if len(embedURLs) == 0 {
+		return nil, nil, errors.New("embed URL not found in movie page")
+	}
+	return current, embedURLs, nil
 }
 
 func (c *Client) streamFromEmbed(ctx context.Context, current *session, embedURL string) (MovieStream, error) {
@@ -93,21 +114,39 @@ func (c *Client) streamFromEmbed(ctx context.Context, current *session, embedURL
 	if err != nil {
 		return MovieStream{}, fmt.Errorf("fetch embed: %w", err)
 	}
+	if containsSeriesPlaylist(embedHTML) {
+		return MovieStream{}, ErrNotMovie
+	}
 	hlsMatch := hlsPattern.FindSubmatch(embedHTML)
-	markerMatch := markerPattern.FindSubmatch(embedHTML)
-	if len(hlsMatch) != 2 || len(markerMatch) != 2 {
+	if len(hlsMatch) != 2 {
 		return MovieStream{}, errors.New("HLS URL or dynamic marker not found in embed page")
 	}
 	hlsURL, err := decodeJSString(string(hlsMatch[1]))
 	if err != nil {
 		return MovieStream{}, fmt.Errorf("decode HLS URL: %w", err)
 	}
-	marker, err := decodeJSString(string(markerMatch[1]))
+	marker, err := parseDynamicMarker(embedHTML)
 	if err != nil {
-		return MovieStream{}, fmt.Errorf("decode HLS marker: %w", err)
+		return MovieStream{}, err
 	}
-	hlsURL = html.UnescapeString(hlsURL)
-	marker = strings.TrimLeft(html.UnescapeString(marker), "?&")
+	return c.streamFromHLS(
+		ctx,
+		current,
+		html.UnescapeString(hlsURL),
+		marker,
+		parseAudioNames(embedHTML),
+		parseSubtitles(embedHTML),
+	)
+}
+
+func (c *Client) streamFromHLS(
+	ctx context.Context,
+	current *session,
+	hlsURL string,
+	marker string,
+	audioNames []string,
+	subtitles []SubtitleTrack,
+) (MovieStream, error) {
 	separator := "?"
 	if strings.Contains(hlsURL, "?") {
 		separator = "&"
@@ -121,7 +160,19 @@ func (c *Client) streamFromEmbed(ctx context.Context, current *session, embedURL
 	if !strings.Contains(string(masterBody), "#EXTM3U") {
 		return MovieStream{}, errors.New("HLS master response is not an m3u8 playlist")
 	}
-	return parseMaster(masterURL, string(masterBody), parseAudioNames(embedHTML), parseSubtitles(embedHTML))
+	return parseMaster(masterURL, string(masterBody), audioNames, subtitles)
+}
+
+func parseDynamicMarker(embedHTML []byte) (string, error) {
+	markerMatch := markerPattern.FindSubmatch(embedHTML)
+	if len(markerMatch) != 2 {
+		return "", errors.New("dynamic marker not found in embed page")
+	}
+	marker, err := decodeJSString(string(markerMatch[1]))
+	if err != nil {
+		return "", fmt.Errorf("decode HLS marker: %w", err)
+	}
+	return strings.TrimLeft(html.UnescapeString(marker), "?&"), nil
 }
 
 func uniqueEmbedURLs(matches []string, scheme string) []string {
@@ -192,13 +243,14 @@ func parseSubtitles(embedHTML []byte) []SubtitleTrack {
 	if len(match) != 2 {
 		return nil
 	}
-	var entries []struct {
-		URL  string `json:"url"`
-		Name string `json:"name"`
-	}
+	var entries []embedSubtitleEntry
 	if err := json.Unmarshal(match[1], &entries); err != nil {
 		return nil
 	}
+	return subtitleTracks(entries)
+}
+
+func subtitleTracks(entries []embedSubtitleEntry) []SubtitleTrack {
 	tracks := make([]SubtitleTrack, 0, len(entries))
 	for index, entry := range entries {
 		name := html.UnescapeString(entry.Name)

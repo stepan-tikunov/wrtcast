@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-func TestRealGetStreamsByMovieID(t *testing.T) {
+func TestRealMovieService(t *testing.T) {
 	if os.Getenv("MOVIE_PROVIDER_INTEGRATION") == "" {
 		t.Skip("set MOVIE_PROVIDER_INTEGRATION=1 to call the live service")
 	}
@@ -79,5 +79,33 @@ func TestRealGetStreamsByMovieID(t *testing.T) {
 	}
 	if !hasAudioMetadata {
 		t.Fatal("missing parsed audio metadata")
+	}
+
+	seriesID := client.ExternalMovieID("20973")
+	series, err := moviev1.NewMovieServiceClient(connection).GetSeries(
+		ctx,
+		&moviev1.GetSeriesQuery{MovieId: seriesID},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(series.GetSeasons()) == 0 || len(series.GetSeasons()[0].GetEpisodes()) == 0 {
+		t.Fatal("got no series episodes")
+	}
+
+	episodeStreams, err := moviev1.NewMovieServiceClient(connection).GetEpisodeStreams(
+		ctx,
+		&moviev1.GetEpisodeStreamsQuery{
+			MovieId:       seriesID,
+			SeasonNumber:  8,
+			EpisodeNumber: "1",
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(episodeStreams.GetStreams()) == 0 ||
+		episodeStreams.GetStreams()[0].GetMasterPlaylistUrl() == "" {
+		t.Fatal("selected episode has no streams")
 	}
 }
