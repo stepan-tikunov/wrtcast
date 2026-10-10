@@ -1,4 +1,5 @@
 .DS_Store
+.codex/
 /castctl/castctl
 /castctl/build/
 /movie-api/movie-api
