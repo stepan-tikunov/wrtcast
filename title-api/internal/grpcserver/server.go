@@ -190,6 +190,11 @@ func mediaStreams(streams []provider.MovieStream) []*titlev1.MediaStream {
 	for _, stream := range streams {
 		mediaStream := &titlev1.MediaStream{
 			MasterPlaylistUrl: stream.MasterPlaylistURL,
+			ProxyHeaders: make(
+				[]*titlev1.MediaStream_ProxyHeader,
+				0,
+				len(stream.ProxyHeaders),
+			),
 			AudioTracks: make(
 				[]*titlev1.MediaStream_AudioTrack,
 				0,
@@ -200,6 +205,12 @@ func mediaStreams(streams []provider.MovieStream) []*titlev1.MediaStream {
 				0,
 				len(stream.Subtitles),
 			),
+		}
+		for _, header := range stream.ProxyHeaders {
+			mediaStream.ProxyHeaders = append(
+				mediaStream.ProxyHeaders,
+				&titlev1.MediaStream_ProxyHeader{Name: header.Name, Value: header.Value},
+			)
 		}
 		for _, track := range stream.AudioTracks {
 			mediaStream.AudioTracks = append(

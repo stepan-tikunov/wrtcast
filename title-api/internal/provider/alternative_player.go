@@ -235,6 +235,10 @@ func (c *Client) alternativePlaybackStreams(
 				MasterPlaylistURL: c.mediaBaseURL + "/v1/media/" + id + "/master.m3u8",
 				AudioTracks:       []AudioTrack{{ID: "alternative", Name: strings.TrimSpace(source.Label), Language: languageFromLabel(source.Label), Default: true}},
 				Subtitles:         subtitles,
+				ProxyHeaders: []ProxyHeader{{
+					Name:  "Origin",
+					Value: playerURL.Scheme + "://" + playerURL.Host,
+				}},
 			}
 		}()
 	}

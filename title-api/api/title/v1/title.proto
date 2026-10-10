@@ -96,6 +96,11 @@ message GetTitleDetailsQueryResponse {
 }
 
 message MediaStream {
+  message ProxyHeader {
+    string name = 1;
+    string value = 2;
+  }
+
   message AudioTrack {
     string id = 1;
     string name = 2;
@@ -115,4 +120,5 @@ message MediaStream {
   string master_playlist_url = 1;
   repeated AudioTrack audio_tracks = 2;
   repeated SubtitleTrack subtitles = 3;
+  repeated ProxyHeader proxy_headers = 4;
 }

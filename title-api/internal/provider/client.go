@@ -25,6 +25,12 @@ type MovieStream struct {
 	MasterPlaylistURL string
 	AudioTracks       []AudioTrack
 	Subtitles         []SubtitleTrack
+	ProxyHeaders      []ProxyHeader
+}
+
+type ProxyHeader struct {
+	Name  string
+	Value string
 }
 
 type AudioTrack struct {
