@@ -39,7 +39,6 @@
 #define LOAD_TIMEOUT_S 20 /* how long play waits for playback to start */
 #define MAX_MSG (64 * 1024)
 #define MAX_TRACKS 32
-#define MAX_SUBS 16
 #define SUB_TRACK_BASE 101 /* ids for side-loaded subtitles, clear of HLS ones */
 #define MAX_DEVICES 32
 #define DISCOVER_MS 2000 /* default mDNS listening window */
@@ -1258,24 +1257,31 @@ static double parse_seconds(const char *s)
 static size_t append_subs(char *body, size_t n, size_t cap, char **subs,
 			  int nsubs)
 {
-	char url[4200], lang[64], name[200];
+	char url[4200], lang[64], name[200], track[4800];
 	int i;
 
 	if (!nsubs)
 		return n;
 	n += snprintf(body + n, cap - n, ",\"tracks\":[");
 	for (i = 0; i < nsubs; i++) {
+		size_t len;
 		jescape(url, sizeof(url), subs[i * 3]);
 		jescape(lang, sizeof(lang), subs[i * 3 + 1]);
 		jescape(name, sizeof(name), subs[i * 3 + 2]);
-		n += snprintf(body + n, cap - n,
-			      "%s{\"trackId\":%d,\"type\":\"TEXT\","
-			      "\"subtype\":\"SUBTITLES\",\"trackContentId\":%s,"
-			      "\"trackContentType\":\"text/vtt\","
-			      "\"language\":%s,\"name\":%s}",
-			      i ? "," : "", SUB_TRACK_BASE + i, url, lang, name);
-		if (n >= cap)
-			die("too many subtitles");
+		len = snprintf(track, sizeof(track),
+			       "%s{\"trackId\":%d,\"type\":\"TEXT\","
+			       "\"subtype\":\"SUBTITLES\",\"trackContentId\":%s,"
+			       "\"trackContentType\":\"text/vtt\","
+			       "\"language\":%s,\"name\":%s}",
+			       i ? "," : "", SUB_TRACK_BASE + i, url, lang, name);
+		/* The whole LOAD must fit one Cast message: keep the first ones. */
+		if (n + len + 1 >= cap) {
+			fprintf(stderr, "castctl: %d of %d subtitle tracks dropped "
+				"to fit the message\n", nsubs - i, nsubs);
+			break;
+		}
+		memcpy(body + n, track, len + 1);
+		n += len;
 	}
 	return n + snprintf(body + n, cap - n, "]");
 }
@@ -1288,7 +1294,7 @@ static void cmd_play(int argc, char **argv)
 	const char *stream_type = "BUFFERED";
 	const char *src = NULL, *style = NULL, *segfmt = NULL;
 	double start = 0;
-	char *subs[MAX_SUBS * 3];
+	char **subs = calloc(argc, sizeof(*subs));
 	int nsubs = 0;
 	struct app a;
 	struct media md;
@@ -1308,8 +1314,6 @@ static void cmd_play(int argc, char **argv)
 		else if (!strcmp(argv[i], "-f") && i + 1 < argc)
 			segfmt = argv[++i];
 		else if (!strcmp(argv[i], "-s") && i + 3 < argc) {
-			if (nsubs == MAX_SUBS)
-				die("at most %d subtitle tracks", MAX_SUBS);
 			memcpy(&subs[nsubs++ * 3], &argv[i + 1], 3 * sizeof(*argv));
 			i += 3;
 		} else if (!src)
@@ -1341,7 +1345,10 @@ static void cmd_play(int argc, char **argv)
 			n += snprintf(body + n, sizeof(body) - n,
 				      ",\"hlsVideoSegmentFormat\":\"fmp4\"");
 	}
-	n = append_subs(body, n, sizeof(body) - 2, subs, nsubs);
+	if (!subs)
+		die("out of memory");
+	/* Leave room for the subtitle style and the closing braces. */
+	n = append_subs(body, n, sizeof(body) - 1024, subs, nsubs);
 	if (style) {
 		char st[512];
 		text_style(st, sizeof(st), style);
