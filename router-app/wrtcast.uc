@@ -610,7 +610,7 @@ const routes = {
 			fail(400, 'invalid quality');
 		if (p.style != null && !valid_style(p.style))
 			fail(400, 'invalid subtitle style');
-		if (p.source != null && (length(p.source) > 100 || match(p.source, /[\x00-\x1f]/)))
+		if (p.source != null && (length(p.source) > 100 || match(p.source, /[[:cntrl:]]/)))
 			fail(400, 'invalid source');
 		let dev = device(p);
 		let last = json(readfile(state_file(dev)) ?? 'null');
