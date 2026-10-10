@@ -1049,12 +1049,13 @@ static void usage(void)
 "commands:\n"
 "  discover [-t seconds]               list Chromecasts on the local network\n"
 "                                      as JSON (listens 2 s by default)\n"
-"  play <url> [-t content-type] [-l] [-s url lang name]...\n"
+"  play <url> [-t content-type] [-l] [-s url lang name]... [-y style]\n"
 "                                      load and play a stream (HLS by default;\n"
 "                                      -l marks it as a live stream); waits\n"
 "                                      until playback starts or fails; each -s\n"
 "                                      adds a WebVTT subtitle track (off until\n"
-"                                      selected with \"subs\")\n"
+"                                      selected with \"subs\"); -y sets the\n"
+"                                      subtitle style as in substyle\n"
 "  pause | resume                      pause / resume playback\n"
 "  stop                                stop media\n"
 "  quit                                close the app on the device\n"
@@ -1063,6 +1064,10 @@ static void usage(void)
 "  audio <id|lang|name>                switch audio track (see \"tracks\"\n"
 "                                      in status; name matches substring)\n"
 "  subs <id|lang|name|off>             switch / disable subtitles\n"
+"  substyle <key=value,...>            subtitle look: size=0.3..3,\n"
+"                                      color/bg/edgecolor/window=#RRGGBB[AA],\n"
+"                                      edge=none|outline|shadow|raised|depressed,\n"
+"                                      font=sans|serif|mono|casual|cursive|smallcaps\n"
 "  volume <0..100>                     set device volume\n"
 "  mute | unmute\n"
 "  status                              print JSON status\n"
@@ -1084,7 +1089,7 @@ static void attach_media(struct app *a, struct media *md)
 
 static void media_command(struct app *a, struct media *md, const char *body)
 {
-	char buf[512];
+	char buf[1024];
 	const char *r;
 
 	snprintf(buf, sizeof(buf), "%s,\"mediaSessionId\":%ld", body,
@@ -1154,6 +1159,85 @@ static void wait_for_playback(const char *transport, const char *r,
 	}
 }
 
+static int is_color(const char *v)
+{
+	size_t n = strlen(v);
+
+	return v[0] == '#' && (n == 7 || n == 9) &&
+	       strspn(v + 1, "0123456789abcdefABCDEF") == n - 1;
+}
+
+/*
+ * Turns "size=1.3,color=#FFFF00,bg=#00000099,edge=outline,font=sans" into
+ * a Cast textTrackStyle object. Colors are #RRGGBB or #RRGGBBAA.
+ */
+static void text_style(char *out, size_t cap, const char *spec)
+{
+	static const char *const edges[][2] = {
+		{ "none", "NONE" }, { "outline", "OUTLINE" },
+		{ "shadow", "DROP_SHADOW" }, { "raised", "RAISED" },
+		{ "depressed", "DEPRESSED" },
+	};
+	static const char *const fonts[][2] = {
+		{ "sans", "SANS_SERIF" }, { "serif", "SERIF" },
+		{ "mono", "MONOSPACED_SANS_SERIF" }, { "casual", "CASUAL" },
+		{ "cursive", "CURSIVE" }, { "smallcaps", "SMALL_CAPITALS" },
+	};
+	char buf[256], *save, *kv;
+	size_t n = 0;
+	size_t i;
+
+	snprintf(buf, sizeof(buf), "%s", spec);
+	n += snprintf(out + n, cap - n, "{");
+	for (kv = strtok_r(buf, ",", &save); kv; kv = strtok_r(NULL, ",", &save)) {
+		char *v = strchr(kv, '=');
+		const char *field = NULL, *val = NULL;
+		char num[32];
+
+		if (!v)
+			die("bad subtitle style \"%s\": expected key=value", kv);
+		*v++ = 0;
+		if (!strcmp(kv, "size")) {
+			char *end;
+			double f = strtod(v, &end);
+			if (*end || f < 0.3 || f > 3)
+				die("subtitle size must be 0.3..3");
+			snprintf(num, sizeof(num), "%.2f", f);
+			field = "fontScale";
+			val = num;
+		} else if (!strcmp(kv, "color") || !strcmp(kv, "bg") ||
+			   !strcmp(kv, "edgecolor") || !strcmp(kv, "window")) {
+			if (!is_color(v))
+				die("bad color \"%s\": use #RRGGBB or #RRGGBBAA", v);
+			field = !strcmp(kv, "color") ? "foregroundColor" :
+				!strcmp(kv, "bg") ? "backgroundColor" :
+				!strcmp(kv, "edgecolor") ? "edgeColor" : "windowColor";
+		} else if (!strcmp(kv, "edge") || !strcmp(kv, "font")) {
+			int edge = !strcmp(kv, "edge");
+			size_t cnt = edge ? sizeof(edges) / sizeof(*edges) :
+					    sizeof(fonts) / sizeof(*fonts);
+			for (i = 0; i < cnt; i++)
+				if (!strcmp(v, (edge ? edges : fonts)[i][0]))
+					val = (edge ? edges : fonts)[i][1];
+			if (!val)
+				die("unknown subtitle %s \"%s\"", kv, v);
+			field = edge ? "edgeType" : "fontGenericFamily";
+		} else {
+			die("unknown subtitle style \"%s\"", kv);
+		}
+		/* A window color only shows with a window behind the text. */
+		if (!strcmp(kv, "window"))
+			n += snprintf(out + n, cap - n, "%s\"windowType\":\"NORMAL\"",
+				      n > 1 ? "," : "");
+		n += snprintf(out + n, cap - n,
+			      val == num ? "%s\"%s\":%s" : "%s\"%s\":\"%s\"",
+			      n > 1 ? "," : "", field, val ? val : v);
+		if (n >= cap)
+			die("subtitle style too long");
+	}
+	snprintf(out + n, cap - n, "}");
+}
+
 /*
  * Subtitles that are not in the HLS manifest are side-loaded: LOAD lists them
  * as WebVTT text tracks, and they can be switched with "subs" afterwards.
@@ -1190,7 +1274,7 @@ static void cmd_play(int argc, char **argv)
 	char url[4200], ctype[200];
 	const char *content_type = "application/x-mpegURL";
 	const char *stream_type = "BUFFERED";
-	const char *src = NULL;
+	const char *src = NULL, *style = NULL;
 	char *subs[MAX_SUBS * 3];
 	int nsubs = 0;
 	struct app a;
@@ -1204,6 +1288,8 @@ static void cmd_play(int argc, char **argv)
 			content_type = argv[++i];
 		else if (!strcmp(argv[i], "-l"))
 			stream_type = "LIVE";
+		else if (!strcmp(argv[i], "-y") && i + 1 < argc)
+			style = argv[++i];
 		else if (!strcmp(argv[i], "-s") && i + 3 < argc) {
 			if (nsubs == MAX_SUBS)
 				die("at most %d subtitle tracks", MAX_SUBS);
@@ -1229,6 +1315,11 @@ static void cmd_play(int argc, char **argv)
 		     "\"streamType\":\"%s\"",
 		     url, ctype, stream_type);
 	n = append_subs(body, n, sizeof(body) - 2, subs, nsubs);
+	if (style) {
+		char st[512];
+		text_style(st, sizeof(st), style);
+		n += snprintf(body + n, sizeof(body) - n, ",\"textTrackStyle\":%s", st);
+	}
 	snprintf(body + n, sizeof(body) - n, "}");
 	r = request(a.transport_id, NS_MEDIA, body);
 	memset(&md, 0, sizeof(md));
@@ -1419,6 +1510,16 @@ int main(int argc, char **argv)
 		attach_media(&a, &md);
 		cmd_select_track(&a, &md, is_audio ? "AUDIO" : "TEXT",
 				 !is_audio && !strcmp(argv[1], "off") ? NULL : argv[1]);
+		print_status(&a, &md);
+	} else if (!strcmp(cmd, "substyle")) {
+		char st[512], body[600];
+		if (argc != 2)
+			usage();
+		text_style(st, sizeof(st), argv[1]);
+		attach_media(&a, &md);
+		snprintf(body, sizeof(body),
+			 "\"type\":\"EDIT_TRACKS_INFO\",\"textTrackStyle\":%s", st);
+		media_command(&a, &md, body);
 		print_status(&a, &md);
 	} else if (!strcmp(cmd, "quit")) {
 		char body[128];
