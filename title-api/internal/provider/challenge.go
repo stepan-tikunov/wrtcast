@@ -25,6 +25,7 @@ var ErrInvalidTitleID = errors.New("invalid movie ID")
 
 type Config struct {
 	BaseURL         string
+	MediaBaseURL    string
 	RefreshInterval time.Duration
 	HTTPTimeout     time.Duration
 	UserAgent       string
@@ -44,6 +45,8 @@ type Client struct {
 	refreshInterval time.Duration
 	httpTimeout     time.Duration
 	userAgent       string
+	mediaBaseURL    string
+	masters         *masterStore
 
 	mu             sync.RWMutex
 	session        *session
@@ -69,6 +72,13 @@ func NewClient(config Config) (*Client, error) {
 	if config.UserAgent == "" {
 		config.UserAgent = defaultUserAgent
 	}
+	if config.MediaBaseURL == "" {
+		config.MediaBaseURL = "http://localhost:50052"
+	}
+	mediaBaseURL, err := url.Parse(config.MediaBaseURL)
+	if err != nil || mediaBaseURL.Scheme == "" || mediaBaseURL.Host == "" {
+		return nil, fmt.Errorf("parse media base URL: %w", err)
+	}
 
 	digest := sha1.Sum([]byte(strings.ToLower(baseURL.Hostname())))
 	return &Client{
@@ -77,6 +87,8 @@ func NewClient(config Config) (*Client, error) {
 		refreshInterval: config.RefreshInterval,
 		httpTimeout:     config.HTTPTimeout,
 		userAgent:       config.UserAgent,
+		mediaBaseURL:    strings.TrimRight(mediaBaseURL.String(), "/"),
+		masters:         newMasterStore(10*time.Minute, 256),
 	}, nil
 }
 

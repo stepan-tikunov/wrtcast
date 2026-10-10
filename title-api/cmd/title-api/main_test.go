@@ -99,3 +99,28 @@ func TestPosterHandler(t *testing.T) {
 		}
 	}
 }
+
+type fakeMasters map[string][]byte
+
+func (masters fakeMasters) MasterPlaylist(id string) ([]byte, bool) {
+	body, ok := masters[id]
+	return body, ok
+}
+
+func TestMasterPlaylistHandler(t *testing.T) {
+	t.Parallel()
+	handler := masterPlaylistHandler(fakeMasters{"known": []byte("#EXTM3U\n")})
+	for _, test := range []struct {
+		id     string
+		status int
+	}{{"known", http.StatusOK}, {"missing", http.StatusNotFound}} {
+		response := httptest.NewRecorder()
+		handler(response, httptest.NewRequest(http.MethodGet, "/", nil), map[string]string{"id": test.id})
+		if response.Code != test.status {
+			t.Errorf("%s: status = %d, want %d", test.id, response.Code, test.status)
+		}
+		if test.status == http.StatusOK && response.Header().Get("Content-Type") != "application/vnd.apple.mpegurl" {
+			t.Errorf("Content-Type = %q", response.Header().Get("Content-Type"))
+		}
+	}
+}

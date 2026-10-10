@@ -145,12 +145,13 @@ func TestRealTitleService(t *testing.T) {
 	alternativeFound := false
 	for _, stream := range arcane.GetStreams() {
 		for _, audio := range stream.GetAudioTracks() {
-			if strings.Contains(audio.GetName(), "2160p") {
+			if strings.Contains(audio.GetName(), "Iyuno-SDI") &&
+				strings.Contains(stream.GetMasterPlaylistUrl(), "/v1/media/") {
 				alternativeFound = true
 			}
 		}
 	}
 	if !alternativeFound {
-		t.Fatal("Arcane has no 2160p stream from the alternative player")
+		t.Fatal("Arcane has no synthetic stream from the alternative player")
 	}
 }

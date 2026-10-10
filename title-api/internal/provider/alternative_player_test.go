@@ -2,6 +2,9 @@ package provider
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -66,13 +69,20 @@ func TestPlayerChallenge(t *testing.T) {
 
 func TestAlternativePlaybackStreams(t *testing.T) {
 	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720\nmedia.m3u8\n"))
+	}))
+	defer server.Close()
+	client, err := NewClient(Config{BaseURL: "https://example.com", MediaBaseURL: "https://api.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	var playback alternativePlayback
 	playback.HLSSource = append(playback.HLSSource, struct {
 		Label   string            `json:"label"`
 		Quality map[string]string `json:"quality"`
 	}{Label: "(Russian) Dub", Quality: map[string]string{
-		"720":  "https://cdn.example/720/master.m3u8 or https://failover.example/720/master.m3u8",
-		"1080": "https://cdn.example/1080/master.m3u8",
+		"720": server.URL + "/720/master.m3u8",
 	}})
 	playback.Tracks = append(playback.Tracks, struct {
 		Kind     string `json:"kind"`
@@ -82,9 +92,15 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 		Default  bool   `json:"default"`
 	}{Kind: "captions", Label: "Russian", Source: "https://cdn.example/sub.vtt", Language: "rus", Default: true})
 
-	streams := playback.streams()
-	if len(streams) != 2 || !strings.Contains(streams[0].AudioTracks[0].Name, "1080p") ||
+	playerURL, _ := url.Parse("https://player.example/")
+	streams := client.alternativePlaybackStreams(context.Background(), server.Client(), playerURL, playback)
+	if len(streams) != 1 || streams[0].AudioTracks[0].Name != "(Russian) Dub" ||
 		streams[0].AudioTracks[0].Language != "ru" || len(streams[0].Subtitles) != 1 {
 		t.Fatalf("unexpected streams: %+v", streams)
+	}
+	id := strings.Split(strings.TrimSuffix(streams[0].MasterPlaylistURL, "/master.m3u8"), "/")
+	master, ok := client.MasterPlaylist(id[len(id)-1])
+	if !ok || !strings.Contains(string(master), server.URL+"/720/media.m3u8") {
+		t.Fatalf("unexpected synthetic master: %q", master)
 	}
 }

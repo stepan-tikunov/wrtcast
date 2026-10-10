@@ -40,11 +40,13 @@ func run() error {
 
 	baseURL := envOrDefault("MOVIE_PROVIDER_BASE_URL", defaultBaseURL)
 	providerUserAgent := os.Getenv("MOVIE_PROVIDER_USER_AGENT")
+	mediaBaseURL := envOrDefault("TITLE_API_PUBLIC_URL", "http://localhost:50052")
 	grpcAddress := envOrDefault("GRPC_ADDR", defaultGRPCAddr)
 	httpAddress := envOrDefault("HTTP_ADDR", defaultHTTPAddr)
 
 	client, err := provider.NewClient(provider.Config{
 		BaseURL:         baseURL,
+		MediaBaseURL:    mediaBaseURL,
 		RefreshInterval: 5 * time.Minute,
 		UserAgent:       providerUserAgent,
 	})
@@ -81,6 +83,11 @@ func run() error {
 		return err
 	}
 	if err := gateway.HandlePath(http.MethodGet, "/v1/posters", posterHandler(client)); err != nil {
+		_ = grpcListener.Close()
+		_ = httpListener.Close()
+		return err
+	}
+	if err := gateway.HandlePath(http.MethodGet, "/v1/media/{id}/master.m3u8", masterPlaylistHandler(client)); err != nil {
 		_ = grpcListener.Close()
 		_ = httpListener.Close()
 		return err
@@ -122,6 +129,23 @@ func run() error {
 		return serveError
 	}
 	return nil
+}
+
+type masterPlaylistSource interface {
+	MasterPlaylist(id string) ([]byte, bool)
+}
+
+func masterPlaylistHandler(source masterPlaylistSource) runtime.HandlerFunc {
+	return func(response http.ResponseWriter, _ *http.Request, pathParams map[string]string) {
+		body, ok := source.MasterPlaylist(pathParams["id"])
+		if !ok {
+			http.Error(response, "master playlist not found", http.StatusNotFound)
+			return
+		}
+		response.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+		response.Header().Set("Cache-Control", "private, max-age=300")
+		_, _ = response.Write(body)
+	}
 }
 
 func envOrDefault(name, fallback string) string {

@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 var (
@@ -133,7 +134,7 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 	if err := json.Unmarshal(body, &playback); err != nil {
 		return nil, fmt.Errorf("decode playback: %w", err)
 	}
-	return playback.streams(), nil
+	return c.alternativePlaybackStreams(ctx, client, playerURL, playback), nil
 }
 
 func readAlternativeResponse(response *http.Response) ([]byte, error) {
@@ -204,7 +205,12 @@ func (catalog alternativeCatalog) selectedFile(season int32, episode string) (al
 	return catalog.Active, nil
 }
 
-func (playback alternativePlayback) streams() []MovieStream {
+func (c *Client) alternativePlaybackStreams(
+	ctx context.Context,
+	client *http.Client,
+	playerURL *url.URL,
+	playback alternativePlayback,
+) []MovieStream {
 	subtitles := make([]SubtitleTrack, 0, len(playback.Tracks))
 	for index, track := range playback.Tracks {
 		if track.Source == "" {
@@ -212,27 +218,122 @@ func (playback alternativePlayback) streams() []MovieStream {
 		}
 		subtitles = append(subtitles, SubtitleTrack{ID: strconv.Itoa(index + 1), Name: track.Label, Language: track.Language, PlaylistURL: track.Source})
 	}
-	streams := make([]MovieStream, 0)
-	for _, source := range playback.HLSSource {
-		qualities := make([]string, 0, len(source.Quality))
-		for quality := range source.Quality {
-			qualities = append(qualities, quality)
-		}
-		sort.Slice(qualities, func(i, j int) bool {
-			left, _ := strconv.Atoi(qualities[i])
-			right, _ := strconv.Atoi(qualities[j])
-			return left > right
-		})
-		for _, quality := range qualities {
-			links := strings.Split(source.Quality[quality], " or ")
-			if len(links) == 0 || strings.TrimSpace(links[0]) == "" {
-				continue
+	streams := make([]MovieStream, len(playback.HLSSource))
+	var wait sync.WaitGroup
+	for index := range playback.HLSSource {
+		index := index
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			source := playback.HLSSource[index]
+			master := c.syntheticMaster(ctx, client, playerURL, source.Quality)
+			if len(master) == 0 {
+				return
 			}
-			name := strings.TrimSpace(source.Label) + " · " + quality + "p"
-			streams = append(streams, MovieStream{MasterPlaylistURL: strings.TrimSpace(links[0]), AudioTracks: []AudioTrack{{ID: "alternative", Name: name, Language: languageFromLabel(source.Label), Default: true}}, Subtitles: subtitles})
+			id := c.masters.put(master)
+			streams[index] = MovieStream{
+				MasterPlaylistURL: c.mediaBaseURL + "/v1/media/" + id + "/master.m3u8",
+				AudioTracks:       []AudioTrack{{ID: "alternative", Name: strings.TrimSpace(source.Label), Language: languageFromLabel(source.Label), Default: true}},
+				Subtitles:         subtitles,
+			}
+		}()
+	}
+	wait.Wait()
+	result := streams[:0]
+	for _, stream := range streams {
+		if stream.MasterPlaylistURL != "" {
+			result = append(result, stream)
 		}
 	}
+	streams = result
 	return streams
+}
+
+func (c *Client) syntheticMaster(ctx context.Context, client *http.Client, playerURL *url.URL, qualities map[string]string) []byte {
+	type variant struct {
+		quality              int
+		attributes, mediaURL string
+	}
+	variants := make(chan variant, len(qualities))
+	var wait sync.WaitGroup
+	for qualityText, alternatives := range qualities {
+		quality, err := strconv.Atoi(qualityText)
+		if err != nil {
+			continue
+		}
+		link := strings.TrimSpace(strings.Split(alternatives, " or ")[0])
+		if link == "" {
+			continue
+		}
+		wait.Add(1)
+		go func(quality int, link string) {
+			defer wait.Done()
+			attributes, mediaURL, err := c.resolveAlternativeVariant(ctx, client, playerURL, link)
+			if err == nil {
+				variants <- variant{quality: quality, attributes: attributes, mediaURL: mediaURL}
+			}
+		}(quality, link)
+	}
+	wait.Wait()
+	close(variants)
+	resolved := make([]variant, 0, len(qualities))
+	for item := range variants {
+		resolved = append(resolved, item)
+	}
+	sort.Slice(resolved, func(i, j int) bool { return resolved[i].quality < resolved[j].quality })
+	if len(resolved) == 0 {
+		return nil
+	}
+	var master strings.Builder
+	master.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n")
+	for _, item := range resolved {
+		master.WriteString("#EXT-X-STREAM-INF:")
+		master.WriteString(item.attributes)
+		master.WriteByte('\n')
+		master.WriteString(item.mediaURL)
+		master.WriteByte('\n')
+	}
+	return []byte(master.String())
+}
+
+func (c *Client) resolveAlternativeVariant(ctx context.Context, client *http.Client, playerURL *url.URL, rawURL string) (string, string, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", "", err
+	}
+	request.Header.Set("User-Agent", c.userAgent)
+	request.Header.Set("Origin", playerURL.Scheme+"://"+playerURL.Host)
+	request.Header.Set("Referer", playerURL.String())
+	response, err := client.Do(request)
+	if err != nil {
+		return "", "", err
+	}
+	body, err := readAlternativeResponse(response)
+	if err != nil {
+		return "", "", err
+	}
+	lines := strings.Split(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n")
+	for index, line := range lines {
+		if !strings.HasPrefix(line, "#EXT-X-STREAM-INF:") {
+			continue
+		}
+		for next := index + 1; next < len(lines); next++ {
+			candidate := strings.TrimSpace(lines[next])
+			if candidate == "" || strings.HasPrefix(candidate, "#") {
+				continue
+			}
+			base, err := url.Parse(rawURL)
+			if err != nil {
+				return "", "", err
+			}
+			reference, err := url.Parse(candidate)
+			if err != nil {
+				return "", "", err
+			}
+			return strings.TrimPrefix(line, "#EXT-X-STREAM-INF:"), base.ResolveReference(reference).String(), nil
+		}
+	}
+	return "", "", errors.New("variant playlist not found in upstream master")
 }
 
 func languageFromLabel(label string) string {
