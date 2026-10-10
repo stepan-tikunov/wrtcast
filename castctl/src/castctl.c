@@ -39,6 +39,8 @@
 #define LOAD_TIMEOUT_S 20 /* how long play waits for playback to start */
 #define MAX_MSG (64 * 1024)
 #define MAX_TRACKS 32
+#define MAX_SUBS 16
+#define SUB_TRACK_BASE 101 /* ids for side-loaded subtitles, clear of HLS ones */
 #define MAX_DEVICES 32
 #define DISCOVER_MS 2000 /* default mDNS listening window */
 
@@ -1047,9 +1049,12 @@ static void usage(void)
 "commands:\n"
 "  discover [-t seconds]               list Chromecasts on the local network\n"
 "                                      as JSON (listens 2 s by default)\n"
-"  play <url> [-t content-type] [-l]   load and play a stream (HLS by default;\n"
+"  play <url> [-t content-type] [-l] [-s url lang name]...\n"
+"                                      load and play a stream (HLS by default;\n"
 "                                      -l marks it as a live stream); waits\n"
-"                                      until playback starts or fails\n"
+"                                      until playback starts or fails; each -s\n"
+"                                      adds a WebVTT subtitle track (off until\n"
+"                                      selected with \"subs\")\n"
 "  pause | resume                      pause / resume playback\n"
 "  stop                                stop media\n"
 "  quit                                close the app on the device\n"
@@ -1149,16 +1154,49 @@ static void wait_for_playback(const char *transport, const char *r,
 	}
 }
 
+/*
+ * Subtitles that are not in the HLS manifest are side-loaded: LOAD lists them
+ * as WebVTT text tracks, and they can be switched with "subs" afterwards.
+ * The receiver fetches them itself, so the server must allow CORS.
+ */
+static size_t append_subs(char *body, size_t n, size_t cap, char **subs,
+			  int nsubs)
+{
+	char url[4200], lang[64], name[200];
+	int i;
+
+	if (!nsubs)
+		return n;
+	n += snprintf(body + n, cap - n, ",\"tracks\":[");
+	for (i = 0; i < nsubs; i++) {
+		jescape(url, sizeof(url), subs[i * 3]);
+		jescape(lang, sizeof(lang), subs[i * 3 + 1]);
+		jescape(name, sizeof(name), subs[i * 3 + 2]);
+		n += snprintf(body + n, cap - n,
+			      "%s{\"trackId\":%d,\"type\":\"TEXT\","
+			      "\"subtype\":\"SUBTITLES\",\"trackContentId\":%s,"
+			      "\"trackContentType\":\"text/vtt\","
+			      "\"language\":%s,\"name\":%s}",
+			      i ? "," : "", SUB_TRACK_BASE + i, url, lang, name);
+		if (n >= cap)
+			die("too many subtitles");
+	}
+	return n + snprintf(body + n, cap - n, "]");
+}
+
 static void cmd_play(int argc, char **argv)
 {
-	static char body[8192];
+	static char body[MAX_MSG - 256];
 	char url[4200], ctype[200];
 	const char *content_type = "application/x-mpegURL";
 	const char *stream_type = "BUFFERED";
 	const char *src = NULL;
+	char *subs[MAX_SUBS * 3];
+	int nsubs = 0;
 	struct app a;
 	struct media md;
 	const char *r;
+	size_t n;
 	int i;
 
 	for (i = 1; i < argc; i++) {
@@ -1166,7 +1204,12 @@ static void cmd_play(int argc, char **argv)
 			content_type = argv[++i];
 		else if (!strcmp(argv[i], "-l"))
 			stream_type = "LIVE";
-		else if (!src)
+		else if (!strcmp(argv[i], "-s") && i + 3 < argc) {
+			if (nsubs == MAX_SUBS)
+				die("at most %d subtitle tracks", MAX_SUBS);
+			memcpy(&subs[nsubs++ * 3], &argv[i + 1], 3 * sizeof(*argv));
+			i += 3;
+		} else if (!src)
 			src = argv[i];
 		else
 			usage();
@@ -1180,11 +1223,13 @@ static void cmd_play(int argc, char **argv)
 
 	jescape(url, sizeof(url), src);
 	jescape(ctype, sizeof(ctype), content_type);
-	snprintf(body, sizeof(body),
-		 "\"type\":\"LOAD\",\"autoplay\":true,\"currentTime\":0,"
-		 "\"media\":{\"contentId\":%s,\"contentType\":%s,"
-		 "\"streamType\":\"%s\"}",
-		 url, ctype, stream_type);
+	n = snprintf(body, sizeof(body),
+		     "\"type\":\"LOAD\",\"autoplay\":true,\"currentTime\":0,"
+		     "\"media\":{\"contentId\":%s,\"contentType\":%s,"
+		     "\"streamType\":\"%s\"",
+		     url, ctype, stream_type);
+	n = append_subs(body, n, sizeof(body) - 2, subs, nsubs);
+	snprintf(body + n, sizeof(body) - n, "}");
 	r = request(a.transport_id, NS_MEDIA, body);
 	memset(&md, 0, sizeof(md));
 	md.ntracks = md.nactive = -1;
