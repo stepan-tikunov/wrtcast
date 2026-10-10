@@ -19,8 +19,10 @@ svg{width:24px;height:24px;fill:currentColor;flex:none}
 .ib:active,.pill:active,.card:active,.ep:active{transform:scale(.96)}
 .ib,.pill,.card,.ep{transition:transform .12s}
 
-header{position:sticky;top:0;z-index:2;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));background:linear-gradient(var(--bg) 70%,#0e0e1000)}
-#f{position:relative}
+header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));background:linear-gradient(var(--bg) 70%,#0e0e1000)}
+#f{position:relative;flex:1}
+#devbtn{width:46px;height:46px;border-radius:14px;background:var(--s2);color:var(--mu)}
+#devbtn.on{color:var(--ac)}
 #f svg{position:absolute;left:14px;top:13px;width:20px;height:20px;color:var(--mu)}
 #q{width:100%;height:46px;padding:0 14px 0 42px;border:0;border-radius:14px;background:var(--s2);outline:none;font-size:17px;-webkit-user-select:text;user-select:text}
 #q:focus{box-shadow:0 0 0 2px var(--ac)}
@@ -45,6 +47,18 @@ header{position:sticky;top:0;z-index:2;padding:10px 12px;padding-top:max(10px,en
 #dposter{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--s2);box-shadow:0 8px 24px #0008}
 #det h1{margin:0 0 4px;font-size:22px;line-height:1.2}
 #dmeta{color:#c8c8cc;font-size:14px}
+#dmeta .orig{margin-bottom:2px;color:var(--mu)}
+.rt{display:flex;gap:6px;margin-top:8px}
+.rt span{padding:3px 8px;border-radius:7px;background:#ffffff1f;font-size:12px;font-weight:600}
+.rt b{color:var(--ac)}
+#dinfo{padding:4px 16px 4px}
+#ddesc{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;margin:4px 0 10px;color:#c8c8cc;font-size:15px;line-height:1.45;cursor:pointer}
+#ddesc.full{-webkit-line-clamp:unset}
+.facts{color:var(--mu);font-size:14px}
+.facts div{margin:4px 0}
+.facts b{color:var(--tx);font-weight:500}
+#dinfo .skl{height:13px;margin:8px 0}
+#dinfo .skl:last-child{width:60%}
 .pill{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;padding:0 20px;border:0;border-radius:26px;background:var(--s2);font-weight:600}
 .pill.ac{background:var(--ac);color:#111}
 #dplay{position:relative;width:100%;margin-top:18px}
@@ -93,6 +107,23 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .spin{width:14px;height:14px;border:2px solid var(--mu);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* device picker */
+#devs{position:fixed;left:0;right:0;bottom:0;z-index:6;padding:8px 16px max(16px,env(safe-area-inset-bottom));background:var(--s1);border-radius:20px 20px 0 0;box-shadow:0 -6px 30px #000c}
+#devs .handle{width:40px;height:5px;margin:0 auto 8px;border-radius:3px;background:var(--s3)}
+#devs h2{display:flex;align-items:center;margin:0 0 4px;font-size:18px}
+#devs h2 span{flex:1}
+#devlist .dev{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;padding:8px 4px;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
+.dev span{flex:1;min-width:0}
+.dev b{display:block;font-weight:550}
+.dev small{color:var(--mu)}
+.dev svg{color:var(--mu)}
+.dev.on,.dev.on svg{color:var(--ac)}
+.dev i{width:10px;height:10px;border-radius:50%;background:var(--ac);visibility:hidden}
+.dev.on i{visibility:visible}
+#devlist .note{padding:24px}
+#devname{display:flex;align-items:center;gap:6px;margin:8px auto 0;padding:6px 12px;border:0;border-radius:16px;background:none;color:var(--mu);font-size:14px}
+#devname svg{width:18px;height:18px}
+
 #toast{position:fixed;left:50%;bottom:96px;z-index:7;transform:translateX(-50%);width:max-content;max-width:90%;padding:10px 16px;border-radius:12px;background:var(--err);color:#fff;font-size:14px;box-shadow:0 4px 16px #0008}
 #toast:empty{display:none}
 
@@ -118,10 +149,14 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 #det{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
 #det.out{animation:slideout .2s ease-in forwards}
 #dposter{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards}
+#dinfo>*,.rt{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
 #det h1,#dmeta,#dplay{animation:pop .4s .1s cubic-bezier(.2,.8,.2,1) backwards}
 .ep.anim{animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 18ms)}
 .chip{transition:background .2s,color .2s}
-#pl{animation:rise .3s cubic-bezier(.2,.8,.2,1)}
+#pl,#devs{animation:rise .3s cubic-bezier(.2,.8,.2,1)}
+#devs.out{animation:sink .22s ease-in forwards}
+@keyframes sink{to{transform:translateY(100%)}}
+.dev{animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 40ms)}
 #full{display:grid!important;grid-template-rows:0fr;transition:grid-template-rows .32s cubic-bezier(.2,.8,.2,1)}
 #full>div{min-height:0;overflow:hidden}
 #pl.open #full{grid-template-rows:1fr}
@@ -151,10 +186,11 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></symbol>
   <symbol id="i-list" viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
 
-<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"></form></header>
+<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"></form><button class="ib" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg></button></header>
 <main id="grid"></main>
 <p class="note" id="msg"><svg><use href="#i-tv"/></svg><span>Найдите фильм или сериал и запустите его на ТВ</span></p>
 
@@ -165,6 +201,7 @@ svg.spring{animation:spring .3s ease-out}
     <div class="hero"><img id="dposter" alt=""><div><h1 id="dtitle"></h1><div id="dmeta"></div></div></div>
     <button class="pill ac" id="dplay"><svg><use href="#i-play"/></svg><span>Смотреть на ТВ</span></button>
   </div>
+  <div id="dinfo"></div>
   <div id="seasons"></div>
   <div id="eps"></div>
 </section>
@@ -195,8 +232,14 @@ svg.spring{animation:spring .3s ease-out}
     <div class="row"><div class="sel"><label for="audio">Озвучка</label><select id="audio"></select></div><div class="sel"><label for="subs">Субтитры</label><select id="subs"></select></div></div>
     <div class="row" id="eprow"><button class="pill" id="eplist"><svg><use href="#i-list"/></svg>Серии</button></div>
     <button id="stop" data-c="stop">Остановить</button>
+    <button id="devname"><svg><use href="#i-tv"/></svg><span></span></button>
     </div>
   </div></div>
+</section>
+<section id="devs" hidden>
+  <div class="handle"></div>
+  <h2><span>Где смотреть</span><button class="ib" id="devscan" aria-label="Обновить"><svg><use href="#i-refresh"/></svg></button></h2>
+  <div id="devlist"></div>
 </section>
 <div id="toast"></div>
 
@@ -208,8 +251,13 @@ let pending = null;     // play request in flight; status polls are ignored mean
 let item = null;        // movie or series shown on the details page
 let season = null;
 let pollError = '';
-const catalogs = {};
+const titles = {};      // /title answers by id
 const layers = [];      // open overlays; the back button closes the last one
+let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF default
+let devices = null;     // last /devices answer
+
+// Requests that talk to the TV carry the chosen device.
+const withDevice = path => device ? path + (path.includes('?') ? '&' : '?') + 'device=' + encodeURIComponent(device) : path;
 
 async function api(path, body) {
   const o = { headers: {} };
@@ -287,13 +335,15 @@ function openLayer(name) {
 }
 
 function showLayer(name, on) {
-  const e = $(name == 'det' ? 'det' : 'shade');
-  if (on) {
+  const show = e => {
     e.classList.remove('out');
     e.hidden = false;
-  } else {
-    animateOut(e);
-  }
+  };
+  const e = $(name == 'det' ? 'det' : 'shade');
+  // The shade is shared by the player and the device picker.
+  if (on) show(e);
+  else if (name == 'det' || !layers.some(l => l == 'pl' || l == 'dev')) animateOut(e);
+  if (name == 'dev') on ? show($('devs')) : animateOut($('devs'));
   if (name == 'pl') {
     $('pl').classList.toggle('open', on);
     $('full').inert = !on || !!pending;
@@ -330,7 +380,6 @@ function renderResults(results) {
     const b = el('button', { className: 'card' }, img, el('b', {}, m.title), el('span', {}, m.year));
     b.style.setProperty('--i', i);
     b.dataset.id = m.id;
-    if (m.type == 'series') b.append(el('span', { className: 'badge' }, 'Сериал'));
     b.onclick = () => openDetails(m);
     return b;
   }));
@@ -365,40 +414,64 @@ async function search(q) {
 
 // ---- details page -------------------------------------------------------
 
-async function catalog(id) {
-  return catalogs[id] ??= (await api('series?id=' + encodeURIComponent(id))).seasons;
+async function title(id) {
+  return titles[id] ??= await api('title?id=' + encodeURIComponent(id));
 }
 
+const RATINGS = { kinopoisk: 'КП', imdb: 'IMDb' };
+const duration = s => !s ? '' : (s >= 3600 ? Math.floor(s / 3600) + ' ч ' : '') + Math.round(s % 3600 / 60) + ' мин';
+
+function renderInfo(t) {
+  $('dmeta').replaceChildren(
+    ...(t.original && t.original != t.title ? [el('div', { className: 'orig' }, t.original)] : []),
+    el('div', {}, [t.year, t.countries.slice(0, 2).join(', '), t.type == 'series' ? 'Сериал' : duration(t.duration)].filter(Boolean).join(' · ')),
+    ...(t.ratings.length ? [el('div', { className: 'rt' }, ...t.ratings.map(r =>
+      el('span', {}, (RATINGS[r.source] || r.source) + ' ', el('b', {}, r.value.toFixed(1)))))] : []));
+  const facts = [['Жанр', t.genres.slice(0, 4)], ['Режиссёр', t.directors.slice(0, 2)], ['В ролях', t.actors.slice(0, 6)]]
+    .filter(([, v]) => v.length);
+  const desc = el('p', { id: 'ddesc' }, t.description || '');
+  desc.onclick = () => desc.classList.toggle('full');
+  $('dinfo').replaceChildren(...(t.description ? [desc] : []),
+    el('div', { className: 'facts' }, ...facts.map(([k, v]) => el('div', {}, el('b', {}, k + ': '), v.join(', ')))));
+}
+
+// m comes from search results (id, title, year, poster); whether it is a movie
+// or a series is only known once /title answers.
 async function openDetails(m) {
   item = m;
   $('dtitle').textContent = m.title;
-  $('dmeta').textContent = [m.year, m.type == 'series' ? 'Сериал' : 'Фильм'].filter(Boolean).join(' · ');
+  $('dmeta').textContent = m.year || '';
   $('dposter').hidden = !m.poster;
   $('dposter').src = m.poster || '';
   $('dbg').style.backgroundImage = m.poster ? `url("${m.poster}")` : 'none';
-  $('dplay').hidden = m.type == 'series';
+  $('dplay').hidden = true;
   $('seasons').replaceChildren();
   $('eps').replaceChildren();
+  $('dinfo').replaceChildren(...[1, 2, 3].map(() => el('span', { className: 'skl' })));
   // The blurred backdrop overflows .top; older engines can still scroll it.
   $('det').scrollTop = $('det').firstElementChild.scrollTop = 0;
   openLayer('det');
-  renderDetails();
-  if (m.type != 'series') return;
-  $('eps').replaceChildren(el('p', { className: 'note' }, 'Загружаю серии…'));
+  let t;
   try {
-    m.seasons = await catalog(m.id);
+    t = await title(m.id);
   } catch (e) {
-    $('eps').replaceChildren(el('p', { className: 'note' }, 'Не удалось загрузить серии'));
+    if (item == m) $('dinfo').replaceChildren(el('p', { className: 'note' }, 'Не удалось загрузить'));
     return toast(e);
   }
   if (item != m) return;
+  Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: m.poster || t.poster });
+  renderInfo(t);
+  if (t.type != 'series') {
+    $('dplay').hidden = false;
+    return renderDetails();
+  }
   const now = st?.now?.id == m.id ? st.now : null;
   showSeason(m.seasons.find(s => s.season == now?.season) || m.seasons[0]);
 }
 
 // Movie play button; offers the player instead when the movie is already on.
 function renderDetails() {
-  if (!item || item.type == 'series') return;
+  if (!item || item.type != 'movie') return;
   const on = st?.media && st.now?.id == item.id;
   const starting = pending?.id == item.id;
   $('dplay').lastChild.textContent = starting ? 'Запускаю…' : on ? 'Уже на ТВ — открыть плеер' : 'Смотреть на ТВ';
@@ -456,7 +529,7 @@ async function play(m) {
   pending = req;
   refresh();
   try {
-    const s = await api('play', req);
+    const s = await api(withDevice('play'), req);
     pending = null;
     render(s);
     while (layers.includes('det')) await closeTop();
@@ -473,7 +546,7 @@ async function stepEpisode(dir) {
   const now = st?.now;
   if (now?.season == null) return;
   try {
-    const seasons = await catalog(now.id);
+    const { seasons } = await title(now.id);
     const si = seasons.findIndex(s => s.season == now.season);
     const eps = seasons[si]?.episodes || [];
     const ei = eps.findIndex(e => e.episode == now.episode);
@@ -560,6 +633,8 @@ function render(s) {
   st = s;
   statusAt = Date.now();
   refresh();
+  $('devname').lastChild.textContent = s.device?.name || '';
+  $('devname').hidden = !s.device?.name || (devices?.devices.length ?? 0) < 2;
   const m = s.media;
   if (!m) return;
   const series = s.now?.season != null;
@@ -586,7 +661,7 @@ async function cmd(c, arg) {
   }
   if (c == 'mute' && st?.muted) c = 'unmute';
   try {
-    render(await api('cmd', arg == null ? { c } : { c, arg: String(arg) }));
+    render(await api(withDevice('cmd'), arg == null ? { c } : { c, arg: String(arg) }));
   } catch (e) {
     toast(e);
     poll();
@@ -597,15 +672,70 @@ async function poll() {
   if (busy || document.hidden) return;
   busy = true;
   try {
-    const s = await api('status');
+    const sent = device;
+    const s = await api(withDevice('status'));
     pollError = '';
-    if (!pending) render(s);
+    if (!pending && sent == device) render(s);
   } catch (e) {
+    if (e.message == 'device not found' && device) {
+      // The saved TV is gone; fall back to the default one.
+      toast('Устройство не найдено, переключаюсь на другое');
+      selectDevice('');
+      busy = false;
+      return;
+    }
     // Report a lost connection once, not on every poll.
     if (e.message != pollError) toast('Нет связи с ТВ: ' + e.message);
     pollError = e.message;
   }
   busy = false;
+}
+
+// ---- devices ------------------------------------------------------------
+
+const currentDevice = () => device || st?.device?.id || devices?.default || '';
+
+function renderDevices() {
+  const list = devices?.devices || [];
+  $('devbtn').classList.toggle('on', list.length > 1);
+  if ($('devs').hidden) return;
+  const cur = currentDevice();
+  $('devlist').replaceChildren(...list.map((d, i) => {
+    const b = el('button', { className: 'dev' + (d.id == cur ? ' on' : '') },
+      el('span', {}, el('b', {}, d.name || d.host), el('small', {}, [d.model, d.host].filter(Boolean).join(' · '))), el('i'));
+    b.prepend(document.querySelector('#devbtn svg').cloneNode(true));
+    b.style.setProperty('--i', i);
+    b.onclick = async () => {
+      // The player may belong to the previous TV, so close it as well.
+      while (layers.some(l => l == 'pl' || l == 'dev')) await closeTop();
+      selectDevice(d.id);
+    };
+    return b;
+  }));
+  if (!list.length) $('devlist').append(el('p', { className: 'note' }, 'Chromecast не найден в сети'));
+}
+
+async function loadDevices(rescan) {
+  $('devscan').disabled = true;
+  if (rescan) $('devscan').querySelector('svg').style.animation = 'spin .8s linear infinite';
+  try {
+    devices = await api('devices' + (rescan ? '?refresh=1' : ''));
+  } catch (e) {
+    toast(e);
+  }
+  $('devscan').disabled = false;
+  $('devscan').querySelector('svg').style.animation = '';
+  renderDevices();
+}
+
+function selectDevice(id) {
+  if (id == currentDevice() && id == device) return;
+  device = id;
+  localStorage.device = id;
+  st = null;
+  refresh();
+  renderDevices();
+  poll();
 }
 
 // ---- wiring -------------------------------------------------------------
@@ -651,8 +781,15 @@ $('eplist').onclick = async () => {
   const n = st?.now;
   if (!n) return;
   await closeTop();
-  openDetails({ id: n.id, title: n.title, poster: n.poster, type: 'series' });
+  openDetails({ id: n.id, title: n.title, poster: n.poster });
 };
+$('devbtn').onclick = () => {
+  openLayer('dev');
+  renderDevices();
+  loadDevices(true);
+};
+$('devname').onclick = $('devbtn').onclick;
+$('devscan').onclick = () => loadDevices(true);
 $('next').onclick = () => stepEpisode(1);
 $('prev').onclick = () => stepEpisode(-1);
 document.addEventListener('visibilitychange', poll);
@@ -668,6 +805,7 @@ try {
   }
 } catch {}
 poll();
+loadDevices(false);
 setInterval(poll, 2000);
 setInterval(showTime, 250);
 </script>
