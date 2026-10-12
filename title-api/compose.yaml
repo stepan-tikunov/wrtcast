@@ -20,5 +20,11 @@ services:
     environment:
       HTTP_ADDR: ${WG_ADDR:?set WG_ADDR to the server's WireGuard address}:50052
       GRPC_ADDR: 127.0.0.1:50051
+      TITLE_API_STATE_DB: /var/lib/title-api/state.db
       HTTPS_PROXY: ${EGRESS_PROXY:-}
       HTTP_PROXY: ${EGRESS_PROXY:-}
+    volumes:
+      - title-api-state:/var/lib/title-api
+
+volumes:
+  title-api-state:

@@ -46,7 +46,7 @@ func (c *Client) TitleMetadata(ctx context.Context, externalMovieID string) (Tit
 		return TitleMetadata{}, err
 	}
 
-	metadata, err := parseTitleMetadata(movieHTML, c.baseURL)
+	metadata, err := parseTitleMetadata(movieHTML, c.providerURL())
 	if err != nil {
 		return TitleMetadata{}, fmt.Errorf("parse title metadata: %w", err)
 	}
@@ -66,7 +66,7 @@ func (c *Client) TitleMetadata(ctx context.Context, externalMovieID string) (Tit
 
 func (c *Client) mediaTypeFromAlternativePlayers(ctx context.Context, movieHTML []byte) (MediaType, error) {
 	loadErrors := make([]error, 0)
-	for _, playerURL := range alternativePlayerURLs(movieHTML, c.baseURL.Scheme) {
+	for _, playerURL := range alternativePlayerURLs(movieHTML, c.providerURL().Scheme) {
 		player, err := c.loadAlternativePlayer(ctx, playerURL)
 		if err != nil {
 			loadErrors = append(loadErrors, fmt.Errorf("%s: %w", playerURL, err))
@@ -92,7 +92,7 @@ func (c *Client) mediaTypeFromEmbeds(
 	var durationSeconds uint64
 	fetchErrors := make([]error, 0)
 	for _, embedURL := range embedURLs {
-		embedHTML, _, err := c.get(ctx, current, embedURL, c.baseURL.String()+"/")
+		embedHTML, _, err := c.get(ctx, current, embedURL, c.providerURL().String()+"/")
 		if err != nil {
 			fetchErrors = append(fetchErrors, fmt.Errorf("%s: %w", embedURL, err))
 			continue

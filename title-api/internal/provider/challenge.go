@@ -12,7 +12,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 // The CDN binds signed media URLs to the User-Agent used to request the embed
@@ -29,24 +32,27 @@ type Config struct {
 	RefreshInterval time.Duration
 	HTTPTimeout     time.Duration
 	UserAgent       string
+	URLStore        ProviderURLStore
 }
 
 type session struct {
 	client      *http.Client
 	generation  uint64
 	mu          sync.RWMutex
-	cookies     map[string]string
-	cookieOrder []string
+	cookies     map[string]map[string]string
+	cookieOrder map[string][]string
 }
 
 type Client struct {
-	baseURL         *url.URL
+	bootstrapURL    *url.URL
+	baseURL         atomic.Pointer[url.URL]
 	domainPrefix    string
 	refreshInterval time.Duration
 	httpTimeout     time.Duration
 	userAgent       string
 	mediaBaseURL    string
 	masters         *masterStore
+	urlStore        ProviderURLStore
 
 	mu             sync.RWMutex
 	session        *session
@@ -81,15 +87,18 @@ func NewClient(config Config) (*Client, error) {
 	}
 
 	digest := sha1.Sum([]byte(strings.ToLower(baseURL.Hostname())))
-	return &Client{
-		baseURL:         baseURL,
+	client := &Client{
+		bootstrapURL:    baseURL,
 		domainPrefix:    hex.EncodeToString(digest[:])[:8],
 		refreshInterval: config.RefreshInterval,
 		httpTimeout:     config.HTTPTimeout,
 		userAgent:       config.UserAgent,
 		mediaBaseURL:    strings.TrimRight(mediaBaseURL.String(), "/"),
 		masters:         newMasterStore(6*time.Hour, 4096),
-	}, nil
+		urlStore:        config.URLStore,
+	}
+	client.baseURL.Store(baseURL)
+	return client, nil
 }
 
 func (c *Client) DomainPrefix() string {
@@ -100,7 +109,23 @@ func (c *Client) ExternalTitleID(siteMovieID string) string {
 	return c.domainPrefix + siteMovieID
 }
 
+func (c *Client) ProviderURL() string {
+	return c.providerURL().String()
+}
+
 func (c *Client) Start(ctx context.Context) error {
+	if c.urlStore != nil {
+		stored, err := c.urlStore.Load(ctx)
+		if err != nil {
+			return fmt.Errorf("load remembered provider URL: %w", err)
+		}
+		if stored != "" {
+			remembered, parseErr := parseProviderURL(stored)
+			if parseErr == nil && sameProvider(c.bootstrapURL, remembered) {
+				c.baseURL.Store(remembered)
+			}
+		}
+	}
 	if err := c.Refresh(ctx); err != nil {
 		return err
 	}
@@ -139,8 +164,41 @@ func (c *Client) refreshIfStale(ctx context.Context, generation uint64) error {
 }
 
 func (c *Client) refreshLocked(ctx context.Context) error {
+	active := c.providerURL()
+	candidates := []*url.URL{active}
+	if active.String() != c.bootstrapURL.String() {
+		candidates = append(candidates, c.bootstrapURL)
+	}
+
+	var refreshErrors []error
+	for _, candidateURL := range candidates {
+		candidate, resolvedURL, err := c.refreshFrom(ctx, candidateURL)
+		if err != nil {
+			refreshErrors = append(refreshErrors, fmt.Errorf("%s: %w", candidateURL, err))
+			continue
+		}
+
+		c.mu.Lock()
+		c.nextGeneration++
+		candidate.generation = c.nextGeneration
+		c.session = candidate
+		c.mu.Unlock()
+
+		c.baseURL.Store(resolvedURL)
+		if c.urlStore != nil {
+			if err := c.urlStore.Save(ctx, resolvedURL.String()); err != nil {
+				return fmt.Errorf("remember provider URL: %w", err)
+			}
+		}
+		return nil
+	}
+	return errors.Join(refreshErrors...)
+}
+
+func (c *Client) refreshFrom(ctx context.Context, initialURL *url.URL) (*session, *url.URL, error) {
 	candidate := &session{
-		cookies: make(map[string]string),
+		cookies:     make(map[string]map[string]string),
+		cookieOrder: make(map[string][]string),
 	}
 	candidate.client = &http.Client{
 		Timeout: c.httpTimeout,
@@ -148,11 +206,11 @@ func (c *Client) refreshLocked(ctx context.Context) error {
 			if len(via) >= 10 {
 				return errors.New("stopped after 10 redirects")
 			}
-			if request.Response != nil && request.Response.Request.URL.Hostname() == c.baseURL.Hostname() {
-				candidate.absorbSetCookies(request.Response.Header.Values("Set-Cookie"))
+			if request.Response != nil {
+				candidate.absorbSetCookies(request.Response.Request.URL.Host, request.Response.Header.Values("Set-Cookie"))
 			}
-			if request.URL.Hostname() == c.baseURL.Hostname() {
-				request.Header.Set("Cookie", candidate.cookieHeader())
+			if cookies := candidate.cookieHeader(request.URL.Host); cookies != "" {
+				request.Header.Set("Cookie", cookies)
 			} else {
 				request.Header.Del("Cookie")
 			}
@@ -160,37 +218,37 @@ func (c *Client) refreshLocked(ctx context.Context) error {
 		},
 	}
 
-	challengeURL := c.baseURL.ResolveReference(&url.URL{Path: "/"})
+	challengeURL := initialURL.ResolveReference(&url.URL{Path: "/"})
 	for attempt := 0; attempt < 4; attempt++ {
-		body, _, err := c.get(ctx, candidate, challengeURL.String(), "")
+		body, finalURL, err := c.get(ctx, candidate, challengeURL.String(), "")
 		if err != nil {
-			return fmt.Errorf("refresh anti-bot session: %w", err)
+			return nil, nil, fmt.Errorf("refresh anti-bot session: %w", err)
+		}
+		resolvedURL := providerOrigin(finalURL)
+		if !sameProvider(c.bootstrapURL, resolvedURL) {
+			return nil, nil, fmt.Errorf("provider redirected outside %s to %s", c.bootstrapURL.Hostname(), resolvedURL)
 		}
 		if !isChallenge(body) {
-			c.mu.Lock()
-			c.nextGeneration++
-			candidate.generation = c.nextGeneration
-			c.session = candidate
-			c.mu.Unlock()
-			return nil
+			return candidate, resolvedURL, nil
 		}
+		challengeURL = resolvedURL.ResolveReference(&url.URL{Path: "/"})
 
-		parameters := candidate.cookieValue("__js_p_")
+		parameters := candidate.cookieValue(finalURL.Host, "__js_p_")
 		parts := strings.Split(parameters, ",")
 		if len(parts) < 2 {
-			return errors.New("anti-bot response has no valid __js_p_ cookie")
+			return nil, nil, errors.New("anti-bot response has no valid __js_p_ cookie")
 		}
 		code, err := strconv.ParseInt(parts[0], 10, 64)
 		if err != nil {
-			return fmt.Errorf("parse anti-bot code: %w", err)
+			return nil, nil, fmt.Errorf("parse anti-bot code: %w", err)
 		}
 		hash, err := challengeHash(ctx, code)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 
-		candidate.setCookie("__jhash_", strconv.Itoa(hash))
-		candidate.setCookie("__jua_", encodeURIComponent(c.userAgent))
+		candidate.setCookie(finalURL.Host, "__jhash_", strconv.Itoa(hash))
+		candidate.setCookie(finalURL.Host, "__jua_", encodeURIComponent(c.userAgent))
 
 		// The browser challenge waits one second before setting the cookies and
 		// navigating. Preserve that timing; the server rejects instant replays.
@@ -198,11 +256,42 @@ func (c *Client) refreshLocked(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return ctx.Err()
+			return nil, nil, ctx.Err()
 		case <-timer.C:
 		}
 	}
-	return errors.New("anti-bot challenge was not accepted after 4 attempts")
+	return nil, nil, errors.New("anti-bot challenge was not accepted after 4 attempts")
+}
+
+func (c *Client) providerURL() *url.URL {
+	return c.baseURL.Load()
+}
+
+func providerOrigin(source *url.URL) *url.URL {
+	return &url.URL{Scheme: source.Scheme, Host: source.Host}
+}
+
+func parseProviderURL(value string) (*url.URL, error) {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme == "" || parsed.Hostname() == "" {
+		return nil, fmt.Errorf("parse provider URL %q: %w", value, err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return nil, fmt.Errorf("provider URL %q has unsupported scheme", value)
+	}
+	return providerOrigin(parsed), nil
+}
+
+func sameProvider(first, second *url.URL) bool {
+	if first == nil || second == nil {
+		return false
+	}
+	firstDomain, firstErr := publicsuffix.EffectiveTLDPlusOne(first.Hostname())
+	secondDomain, secondErr := publicsuffix.EffectiveTLDPlusOne(second.Hostname())
+	if firstErr != nil || secondErr != nil {
+		return strings.EqualFold(first.Hostname(), second.Hostname())
+	}
+	return strings.EqualFold(firstDomain, secondDomain)
 }
 
 func (c *Client) currentSession() (*session, error) {
@@ -222,12 +311,10 @@ func (c *Client) get(ctx context.Context, current *session, target, referer stri
 	request.Header.Set("User-Agent", c.userAgent)
 	request.Header.Set("Accept", "text/html,application/xhtml+xml,application/vnd.apple.mpegurl,*/*;q=0.8")
 	request.Header.Set("Accept-Language", "en-US,en;q=0.8")
-	if request.URL.Hostname() == c.baseURL.Hostname() {
-		if cookies := current.cookieHeader(); cookies != "" {
-			// Set the header directly: net/http.Cookie.String quotes commas, while
-			// provider's __js_p_ value must be sent byte-for-byte without quotes.
-			request.Header.Set("Cookie", cookies)
-		}
+	if cookies := current.cookieHeader(request.URL.Host); cookies != "" {
+		// Set the header directly: net/http.Cookie.String quotes commas, while
+		// provider's __js_p_ value must be sent byte-for-byte without quotes.
+		request.Header.Set("Cookie", cookies)
 	}
 	if referer != "" {
 		request.Header.Set("Referer", referer)
@@ -238,9 +325,7 @@ func (c *Client) get(ctx context.Context, current *session, target, referer stri
 		return nil, nil, err
 	}
 	defer response.Body.Close()
-	if response.Request.URL.Hostname() == c.baseURL.Hostname() {
-		current.absorbSetCookies(response.Header.Values("Set-Cookie"))
-	}
+	current.absorbSetCookies(response.Request.URL.Host, response.Header.Values("Set-Cookie"))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil, response.Request.URL, fmt.Errorf("GET %s returned %s", target, response.Status)
 	}
@@ -266,10 +351,8 @@ func (c *Client) postForm(
 	request.Header.Set("Accept", "text/html,application/xhtml+xml,*/*;q=0.8")
 	request.Header.Set("Accept-Language", "en-US,en;q=0.8")
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	if request.URL.Hostname() == c.baseURL.Hostname() {
-		if cookies := current.cookieHeader(); cookies != "" {
-			request.Header.Set("Cookie", cookies)
-		}
+	if cookies := current.cookieHeader(request.URL.Host); cookies != "" {
+		request.Header.Set("Cookie", cookies)
 	}
 	if referer != "" {
 		request.Header.Set("Referer", referer)
@@ -280,9 +363,7 @@ func (c *Client) postForm(
 		return nil, nil, err
 	}
 	defer response.Body.Close()
-	if response.Request.URL.Hostname() == c.baseURL.Hostname() {
-		current.absorbSetCookies(response.Header.Values("Set-Cookie"))
-	}
+	current.absorbSetCookies(response.Request.URL.Host, response.Header.Values("Set-Cookie"))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil, response.Request.URL, fmt.Errorf("POST %s returned %s", target, response.Status)
 	}
@@ -293,37 +374,40 @@ func (c *Client) postForm(
 	return body, response.Request.URL, nil
 }
 
-func (s *session) setCookie(name, value string) {
+func (s *session) setCookie(host, name, value string) {
 	s.mu.Lock()
-	if _, exists := s.cookies[name]; !exists {
-		s.cookieOrder = append(s.cookieOrder, name)
+	if s.cookies[host] == nil {
+		s.cookies[host] = make(map[string]string)
 	}
-	s.cookies[name] = value
+	if _, exists := s.cookies[host][name]; !exists {
+		s.cookieOrder[host] = append(s.cookieOrder[host], name)
+	}
+	s.cookies[host][name] = value
 	s.mu.Unlock()
 }
 
-func (s *session) cookieValue(name string) string {
+func (s *session) cookieValue(host, name string) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.cookies[name]
+	return s.cookies[host][name]
 }
 
-func (s *session) cookieHeader() string {
+func (s *session) cookieHeader(host string) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	parts := make([]string, 0, len(s.cookieOrder))
-	for _, name := range s.cookieOrder {
-		parts = append(parts, name+"="+s.cookies[name])
+	parts := make([]string, 0, len(s.cookieOrder[host]))
+	for _, name := range s.cookieOrder[host] {
+		parts = append(parts, name+"="+s.cookies[host][name])
 	}
 	return strings.Join(parts, "; ")
 }
 
-func (s *session) absorbSetCookies(headers []string) {
+func (s *session) absorbSetCookies(host string, headers []string) {
 	for _, header := range headers {
 		pair := strings.SplitN(header, ";", 2)[0]
 		name, value, ok := strings.Cut(pair, "=")
 		if ok && strings.TrimSpace(name) != "" {
-			s.setCookie(strings.TrimSpace(name), value)
+			s.setCookie(host, strings.TrimSpace(name), value)
 		}
 	}
 }
@@ -355,16 +439,23 @@ func challengeHash(ctx context.Context, code int64) (int, error) {
 }
 
 func encodeURIComponent(value string) string {
-	const hexDigits = "0123456789ABCDEF"
+	const (
+		upperHexDigits = "0123456789ABCDEF"
+		lowerHexDigits = "0123456789abcdef"
+	)
 	var builder strings.Builder
 	for i := 0; i < len(value); i++ {
 		character := value[i]
 		if character >= 'a' && character <= 'z' ||
 			character >= 'A' && character <= 'Z' ||
 			character >= '0' && character <= '9' ||
-			strings.ContainsRune("-_.!~*'()", rune(character)) {
+			strings.ContainsRune("-_.~", rune(character)) {
 			builder.WriteByte(character)
 			continue
+		}
+		hexDigits := upperHexDigits
+		if strings.ContainsRune("!'()*", rune(character)) {
+			hexDigits = lowerHexDigits
 		}
 		builder.WriteByte('%')
 		builder.WriteByte(hexDigits[character>>4])

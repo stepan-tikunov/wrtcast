@@ -51,7 +51,7 @@ func (c *Client) Search(ctx context.Context, query string) ([]SearchResult, erro
 		return nil, err
 	}
 
-	results, err := parseSearchResults(body, c.baseURL, c.domainPrefix)
+	results, err := parseSearchResults(body, c.providerURL(), c.domainPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("parse search results: %w", err)
 	}
@@ -59,7 +59,8 @@ func (c *Client) Search(ctx context.Context, query string) ([]SearchResult, erro
 }
 
 func (c *Client) searchPage(ctx context.Context, current *session, query string) ([]byte, error) {
-	target := c.baseURL.ResolveReference(&url.URL{Path: "/search-result/"})
+	baseURL := c.providerURL()
+	target := baseURL.ResolveReference(&url.URL{Path: "/search-result/"})
 	form := url.Values{
 		"do":           {"search"},
 		"subaction":    {"search"},
@@ -68,7 +69,7 @@ func (c *Client) searchPage(ctx context.Context, current *session, query string)
 		"full_search":  {"0"},
 		"result_from":  {"1"},
 	}
-	body, _, err := c.postForm(ctx, current, target.String(), form, c.baseURL.String()+"/")
+	body, _, err := c.postForm(ctx, current, target.String(), form, baseURL.String()+"/")
 	if err != nil {
 		return nil, fmt.Errorf("fetch search results: %w", err)
 	}

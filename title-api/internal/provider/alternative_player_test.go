@@ -29,7 +29,7 @@ func TestRealAlternativePlayer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	urls := alternativePlayerURLs(page, client.baseURL.Scheme)
+	urls := alternativePlayerURLs(page, client.providerURL().Scheme)
 	if len(urls) == 0 {
 		t.Fatalf("alternative player not found; token_movie offset=%d, cdn offset=%d", strings.Index(string(page), "token_movie"), strings.Index(string(page), "cdn."))
 	}

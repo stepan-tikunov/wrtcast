@@ -92,7 +92,7 @@ func (c *Client) Series(ctx context.Context, externalMovieID string) ([]Season, 
 	seriesEmbeds := 0
 	parseErrors := make([]error, 0)
 	for _, embedURL := range embedURLs {
-		embedHTML, _, fetchErr := c.get(ctx, current, embedURL, c.baseURL.String()+"/")
+		embedHTML, _, fetchErr := c.get(ctx, current, embedURL, c.providerURL().String()+"/")
 		if fetchErr != nil {
 			parseErrors = append(parseErrors, fmt.Errorf("%s: fetch embed: %w", embedURL, fetchErr))
 			continue
@@ -110,7 +110,7 @@ func (c *Client) Series(ctx context.Context, externalMovieID string) ([]Season, 
 	}
 	// Alternative players add episodes the primary ones lack, and keep the
 	// catalog available while the primary players are down.
-	for _, playerURL := range alternativePlayerURLs(movieHTML, c.baseURL.Scheme) {
+	for _, playerURL := range alternativePlayerURLs(movieHTML, c.providerURL().Scheme) {
 		player, loadErr := c.loadAlternativePlayer(ctx, playerURL)
 		if loadErr != nil {
 			parseErrors = append(parseErrors, fmt.Errorf("%s: %w", playerURL, loadErr))
@@ -152,7 +152,7 @@ func (c *Client) EpisodeStreams(
 	seriesEmbeds := 0
 	episodeFound := false
 	for index, embedURL := range embedURLs {
-		embedHTML, _, fetchErr := c.get(ctx, current, embedURL, c.baseURL.String()+"/")
+		embedHTML, _, fetchErr := c.get(ctx, current, embedURL, c.providerURL().String()+"/")
 		if fetchErr != nil {
 			streamErrors = append(streamErrors, fmt.Errorf("%s: fetch embed: %w", embedURL, fetchErr))
 			continue
@@ -195,7 +195,7 @@ func (c *Client) EpisodeStreams(
 		stream.Name = primaryStreamName(index, len(embedURLs))
 		streams = append(streams, stream)
 	}
-	for _, playerURL := range alternativePlayerURLs(movieHTML, c.baseURL.Scheme) {
+	for _, playerURL := range alternativePlayerURLs(movieHTML, c.providerURL().Scheme) {
 		alternative, alternativeErr := c.alternativeStreams(ctx, playerURL, seasonNumber, episodeNumber)
 		if errors.Is(alternativeErr, ErrEpisodeNotFound) {
 			continue

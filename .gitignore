@@ -3,4 +3,5 @@
 /castctl/castctl
 /castctl/build/
 /title-api/title-api
+/title-api/*.db*
 /.claude/

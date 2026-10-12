@@ -125,7 +125,7 @@ func (c *Client) loadAlternativePlayer(ctx context.Context, rawPlayerURL string)
 		return nil, err
 	}
 	request.Header.Set("User-Agent", c.userAgent)
-	request.Header.Set("Referer", c.baseURL.String()+"/")
+	request.Header.Set("Referer", c.providerURL().String()+"/")
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("fetch player: %w", err)

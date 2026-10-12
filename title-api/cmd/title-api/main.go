@@ -23,9 +23,10 @@ import (
 )
 
 const (
-	defaultBaseURL  = "https://go.\x6c\x6f\x72\x64\x66\x69\x6c\x6d5.pro"
-	defaultGRPCAddr = ":50051"
-	defaultHTTPAddr = ":8080"
+	defaultBaseURL     = "https://go.\x6c\x6f\x72\x64\x66\x69\x6c\x6d5.pro"
+	defaultGRPCAddr    = ":50051"
+	defaultHTTPAddr    = ":8080"
+	defaultStateDBPath = "title-api-state.db"
 )
 
 func main() {
@@ -41,14 +42,21 @@ func run() error {
 	baseURL := envOrDefault("MOVIE_PROVIDER_BASE_URL", defaultBaseURL)
 	providerUserAgent := os.Getenv("MOVIE_PROVIDER_USER_AGENT")
 	mediaBaseURL := envOrDefault("TITLE_API_PUBLIC_URL", "http://localhost:50052")
+	stateDBPath := envOrDefault("TITLE_API_STATE_DB", defaultStateDBPath)
 	grpcAddress := envOrDefault("GRPC_ADDR", defaultGRPCAddr)
 	httpAddress := envOrDefault("HTTP_ADDR", defaultHTTPAddr)
+	urlStore, err := provider.OpenSQLiteProviderURLStore(ctx, stateDBPath)
+	if err != nil {
+		return err
+	}
+	defer urlStore.Close()
 
 	client, err := provider.NewClient(provider.Config{
 		BaseURL:         baseURL,
 		MediaBaseURL:    mediaBaseURL,
 		RefreshInterval: 5 * time.Minute,
 		UserAgent:       providerUserAgent,
+		URLStore:        urlStore,
 	})
 	if err != nil {
 		return err
@@ -57,6 +65,7 @@ func run() error {
 	if err := client.Start(ctx); err != nil {
 		return err
 	}
+	log.Printf("provider anti-bot session initialized for %s", client.ProviderURL())
 
 	grpcListener, err := net.Listen("tcp", grpcAddress)
 	if err != nil {
@@ -101,7 +110,7 @@ func run() error {
 		"gRPC server listening on %s; HTTP gateway listening on %s; title_id prefix for %s is %s",
 		grpcAddress,
 		httpAddress,
-		baseURL,
+		client.ProviderURL(),
 		client.DomainPrefix(),
 	)
 

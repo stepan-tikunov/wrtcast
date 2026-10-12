@@ -60,6 +60,7 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 	if err != nil {
 		return nil, err
 	}
+	baseURL := c.providerURL()
 
 	streams := make([]MovieStream, 0, len(embedURLs))
 	streamErrors := make([]error, 0)
@@ -77,7 +78,7 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 		stream.Name = primaryStreamName(index, len(embedURLs))
 		streams = append(streams, stream)
 	}
-	for _, playerURL := range alternativePlayerURLs(movieHTML, c.baseURL.Scheme) {
+	for _, playerURL := range alternativePlayerURLs(movieHTML, baseURL.Scheme) {
 		alternative, alternativeErr := c.alternativeStreams(ctx, playerURL, 0, "")
 		if alternativeErr != nil {
 			streamErrors = append(streamErrors, fmt.Errorf("%s: %w", playerURL, alternativeErr))
@@ -126,15 +127,16 @@ func (c *Client) movieDocument(ctx context.Context, externalMovieID string) (*se
 		return nil, nil, nil, err
 	}
 
-	embedURLs := uniqueEmbedURLs(embedURLPattern.FindAllString(string(movieHTML), -1), c.baseURL.Scheme)
-	if len(embedURLs) == 0 && len(alternativePlayerURLs(movieHTML, c.baseURL.Scheme)) == 0 {
+	baseURL := c.providerURL()
+	embedURLs := uniqueEmbedURLs(embedURLPattern.FindAllString(string(movieHTML), -1), baseURL.Scheme)
+	if len(embedURLs) == 0 && len(alternativePlayerURLs(movieHTML, baseURL.Scheme)) == 0 {
 		return nil, nil, nil, errors.New("embed URL not found in movie page")
 	}
 	return current, movieHTML, embedURLs, nil
 }
 
 func (c *Client) streamFromEmbed(ctx context.Context, current *session, embedURL string) (MovieStream, error) {
-	embedHTML, _, err := c.get(ctx, current, embedURL, c.baseURL.String()+"/")
+	embedHTML, _, err := c.get(ctx, current, embedURL, c.providerURL().String()+"/")
 	if err != nil {
 		return MovieStream{}, fmt.Errorf("fetch embed: %w", err)
 	}
@@ -221,7 +223,7 @@ func uniqueEmbedURLs(matches []string, scheme string) []string {
 var errAntiBotChallenge = errors.New("anti-bot challenge")
 
 func (c *Client) moviePage(ctx context.Context, current *session, siteMovieID string) ([]byte, error) {
-	target := c.baseURL.ResolveReference(&url.URL{Path: "/index.php", RawQuery: "newsid=" + siteMovieID})
+	target := c.providerURL().ResolveReference(&url.URL{Path: "/index.php", RawQuery: "newsid=" + siteMovieID})
 	body, _, err := c.get(ctx, current, target.String(), "")
 	if err != nil {
 		return nil, fmt.Errorf("fetch movie page: %w", err)

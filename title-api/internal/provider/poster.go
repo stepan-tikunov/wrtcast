@@ -15,10 +15,11 @@ var ErrInvalidPosterURL = errors.New("invalid poster URL")
 // images behind the same anti-bot challenge as its pages, so clients without
 // the session cookies receive the challenge HTML instead of the image.
 func (c *Client) Poster(ctx context.Context, rawURL string) ([]byte, string, error) {
+	baseURL := c.providerURL()
 	target, err := url.Parse(rawURL)
-	if err != nil || target.Scheme != c.baseURL.Scheme ||
-		!strings.EqualFold(target.Hostname(), c.baseURL.Hostname()) {
-		return nil, "", fmt.Errorf("%w: must be on %s", ErrInvalidPosterURL, c.baseURL.Host)
+	if err != nil || target.Scheme != baseURL.Scheme ||
+		!strings.EqualFold(target.Hostname(), baseURL.Hostname()) {
+		return nil, "", fmt.Errorf("%w: must be on %s", ErrInvalidPosterURL, baseURL.Host)
 	}
 
 	current, err := c.currentSession()
@@ -40,7 +41,7 @@ func (c *Client) Poster(ctx context.Context, rawURL string) ([]byte, string, err
 }
 
 func (c *Client) posterImage(ctx context.Context, current *session, target string) ([]byte, string, error) {
-	body, _, err := c.get(ctx, current, target, c.baseURL.String()+"/")
+	body, _, err := c.get(ctx, current, target, c.providerURL().String()+"/")
 	if err != nil {
 		return nil, "", fmt.Errorf("fetch poster: %w", err)
 	}
