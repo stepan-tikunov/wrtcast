@@ -6,12 +6,19 @@
 // Configured in /etc/config/wrtcast.
 'use strict';
 
-import { popen, readfile, writefile, stdin, stdout } from 'fs';
+import { popen, readfile, writefile, rename, unlink, lsdir, stdin, stdout } from 'fs';
 import { cursor } from 'uci';
 
 const STATE = '/tmp/wrtcast.now.';         // + host key; what /play started
 const SUBS = '/tmp/wrtcast.subs.';         // + host key; subtitle URLs for /sub
 const LIST = '/tmp/wrtcast.list.';         // + host key; streams last asked for
+const WATCH = '/tmp/wrtcast.watch.';       // + host key; failed tick checks
+const PROGRESS = '/tmp/wrtcast.progress.json'; // watch progress, copied to flash
+const MAX_TITLES = 200;                      // progress kept for this many titles
+const MAX_EPISODES = 50;                     // and this many episodes of each
+const FLUSH = 300;                           // seconds between flash writes
+const DONE = 0.85;                           // an episode left this far in is watched
+const TTL = 30 * 86400;                      // progress older than this is forgotten
 const DEVICES = '/tmp/wrtcast.devices.json'; // last discovery result
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const COMMANDS = {
@@ -42,6 +49,7 @@ const USER_AGENT = conf('user_agent', 'Mozilla/5.0 (X11; Linux armv7l) ' +
 	'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.225 Safari/537.36 ' +
 	'CrKey/1.56.500000');
 const HEADERS = conf('header', []);
+const PROGRESS_KEEP = conf('progress_file', '/etc/wrtcast.progress.json');
 
 function reply(code, body) {
 	printf('Status: %d %s\r\nContent-Type: application/json\r\n' +
@@ -59,6 +67,13 @@ function load(f) {
 	} catch (e) {
 		return null;
 	}
+}
+
+// Writes JSON through a temporary file so readers never see it cut short.
+function save(f, v) {
+	let s = sprintf('%J', v), tmp = `${f}.${clock()[1]}`;
+	if (writefile(tmp, s) != length(s) || !rename(tmp, f))
+		unlink(tmp);
 }
 
 function shq(s) {
@@ -286,6 +301,144 @@ function title_streams(dev, id, season, episode) {
 	return c;
 }
 
+// ---- watch progress --------------------------------------------------------
+//
+// Where each title was left off: a movie's position, or a series' last
+// episode and the position in each of its episodes. Kept in /tmp and copied
+// to flash every few minutes, or right away when a title or an episode
+// starts or gets watched. Beyond MAX_TITLES and MAX_EPISODES the least
+// recently watched ones are dropped, and anything untouched for TTL is
+// forgotten, so a title opened a month later starts over.
+
+function progress() {
+	let p = load(PROGRESS) ?? load(PROGRESS_KEEP);
+	if (type(p?.titles) != 'object')
+		return { titles: {} };
+	let old = time() - TTL;
+	for (let id, e in p.titles) {
+		if (e.t < old) {
+			delete p.titles[id];
+			continue;
+		}
+		for (let k, x in e.eps ?? {})
+			if (x.t < old)
+				delete e.eps[k];
+	}
+	return p;
+}
+
+// Keeps the n most recently watched entries of o.
+function trim_lru(o, n) {
+	let k = sort(keys(o), (a, b) => o[b].t - o[a].t);
+	for (let i = n; i < length(k); i++)
+		delete o[k[i]];
+}
+
+const ep_key = (season, episode) => `${season}:${episode}`;
+
+// Copies progress to flash when forced or FLUSH seconds after the last copy.
+function flush(P, force) {
+	let due = force || time() - (P.flushed ?? 0) >= FLUSH;
+	if (due)
+		P.flushed = time();
+	save(PROGRESS, P);
+	if (due)
+		save(PROGRESS_KEEP, P);
+}
+
+// Records the position of now (what /play started) from the receiver's
+// media status. Positions under a second are skipped: the receiver reports
+// 0 while it loads a stream started further in.
+function remember(now, m) {
+	let finished = m.state == 'IDLE' && m.idleReason == 'FINISHED';
+	let pos = +(m.time ?? 0), dur = +(m.duration ?? 0);
+	if (!finished && (pos < 1 || index(['PLAYING', 'PAUSED', 'BUFFERING'], m.state) < 0))
+		return;
+	let P = progress(), e = P.titles[now.id], t = time();
+	let important = !e;
+	e ??= {};
+	let x = e;
+	if (now.season != null) {
+		let k = ep_key(now.season, now.episode);
+		important ||= e.last?.season != now.season || e.last?.episode != now.episode;
+		e.last = { season: now.season, episode: now.episode };
+		e.eps ??= {};
+		important ||= !e.eps[k];
+		x = e.eps[k] ??= {};
+		x.t = t;
+		trim_lru(e.eps, MAX_EPISODES);
+	}
+	// Only an end the receiver reached itself marks a title watched here
+	// (see next_episode). A watched episode stays so while it is still near
+	// the end: a poll can catch it right after the next one was started.
+	let done = finished || (!!x.done && dur > 0 && pos >= dur * DONE);
+	important ||= !!x.done != done;
+	if (finished)
+		pos = dur;
+	// A long pause shouldn't keep rewriting the same position.
+	if (!important && x.pos == pos && x.dur == dur)
+		return;
+	x.pos = pos;
+	x.dur = dur;
+	x.done = done;
+	// For the recently watched list.
+	e.title = now.title ?? e.title;
+	e.poster = now.poster ?? e.poster;
+	e.t = t;
+	P.titles[now.id] = e;
+	trim_lru(P.titles, MAX_TITLES);
+	P.changed = t;
+	flush(P, important);
+}
+
+// Starting another episode of a series marks the last one watched if it was
+// left near the end: people switch off during the credits, which may run
+// for minutes. Movies just resume wherever they were stopped.
+function next_episode(id, season, episode) {
+	let P = progress(), e = P.titles[id], l = e?.last;
+	let x = l ? e.eps?.[ep_key(l.season, l.episode)] : null;
+	if (!x || x.done || ep_key(l.season, l.episode) == ep_key(season, episode) ||
+	    !(x.dur > 0 && x.pos >= x.dur * DONE))
+		return;
+	x.done = true;
+	flush(P, true);
+}
+
+// The position to resume a movie or an episode from; null to start over.
+function resume_at(id, season, episode) {
+	let e = progress().titles[id];
+	let x = season == null ? e : e?.eps?.[ep_key(season, episode)];
+	return x && !x.done && x.pos > 10 ? x.pos - 5 : null;
+}
+
+// Run by cron every minute: records the progress of what /play started
+// while no page polls the status, e.g. with the phone locked. A TV that
+// fails five checks in a row (switched off, or playing something else) is
+// left alone until the next /play.
+function tick() {
+	for (let name in lsdir('/tmp') ?? []) {
+		let k = match(name, /^wrtcast\.now\.(.+)$/)?.[1];
+		let now = k ? load(STATE + k) : null;
+		if (!now?.host || !now.url)
+			continue;
+		let w = load(WATCH + k);
+		let misses = w?.url == now.url ? w.misses : 0;
+		if (misses >= 5)
+			continue;
+		let m = castctl_try({ host: now.host }, 'status')?.media;
+		if (m?.url == now.url)
+			remember(now, m);
+		misses = m?.url == now.url && m.state != 'IDLE' ? 0 : misses + 1;
+		if (misses != w?.misses || w?.url != now.url)
+			save(WATCH + k, { url: now.url, misses });
+	}
+	// The last position before playback stopped would otherwise stay in
+	// /tmp only.
+	let P = load(PROGRESS);
+	if (P?.changed > (P?.flushed ?? 0) && time() - P.flushed >= FLUSH)
+		flush(P);
+}
+
 // Adds the device, the movie started via /play and human-readable track
 // labels: the receiver names tracks by the manifest NAME, which is the
 // title-api track id.
@@ -316,6 +469,7 @@ function with_now(st, dev) {
 		t.label = now.labels?.[t.name] ?? t.name;
 		t.lang = replace(t.lang ?? '', /-x-.*$/, ''); // see unique_audio_langs
 	}
+	remember(now, st.media);
 	return st;
 }
 
@@ -597,6 +751,31 @@ const routes = {
 		};
 	},
 
+	// Where a title was left off: pos, dur and done of a movie, or the last
+	// episode and eps by "season:episode" of a series; null if never watched.
+	// Without id: the recently watched titles, latest first, each with the
+	// position of the movie or of the last episode.
+	'GET /progress': p => {
+		let T = progress().titles;
+		if (p.id == null) {
+			let recent = [];
+			for (let id, e in T) {
+				let x = e.eps ? e.eps[ep_key(e.last?.season, e.last?.episode)] : e;
+				if (e.title && x)
+					push(recent, {
+						id, title: e.title, poster: e.poster ?? null, t: e.t,
+						season: e.last?.season, episode: e.last?.episode,
+						pos: x.pos, dur: x.dur, done: x.done,
+					});
+			}
+			return { recent: sort(recent, (a, b) => b.t - a.t) };
+		}
+		let e = T[title_id(p)];
+		return { progress: !e ? null : e.eps ? { last: e.last, eps: e.eps } :
+			{ pos: e.pos, dur: e.dur, done: e.done } };
+	},
+
+
 	'GET /devices': p => {
 		let list = p.refresh == '1' ? discover() : cached(DEVICES_TTL) ?? discover();
 		let def = CAST_HOST;
@@ -683,8 +862,13 @@ const routes = {
 		// Subtitles are separate WebVTT files, not part of the HLS manifest,
 		// so they are side-loaded; the receiver names them "sub<id>".
 		let args = ['play', url], labels = {};
-		if (+(p.start ?? 0) > 0)
-			push(args, '-p', p.start);
+		// Without start (or reuse) the title resumes where it was left off;
+		// start=0 plays it from the beginning.
+		let start = p.start ?? (p.reuse == '1' ? null : resume_at(id, season, episode));
+		if (season != null)
+			next_episode(id, season, episode);
+		if (+(start ?? 0) > 0)
+			push(args, '-p', sprintf('%.1f', +start));
 		if (s.fmp4)
 			push(args, '-f', 'fmp4');
 		// Signed subtitle URLs can be ~2 KB each through the proxy, too much
@@ -708,7 +892,8 @@ const routes = {
 			if (p[k] != null)
 				st = castctl_try(dev, k, p[k]) ?? st;
 		writefile(state_file(dev), sprintf('%J', {
-			id, stream: n, source: s.name, url, title: p.title ?? null, season,
+			id, stream: n, source: s.name, url, host: host_of(dev),
+			title: p.title ?? null, season,
 			episode, labels, quality, qualities: map(quals, v => v.label),
 			streams: list, fetched,
 			// Only our own proxy paths, so the UI never loads arbitrary URLs.
@@ -734,6 +919,11 @@ const routes = {
 		return with_now(castctl(dev, c, arg), dev);
 	},
 };
+
+if (ARGV[0] == 'tick') {
+	tick();
+	exit(0);
+}
 
 // The uhttpd alias passes the full URL path (/api/x); direct CGI calls pass /x.
 // The media proxy is called by the receiver, which can't send a token, so it

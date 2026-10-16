@@ -24,8 +24,11 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #devbtn{width:46px;height:46px;border-radius:14px;background:var(--s2);color:var(--mu)}
 #devbtn.on{color:var(--ac)}
 #f svg{position:absolute;left:14px;top:13px;width:20px;height:20px;color:var(--mu)}
-#q{width:100%;height:46px;padding:0 14px 0 42px;border:0;border-radius:14px;background:var(--s2);outline:none;font-size:17px;-webkit-user-select:text;user-select:text}
+#q{width:100%;height:46px;padding:0 46px 0 42px;border:0;border-radius:14px;background:var(--s2);outline:none;font-size:17px;-webkit-user-select:text;user-select:text}
 #q:focus{box-shadow:0 0 0 2px var(--ac)}
+#q::-webkit-search-cancel-button{display:none}
+#qx{position:absolute;right:0;top:0;width:46px;height:46px;color:var(--mu)}
+#qx svg{position:static;width:22px;height:22px}
 
 #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:16px 12px;padding:4px 12px 120px}
 .card{position:relative;display:block;align-self:start;padding:0;border:0;background:none;text-align:left}
@@ -35,6 +38,10 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .card span{color:var(--mu);font-size:13px}
 .badge{position:absolute;top:6px;left:6px;padding:2px 7px;border-radius:6px;background:#000c;color:#ddd!important;font-size:11px!important;font-weight:600}
 .badge.on{left:auto;right:6px;background:var(--ac);color:#111!important}
+#rtitle{margin:0;padding:4px 12px 10px;font-size:17px}
+.pw{position:relative}
+.pw .bar{position:absolute;left:6px;right:6px;bottom:6px;height:4px;border-radius:2px;background:#000a;overflow:hidden}
+.pw .bar div{height:100%;background:var(--ac)}
 .note{padding:56px 24px;color:var(--mu);text-align:center}
 .note svg{display:block;width:48px;height:48px;margin:0 auto 12px;opacity:.5}
 
@@ -62,12 +69,16 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .pill{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;padding:0 20px;border:0;border-radius:26px;background:var(--s2);font-weight:600}
 .pill.ac{background:var(--ac);color:#111}
 #dplay{position:relative;width:100%;margin-top:18px}
+#dfrom0{position:relative;width:100%;height:44px;margin-top:10px;background:#ffffff1f}
 #seasons{display:flex;gap:8px;overflow-x:auto;padding:16px 16px 8px;scrollbar-width:none}
 #seasons::-webkit-scrollbar{display:none}
 .chip{flex:none;height:36px;padding:0 16px;border:0;border-radius:18px;background:var(--s2);font-size:15px}
 .chip.on{background:var(--tx);color:#111;font-weight:600}
 #eps{padding:0 16px}
-.ep{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:8px 0;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
+.ep{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:8px 0;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
+.ep .pb{position:absolute;left:0;bottom:-1px;height:2px;border-radius:1px;background:var(--ac)}
+.ep.done span,.ep.done b{color:var(--mu)}
+.ep.cont small{color:var(--ac)}
 .ep b{min-width:28px;color:var(--mu);font-weight:500}
 .ep span{flex:1}
 .ep small{color:var(--mu)}
@@ -203,6 +214,7 @@ svg.spring{animation:spring .3s ease-out}
   header{justify-content:center;padding:20px var(--gut) 16px}
   #f{max-width:640px}
   #grid{grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:28px 22px;padding:8px var(--gut) 140px}
+  #rtitle{padding:8px var(--gut) 14px;font-size:20px}
   .card b{font-size:15px}
   #det .top{padding:24px var(--dgut) 36px}
   #det .hero{gap:28px}
@@ -210,6 +222,7 @@ svg.spring{animation:spring .3s ease-out}
   #det h1{font-size:34px}
   #dmeta{font-size:15px}
   #dplay{width:auto;min-width:260px;margin-top:24px}
+  #dfrom0{width:auto;min-width:260px}
   #dinfo{padding:8px var(--dgut) 4px}
   #ddesc{max-width:760px;-webkit-line-clamp:6;font-size:16px}
   #seasons{flex-wrap:wrap;padding:20px var(--dgut) 10px}
@@ -242,10 +255,12 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-list" viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
 
-<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"></form><button class="ib" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg></button></header>
+<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg></button></header>
+<h2 id="rtitle" hidden>Недавно смотрели</h2>
 <main id="grid"></main>
 <p class="note" id="msg"><svg><use href="#i-tv"/></svg><span>Найдите фильм или сериал и запустите его на ТВ</span></p>
 
@@ -255,6 +270,7 @@ svg.spring{animation:spring .3s ease-out}
     <div class="nav"><button class="ib" id="dback" aria-label="Назад"><svg><use href="#i-back"/></svg></button></div>
     <div class="hero"><img id="dposter" alt=""><div><h1 id="dtitle"></h1><div id="dmeta"></div></div></div>
     <button class="pill ac" id="dplay"><svg><use href="#i-play"/></svg><span>Смотреть на ТВ</span></button>
+    <button class="pill" id="dfrom0" hidden>Смотреть с начала</button>
   </div>
   <div id="dinfo"></div>
   <div id="seasons"></div>
@@ -328,6 +344,10 @@ let devices = null;     // last /devices answer
 let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null = receiver default
 localStorage.removeItem('subStyle'); // older format with colors
 const SHEETS = { dev: 'devs', sty: 'sty', src: 'srcs' }; // layer name -> bottom sheet
+let recent = [];        // /progress list: recently watched titles, latest first
+let searching = 0;      // number of the search shown; 0 = the recent titles are
+localStorage.removeItem('last'); // searches are no longer restored
+localStorage.removeItem('q');
 
 // Requests that talk to the TV carry the chosen device.
 const withDevice = path => device ? path + (path.includes('?') ? '&' : '?') + 'device=' + encodeURIComponent(device) : path;
@@ -395,7 +415,8 @@ function animateOut(e) {
   };
   e.addEventListener('animationend', end);
 }
-const epLabel = n => n?.season != null ? ` · ${n.season}×${n.episode}` : '';
+const epShort = n => `${n.season}s${n.episode}e`; // 7 сезон 17 серия -> 7s17e
+const epLabel = n => n?.season != null ? ' · ' + epShort(n) : '';
 const note = text => $('msg').lastChild.textContent = text;
 
 // ---- overlays and the back button ----------------------------------------
@@ -435,7 +456,10 @@ const closeTop = () => new Promise(r => {
 window.addEventListener('popstate', () => {
   const name = layers.pop();
   if (name) showLayer(name, false);
-  if (name == 'det') item = null;
+  if (name == 'det') {
+    item = null;
+    loadRecent(); // what was just watched moves to the front
+  }
 });
 
 // ---- search -------------------------------------------------------------
@@ -444,14 +468,7 @@ function renderResults(results) {
   $('msg').hidden = results.length > 0;
   note('Ничего не найдено');
   $('grid').replaceChildren(...results.map((m, i) => {
-    // Placeholder for movies without a poster or when it fails to load.
-    const ph = () => el('i', {}, (m.title || '?')[0]);
-    const img = m.poster
-      ? el('img', { src: m.poster, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer' })
-      : ph();
-    img.onerror = () => img.replaceWith(ph());
-    img.onload = () => img.classList.add('ld');
-    const b = el('button', { className: 'card' }, img, el('b', {}, m.title), el('span', {}, m.year));
+    const b = el('button', { className: 'card' }, poster(m), el('b', {}, m.title), el('span', {}, m.year));
     b.style.setProperty('--i', i);
     b.dataset.id = m.id;
     b.onclick = () => openDetails(m);
@@ -460,7 +477,67 @@ function renderResults(results) {
   markPlaying();
 }
 
-// Marks the card of whatever is on the TV now.
+// Poster of a card, with a placeholder for titles without one or when it
+// fails to load.
+function poster(m) {
+  const ph = () => el('i', {}, (m.title || '?')[0]);
+  const img = m.poster
+    ? el('img', { src: m.poster, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer' })
+    : ph();
+  img.onerror = () => img.replaceWith(ph());
+  img.onload = () => img.classList.add('ld');
+  return img;
+}
+
+// ---- recently watched ---------------------------------------------------
+//
+// The main page lists the watch history until something is searched for;
+// clearing the query brings it back.
+
+async function loadRecent() {
+  try {
+    recent = (await api('progress')).recent;
+  } catch {
+    return; // the list is a convenience; search still works
+  }
+  if (!searching) renderRecent();
+}
+
+// "7s17e" for a series, plus "просмотрено" once the episode is watched or
+// left past 90 % (the play button moves on to the next one). How far in
+// shows on the poster.
+function recentNote(r) {
+  const done = r.done || r.season != null && r.dur && r.pos >= r.dur * 0.9;
+  return [r.season != null ? epShort(r) : '', done ? 'просмотрено' : ''].filter(Boolean).join(' · ');
+}
+
+const recentPart = r => r.done ? 1 : r.dur ? Math.min(1, r.pos / r.dur) : 0;
+
+function renderRecent() {
+  $('rtitle').hidden = !recent.length;
+  $('msg').hidden = recent.length > 0;
+  note('Найдите фильм или сериал и запустите его на ТВ');
+  $('grid').replaceChildren(...recent.map((r, i) => {
+    const b = el('button', { className: 'card' },
+      el('div', { className: 'pw' }, poster(r),
+        el('div', { className: 'bar' }, el('div', { style: `width:${100 * recentPart(r)}%` }))),
+      el('b', {}, r.title), el('span', {}, recentNote(r)));
+    b.style.setProperty('--i', i);
+    b.dataset.id = r.id;
+    b.onclick = () => openDetails({ id: r.id, title: r.title, poster: r.poster });
+    return b;
+  }));
+  markPlaying();
+}
+
+function showRecent() {
+  searching = 0;
+  $('q').value = '';
+  $('qx').hidden = true;
+  renderRecent();
+}
+
+// Marks the cards of whatever is on the TV now.
 function markPlaying() {
   const id = st?.media && st.now?.id;
   for (const c of $('grid').children) {
@@ -471,14 +548,15 @@ function markPlaying() {
 }
 
 async function search(q) {
-  $('msg').hidden = true;
+  const n = searching = Date.now();
+  $('msg').hidden = $('rtitle').hidden = true;
   $('grid').replaceChildren(...Array.from({ length: 9 }, () =>
     el('div', {}, el('span', { className: 'sk' }), el('span', { className: 'skl' }), el('span', { className: 'skl' }))));
   try {
     const { results } = await api('search?q=' + encodeURIComponent(q));
-    localStorage.last = JSON.stringify({ q, results });
-    renderResults(results);
+    if (searching == n) renderResults(results); // not cleared or replaced meanwhile
   } catch (e) {
+    if (searching != n) return;
     $('grid').replaceChildren();
     $('msg').hidden = false;
     note('Не удалось выполнить поиск');
@@ -518,16 +596,19 @@ async function openDetails(m) {
   $('dposter').hidden = !m.poster;
   $('dposter').src = m.poster || '';
   $('dbg').style.backgroundImage = m.poster ? `url("${m.poster}")` : 'none';
-  $('dplay').hidden = true;
+  $('dplay').hidden = $('dfrom0').hidden = true;
   $('seasons').replaceChildren();
   $('eps').replaceChildren();
   $('dinfo').replaceChildren(...[1, 2, 3].map(() => el('span', { className: 'skl' })));
   // The blurred backdrop overflows .top; older engines can still scroll it.
   $('det').scrollTop = $('det').firstElementChild.scrollTop = 0;
   openLayer('det');
+  // Watch progress changes between visits, so unlike /title it isn't cached.
+  const prog = api('progress?id=' + encodeURIComponent(m.id)).then(r => r.progress, () => null);
   let t;
   try {
     t = await title(m.id);
+    m.progress = await prog;
   } catch (e) {
     if (item == m) $('dinfo').replaceChildren(el('p', { className: 'note' }, 'Не удалось загрузить'));
     return toast(e);
@@ -535,21 +616,55 @@ async function openDetails(m) {
   if (item != m) return;
   Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: m.poster || t.poster });
   renderInfo(t);
-  if (t.type != 'series') {
-    $('dplay').hidden = false;
-    return renderDetails();
-  }
+  renderDetails();
+  if (t.type != 'series') return;
   const now = st?.now?.id == m.id ? st.now : null;
-  showSeason(m.seasons.find(s => s.season == now?.season) || m.seasons[0]);
+  const cont = continueAt(m);
+  showSeason(m.seasons.find(s => s.season == (now?.season ?? cont?.season)) || m.seasons[0]);
 }
 
-// Movie play button; offers the player instead when the movie is already on.
+// The episode to go on with and where: the last one watched, or the one
+// after it from the start once that is watched or left past 90 %.
+function continueAt(m) {
+  const last = m.progress?.last;
+  if (!last) return null;
+  const all = m.seasons.flatMap(s => s.episodes.map(e => ({ season: s.season, episode: e.episode })));
+  const i = all.findIndex(e => e.season == last.season && e.episode == last.episode);
+  if (i < 0) return null;
+  const p = m.progress.eps[epKey(last)];
+  if (p?.done || p?.dur && p.pos >= p.dur * 0.9)
+    return all[i + 1] ? { ...all[i + 1], resume: 0, start: 0 } : null;
+  return { ...all[i], resume: p?.pos > 10 ? p.pos : 0 };
+}
+const epKey = e => `${e.season}:${e.episode}`;
+
+// What the play button starts: a movie where it was left off, a series'
+// episode from continueAt or else the first one.
+function playTarget(m) {
+  const base = { id: m.id, title: m.title, poster: m.poster };
+  if (m.type == 'movie') {
+    const p = m.progress;
+    return { ...base, resume: p && !p.done && p.pos > 10 ? p.pos : 0 };
+  }
+  const first = m.seasons?.find(s => s.episodes.length);
+  const c = continueAt(m) || first && { season: first.season, episode: first.episodes[0].episode, resume: 0 };
+  return c && { ...base, ...c };
+}
+
+// Play button; offers the player instead when the title is already on.
 function renderDetails() {
-  if (!item || item.type != 'movie') return;
+  if (!item?.type) return;
   const on = st?.media && st.now?.id == item.id;
   const starting = pending?.id == item.id;
-  $('dplay').lastChild.textContent = starting ? 'Запускаю…' : on ? 'Уже на ТВ — открыть плеер' : 'Смотреть на ТВ';
-  $('dplay').disabled = !!pending;
+  const t = playTarget(item);
+  $('dplay').hidden = !t;
+  if (!t) return;
+  const series = t.season != null;
+  $('dplay').lastChild.textContent = starting ? 'Запускаю…' : on ? 'Уже на ТВ — открыть плеер' :
+    series ? `${t.season} сезон, ${t.episode} серия` + (t.resume ? ', ' + fmt(t.resume) : '') :
+    t.resume ? 'Продолжить с ' + fmt(t.resume) : 'Смотреть на ТВ';
+  $('dplay').disabled = $('dfrom0').disabled = !!pending;
+  $('dfrom0').hidden = !t.resume || on || starting || t.season != null; // movies only
 }
 
 function showSeason(s) {
@@ -565,21 +680,28 @@ function showSeason(s) {
 }
 
 // Called on every status poll; rebuilds the list only when the highlighted
-// episode changes so a tap in progress isn't lost.
+// episode or the progress changes so a tap in progress isn't lost.
 function renderEpisodes(force) {
   if (!item?.seasons || !season) return;
   const now = pending || (st?.media && st.now);
-  const key = `${item.id}|${season.season}|${now?.id}|${now?.season}|${now?.episode}|${!!pending}`;
+  const key = `${item.id}|${season.season}|${now?.id}|${now?.season}|${now?.episode}|${!!pending}|${JSON.stringify(item.progress)}`;
   if (!force && $('eps').dataset.key == key) return;
   $('eps').dataset.key = key;
-  const m = item, sn = season.season;
+  const m = item, sn = season.season, cont = continueAt(m);
   $('eps').replaceChildren(...season.episodes.map((e, i) => {
     const on = now?.id == m.id && now.season == sn && now.episode == e.episode;
+    const p = m.progress?.eps?.[epKey({ season: sn, episode: e.episode })];
+    const part = p && !p.done && p.pos > 10 && p.dur ? p.pos / p.dur : 0;
+    const next = !on && cont?.season == sn && cont.episode == e.episode;
     // Provider titles are usually just "<series> (N сезон) - M серия".
     const generic = !e.title || /серия\s*$/i.test(e.title);
-    const b = el('button', { className: 'ep' + (on ? ' on' : '') + (force ? ' anim' : '') },
+    const b = el('button', { className: 'ep' + (on ? ' on' : '') + (p?.done ? ' done' : '') + (next ? ' cont' : '') + (force ? ' anim' : '') },
       ...(generic ? [el('span', {}, `${e.episode} серия`)] : [el('b', {}, e.episode), el('span', {}, e.title)]),
-      el('small', {}, on ? (pending ? 'запуск…' : 'на ТВ') : e.duration ? Math.round(e.duration / 60) + ' мин' : ''));
+      el('small', {}, on ? (pending ? 'запуск…' : 'на ТВ') :
+        part ? (next ? 'продолжить · ' : '') + 'ещё ' + Math.ceil((p.dur - p.pos) / 60) + ' мин' :
+        next ? 'следующая' : p?.done ? 'просмотрено' :
+        e.duration ? Math.round(e.duration / 60) + ' мин' : ''),
+      ...(part && !on ? [el('i', { className: 'pb', style: `width:${100 * part}%` })] : []));
     b.style.setProperty('--i', i);
     b.onclick = () => start({ id: m.id, title: m.title, poster: m.poster, season: sn, episode: e.episode });
     return b;
@@ -588,8 +710,9 @@ function renderEpisodes(force) {
 
 $('dplay').onclick = () => {
   if (st?.media && st.now?.id == item.id) return openLayer('pl');
-  start(item);
+  start(playTarget(item)); // without start the router resumes where it was left off
 };
+$('dfrom0').onclick = () => start({ ...playTarget(item), start: 0 });
 $('dback').onclick = closeTop;
 
 // ---- playback -----------------------------------------------------------
@@ -614,7 +737,18 @@ async function play(m) {
     const s = await api(withDevice('play'), req);
     pending = null;
     render(s);
-    while (layers.includes('det')) await closeTop();
+    loadRecent();
+    // The details page stays open; the router may have just marked the
+    // previous episode watched.
+    if (item?.id == m.id) {
+      const shown = item;
+      const { progress } = await api('progress?id=' + encodeURIComponent(m.id)).catch(() => ({}));
+      if (item == shown && progress !== undefined) {
+        item.progress = progress;
+        renderDetails();
+        renderEpisodes();
+      }
+    }
   } catch (e) {
     pending = null;
     refresh();
@@ -715,8 +849,12 @@ function showTime() {
   if (m.state == 'PLAYING') t += (Date.now() - statusAt) / 1000;
   if (m.duration) t = Math.min(t, m.duration);
   const state = STATES[m.state] || m.state;
-  $('st').replaceChildren(m.duration ? `${state} · ${fmt(t)} / ${fmt(m.duration)}` : state);
-  if (m.state == 'BUFFERING') $('st').prepend(el('span', { className: 'spin' }));
+  // Only the text changes on every tick: a re-created spinner would restart
+  // its animation four times a second and jerk instead of spinning.
+  const s = $('st'), busy = m.state == 'BUFFERING';
+  if (!!s.querySelector('.spin') != busy || s.lastChild?.nodeType != Node.TEXT_NODE)
+    s.replaceChildren(...(busy ? [el('span', { className: 'spin' })] : []), '');
+  s.lastChild.textContent = m.duration ? `${state} · ${fmt(t)} / ${fmt(m.duration)}` : state;
   $('prog').firstChild.style.width = m.duration ? (100 * t / m.duration) + '%' : 0;
   if (drag != 'pos') {
     $('pos').max = m.duration || 1;
@@ -1069,19 +1207,20 @@ $('stysize').oninput = $('stybg').oninput = () => renderStyle(sliderStyle());
 $('stysize').onchange = $('stybg').onchange = () => setStyle(sliderStyle());
 $('next').onclick = () => stepEpisode(1);
 $('prev').onclick = () => stepEpisode(-1);
-document.addEventListener('visibilitychange', poll);
-
-// Restore the last search instantly instead of repeating it.
-try {
-  const last = JSON.parse(localStorage.last || 'null');
-  if (last) {
-    $('q').value = last.q;
-    renderResults(last.results);
-  } else if (localStorage.q) {
-    search($('q').value = localStorage.q); // query saved by older versions
-  }
-} catch {}
+document.addEventListener('visibilitychange', () => {
+  poll();
+  if (!document.hidden) loadRecent();
+});
+$('q').oninput = () => {
+  $('qx').hidden = !$('q').value;
+  if (!$('q').value && searching) showRecent();
+};
+$('qx').onclick = () => {
+  showRecent();
+  $('q').focus();
+};
 poll();
+loadRecent();
 loadDevices(false);
 setInterval(poll, 2000);
 setInterval(showTime, 250);

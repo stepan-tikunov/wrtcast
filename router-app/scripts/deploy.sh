@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs wrtcast on the router and creates a dedicated uhttpd instance
 # on port 8088: /api/* is aliased to the CGI script, /www/cast is the web root.
-# Existing /etc/config/wrtcast is kept.
+# Existing /etc/config/wrtcast is kept. Adds a cron job for watch progress.
 set -e
 cd "$(dirname "$0")/.."
 ROUTER=${ROUTER:-root@192.168.1.1}
@@ -27,5 +27,15 @@ uci set uhttpd.cast.max_requests='10'
 uci set uhttpd.cast.script_timeout='60'
 uci commit uhttpd
 /etc/init.d/uhttpd reload
+# Records watch progress while no page polls the status.
+CRON='* * * * * /www/cast/cgi-bin/wrtcast tick'
+if ! grep -qF "$CRON" /etc/crontabs/root 2>/dev/null; then
+	echo "$CRON" >> /etc/crontabs/root
+	/etc/init.d/cron enable
+	/etc/init.d/cron restart
+fi
+# Watch progress survives firmware upgrades.
+grep -qx /etc/wrtcast.progress.json /etc/sysupgrade.conf ||
+	echo /etc/wrtcast.progress.json >> /etc/sysupgrade.conf
 REMOTE
 echo "deployed: http://${ROUTER#*@}:8088/api/status"
