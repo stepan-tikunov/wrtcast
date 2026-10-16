@@ -51,6 +51,16 @@ function reply(code, body) {
 
 const fail = (code, msg) => reply(code, { error: msg });
 
+// A state file as JSON, or null when it is missing or cut short (a full /tmp
+// truncates writes, and a parse error would otherwise abort the request).
+function load(f) {
+	try {
+		return json(readfile(f) ?? 'null');
+	} catch (e) {
+		return null;
+	}
+}
+
 function shq(s) {
 	return "'" + replace(s, "'", "'\\''") + "'";
 }
@@ -131,7 +141,7 @@ function discover() {
 
 // Cached device list no older than max_age seconds (any age when null).
 function cached(max_age) {
-	let c = json(readfile(DEVICES) ?? 'null');
+	let c = load(DEVICES);
 	if (type(c) != 'object' || type(c.devices) != 'array' ||
 	    (max_age != null && time() - c.time >= max_age))
 		return null;
@@ -267,7 +277,7 @@ function streams(id, season, episode) {
 // sources before playing and may retry with another, all from one provider
 // request.
 function title_streams(dev, id, season, episode) {
-	let f = LIST + state_key(dev), c = json(readfile(f) ?? 'null');
+	let f = LIST + state_key(dev), c = load(f);
 	if (c?.streams && c.id == id && c.season == season &&
 	    c.episode == episode && time() - c.fetched < 600)
 		return c;
@@ -281,7 +291,7 @@ function title_streams(dev, id, season, episode) {
 // title-api track id.
 function with_now(st, dev) {
 	st.device = { id: dev.id ?? null, name: dev.name ?? host_of(dev) };
-	let now = json(readfile(state_file(dev)) ?? 'null');
+	let now = load(state_file(dev));
 	if (!now || !st.media || st.media.url != now.url)
 		return st;
 	// Started before qualities were recorded: look them up once from the
@@ -626,7 +636,7 @@ const routes = {
 		if (p.source != null && (length(p.source) > 100 || match(p.source, /[[:cntrl:]]/)))
 			fail(400, 'invalid source');
 		let dev = device(p);
-		let last = json(readfile(state_file(dev)) ?? 'null');
+		let last = load(state_file(dev));
 		let list, fetched;
 		if (p.reuse == '1' && last?.streams && last.id == id &&
 		    last.season == season && last.episode == episode &&
@@ -739,7 +749,7 @@ if (pm) {
 // Subtitles of what /play started, by index (see the short links in /play).
 let sm = match(path, /^\/sub\/([0-9A-Za-z._]+)\/([0-9]+)\.vtt$/);
 if (sm) {
-	let subs = json(readfile(SUBS + sm[1]) ?? 'null');
+	let subs = load(SUBS + sm[1]);
 	let url = subs?.urls?.[+sm[2]];
 	if (!url)
 		fail(404, 'no such subtitle');
