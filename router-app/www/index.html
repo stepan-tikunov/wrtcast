@@ -768,6 +768,7 @@ async function play(m) {
 // remembers the list it shows, so playing costs no second provider request.
 async function start(m) {
   if (pending) return;
+  arm(); // still inside the tap; the sheet may close it again
   $('srctitle').textContent = 'Откуда смотреть';
   $('srclist').replaceChildren(el('p', { className: 'note' }, el('span', { className: 'spin' }), 'Ищу источники…'));
   openLayer('src');
@@ -797,6 +798,7 @@ function showSources(m, names, bad) {
       el('span', {}, el('b', {}, n), n == bad ? el('small', {}, 'не открылся') : ''), el('i'));
     b.style.setProperty('--i', i);
     b.onclick = async () => {
+      arm();
       await closeTop();
       localStorage.source = n;
       play({ ...m, source: n });
@@ -893,14 +895,22 @@ function renderBar() {
 
 function refresh() {
   renderBar();
+  syncSession();
   markPlaying();
   renderDetails();
   renderEpisodes();
 }
 
+let autoArmed = false;
 function render(s) {
   st = s;
   statusAt = Date.now();
+  // Something is already on after a reload: try the widget right away. iOS
+  // usually refuses without a tap, and then the first tap does it.
+  if (!autoArmed && ['PLAYING', 'BUFFERING'].includes(s.media?.state)) {
+    autoArmed = true;
+    arm();
+  }
   refresh();
   $('devname').lastChild.textContent = s.device?.name || '';
   $('devname').hidden = !s.device?.name || (devices?.devices.length ?? 0) < 2;
@@ -943,6 +953,7 @@ function skip(delta) {
   m.time = Math.max(0, Math.min(position(m) + delta, m.duration || Infinity));
   statusAt = Date.now();
   showTime();
+  syncSession();
   clearTimeout(seekTimer);
   seekTimer = setTimeout(() => {
     seekTimer = null;
@@ -950,7 +961,9 @@ function skip(delta) {
   }, 600);
 }
 
+let cmdAt = 0; // polls sent before a command may report the old state
 async function cmd(c, arg) {
+  cmdAt = Date.now();
   const m = st?.media;
   if (c == 'toggle') {
     c = m?.state == 'PAUSED' ? 'resume' : 'pause';
@@ -971,13 +984,14 @@ async function cmd(c, arg) {
 }
 
 async function poll() {
-  if (busy || document.hidden) return;
+  // In the background only a lock screen widget needs the status.
+  if (busy || document.hidden && keep.paused) return;
   busy = true;
   try {
-    const sent = device;
+    const sent = device, at = Date.now();
     const s = await api(withDevice('status'));
     pollError = '';
-    if (!pending && !seekTimer && sent == device) render(s);
+    if (!pending && !seekTimer && sent == device && at > cmdAt) render(s);
   } catch (e) {
     if (e.message == 'device not found' && device) {
       // The saved TV is gone; fall back to the default one.
@@ -992,6 +1006,123 @@ async function poll() {
   }
   busy = false;
 }
+
+// ---- lock screen controls -----------------------------------------------
+
+// iOS shows the Now Playing widget only while the page itself plays
+// something, so a silent loop stands in for the TV. Only the widget's
+// buttons control the TV: another app taking over the audio pauses the loop,
+// and the TV must keep playing.
+// 16-bit PCM WAV as a data: URL; a ±1 LSB noise instead of pure zeros, in
+// case iOS skips digital silence. Inaudible either way.
+function silence(sec) {
+  const rate = 8000, n = rate * sec, b = new DataView(new ArrayBuffer(44 + 2 * n));
+  const str = (o, t) => [...t].forEach((c, i) => b.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); b.setUint32(4, 36 + 2 * n, true); str(8, 'WAVEfmt ');
+  b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true); // PCM, mono
+  b.setUint32(24, rate, true); b.setUint32(28, 2 * rate, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true);
+  str(36, 'data'); b.setUint32(40, 2 * n, true);
+  for (let i = 0; i < n; i++) b.setInt16(44 + 2 * i, i & 1 ? 1 : -1, true);
+  let bin = '';
+  const u = new Uint8Array(b.buffer);
+  for (let i = 0; i < u.length; i += 0x8000) bin += String.fromCharCode(...u.subarray(i, i + 0x8000));
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+const keep = new Audio();
+keep.loop = true;
+let keepSrc = null, session = false, sessionKey = '';
+
+// Starts the loop; called from taps, which iOS requires for playing.
+function arm() {
+  session = true;
+  if (!keep.paused) return;
+  if (!keep.src) keep.src = keepSrc ||= silence(30);
+  keep.play().catch(() => {});
+}
+
+function syncSession() {
+  const ms = navigator.mediaSession;
+  const n = pending || st?.now, m = st?.media;
+  if (st && !m && !pending) {
+    // Nothing on the TV: drop the widget.
+    if (session || keep.src) {
+      session = false;
+      sessionKey = '';
+      keep.pause();
+      keep.removeAttribute('src');
+      keep.load();
+      if (ms) ms.metadata = null;
+    }
+    return;
+  }
+  if (!ms || !session) return;
+  const key = JSON.stringify([n?.title, n?.season, n?.episode, n?.poster, st?.device?.name]);
+  if (key != sessionKey) {
+    sessionKey = key;
+    ms.metadata = new MediaMetadata({
+      title: n?.title || 'Chromecast',
+      artist: n?.season != null ? `${n.season} сезон, ${n.episode} серия` : st?.device?.name || '',
+      artwork: n?.poster ? [{ src: n.poster }] : [],
+    });
+  }
+  if (pending || !m) return;
+  // The loop follows a pause on the TV but never restarts by itself: that
+  // would take the audio back from whatever app has it now.
+  if (m.state == 'PAUSED' || m.state == 'IDLE') keep.pause();
+  ms.playbackState = keep.paused ? 'paused' : 'playing';
+  syncPosition();
+}
+
+function syncPosition() {
+  const m = st?.media;
+  if (!session || pending || !m?.duration) return;
+  try {
+    navigator.mediaSession?.setPositionState({ duration: m.duration, position: Math.min(position(m), m.duration), playbackRate: 1 });
+  } catch {}
+}
+// When the loop wraps, iOS briefly shows the loop's own position; putting
+// the TV's back on every tick keeps the widget from jumping to zero.
+keep.ontimeupdate = keep.onseeked = syncPosition;
+
+if (navigator.mediaSession) {
+  const ms = navigator.mediaSession, playing = () => ['PLAYING', 'BUFFERING'].includes(st?.media?.state);
+  const on = (a, f) => { try { ms.setActionHandler(a, f); } catch {} };
+  // After an interruption the widget shows a pause while the TV plays; play
+  // then just brings the loop back.
+  on('play', () => {
+    arm();
+    if (st?.media?.state == 'PAUSED') cmd('toggle');
+    else syncSession();
+  });
+  on('pause', () => {
+    keep.pause();
+    if (playing()) cmd('toggle');
+    else syncSession();
+  });
+  on('seekbackward', d => skip(-(d.seekOffset || 10)));
+  on('seekforward', d => skip(d.seekOffset || 10));
+  on('seekto', d => {
+    const m = st?.media;
+    if (!m || d.seekTime == null) return;
+    clearTimeout(seekTimer);
+    seekTimer = null;
+    m.time = d.seekTime;
+    statusAt = Date.now();
+    showTime();
+    cmd('seek', d.seekTime.toFixed(1));
+  });
+}
+
+// Any tap starts the loop while the TV has something on, so the widget is
+// there after a reload too; iOS plays nothing without a tap. Stopping and
+// a TV with nothing on are left alone, not to cut off other apps' audio.
+const tapArm = e => { if (st?.media && !e.target.closest?.('#stop')) arm(); };
+document.addEventListener('click', tapArm, true);
+document.addEventListener('touchend', tapArm, true);
+// Coming back after another app took the audio brings the widget back.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && session && keep.paused && ['PLAYING', 'BUFFERING'].includes(st?.media?.state)) arm();
+});
 
 // ---- devices ------------------------------------------------------------
 
