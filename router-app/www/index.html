@@ -130,12 +130,14 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* device picker */
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:8;padding:8px 16px max(16px,env(safe-area-inset-bottom));background:var(--s1);border-radius:20px 20px 0 0;box-shadow:0 -6px 30px #000c}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:8;display:flex;flex-direction:column;max-height:calc(100dvh - 48px);padding:8px 16px max(16px,env(safe-area-inset-bottom));background:var(--s1);border-radius:20px 20px 0 0;box-shadow:0 -6px 30px #000c}
 .sheet .handle{width:40px;height:5px;margin:0 auto 8px;border-radius:3px;background:var(--s3)}
 .sheet h2{display:flex;align-items:center;margin:0 0 4px;font-size:18px}
 .sheet h2 span{flex:1}
 /* A sheet over the player dims the player too. */
 #shade.top{z-index:7}
+/* Long lists scroll inside the sheet instead of pushing it off screen. */
+#devlist,#srclist{min-height:0;overflow-y:auto;overscroll-behavior:contain}
 #devlist .dev,#srclist .dev{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;padding:8px 4px;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
 .dev span{flex:1;min-width:0}
 .dev b{display:block;font-weight:550}
