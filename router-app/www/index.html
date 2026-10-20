@@ -100,7 +100,7 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #pl.open #tg{display:none}
 #handle{display:none;width:40px;height:5px;margin:8px auto 0;border-radius:3px;background:var(--s3)}
 #pl.open #handle{display:block}
-#pl.open #thumb{width:48px;height:72px}
+#pl.open #thumb{width:48px;height:72px;cursor:pointer}
 input[type=range]{width:100%;height:32px;margin:0;accent-color:var(--ac);background:none}
 #posw{position:relative}
 #pos{pointer-events:none}
@@ -1341,11 +1341,20 @@ $('source').onchange = e => {
   localStorage.source = e.target.value;
   replay({ source: e.target.value, quality: localStorage.quality });
 };
-$('eplist').onclick = async () => {
+// The page of what is on, under the player.
+async function openNow() {
   const n = st?.now;
   if (!n) return;
   await closeTop();
   openDetails({ id: n.id, title: n.title, poster: n.poster });
+}
+$('eplist').onclick = openNow;
+// In the open player the poster leads to the title; in the mini player the
+// whole bar opens the player.
+$('thumb').onclick = e => {
+  if (layers.at(-1) != 'pl' || pending) return;
+  e.stopPropagation();
+  openNow();
 };
 $('devbtn').onclick = () => {
   openLayer('dev');
