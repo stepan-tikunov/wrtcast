@@ -962,8 +962,10 @@ function skip(delta) {
 }
 
 let cmdAt = 0; // polls sent before a command may report the old state
+let inflight = 0; // commands still on their way to the TV
 async function cmd(c, arg) {
   cmdAt = Date.now();
+  inflight++;
   const m = st?.media;
   if (c == 'toggle') {
     c = m?.state == 'PAUSED' ? 'resume' : 'pause';
@@ -980,6 +982,9 @@ async function cmd(c, arg) {
   } catch (e) {
     toast(e);
     poll();
+  } finally {
+    inflight--;
+    syncSession();
   }
 }
 
@@ -1067,9 +1072,12 @@ function syncSession() {
   }
   if (pending || !m) return;
   // The loop follows a pause on the TV but never restarts by itself: that
-  // would take the audio back from whatever app has it now.
-  if (m.state == 'PAUSED' || m.state == 'IDLE') keep.pause();
-  ms.playbackState = keep.paused ? 'paused' : 'playing';
+  // would take the audio back from whatever app has it now. It stops only
+  // once the command is through: a long backgrounded page that stops playing
+  // is frozen at once, and the request would never leave the phone.
+  const stopped = m.state == 'PAUSED' || m.state == 'IDLE';
+  if (stopped && !inflight) keep.pause();
+  ms.playbackState = keep.paused || stopped ? 'paused' : 'playing';
   syncPosition();
 }
 
@@ -1095,9 +1103,8 @@ if (navigator.mediaSession) {
     else syncSession();
   });
   on('pause', () => {
-    keep.pause();
     if (playing()) cmd('toggle');
-    else syncSession();
+    else keep.pause(), syncSession();
   });
   on('seekbackward', d => skip(-(d.seekOffset || 10)));
   on('seekforward', d => skip(d.seekOffset || 10));
