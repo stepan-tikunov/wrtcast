@@ -5,3 +5,4 @@
 /title-api/title-api
 /title-api/*.db*
 /.claude/
+/router-app/build/

@@ -125,6 +125,13 @@ input[type=range]{width:100%;height:32px;margin:0;accent-color:var(--ac);backgro
 .sel label{display:block;margin:0 0 4px 4px;color:var(--mu);font-size:12px}
 select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;background:var(--s2)}
 .row .pill{flex:1}
+.sw{display:flex;flex:1;align-items:center;gap:12px;min-height:46px;padding:6px 12px;border-radius:14px;background:var(--s2)}
+.sw span{flex:1}
+.sw small{display:block;color:var(--mu);font-size:12px}
+.sw input{appearance:none;-webkit-appearance:none;position:relative;flex:none;width:46px;height:28px;margin:0;border-radius:14px;background:var(--s3);transition:background .2s}
+.sw input::before{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--tx);transition:transform .2s}
+.sw input:checked{background:var(--ac)}
+.sw input:checked::before{transform:translateX(18px)}
 #stop{display:block;margin:4px auto 0;padding:10px 16px;border:0;background:none;color:var(--err);font-size:15px}
 .spin{width:14px;height:14px;border:2px solid var(--mu);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -304,6 +311,7 @@ svg.spring{animation:spring .3s ease-out}
     <div class="row"><button class="ib" data-c="mute" id="mu" aria-label="Звук"><svg><use href="#i-vol"/></svg></button><input type="range" id="vol" min="0" max="100" step="5" aria-label="Громкость"></div>
     <div class="row"><div class="sel"><label for="audio">Озвучка</label><select id="audio"></select></div><div class="sel"><label for="subs">Субтитры</label><div class="pick"><select id="subs"></select><button class="ib" id="styb" aria-label="Вид субтитров">Aa</button></div></div></div>
     <div class="row" id="qrow"><div class="sel" id="srcsel"><label for="source">Источник</label><select id="source"></select></div><div class="sel" id="qsel"><label for="quality">Качество</label><select id="quality"></select></div></div>
+    <div class="row" id="drcrow" hidden><label class="sw"><span>Выравнивать громкость<small>Тише музыка и взрывы, громче речь</small></span><input type="checkbox" id="drc"></label></div>
     <div class="row" id="eprow"><button class="pill" id="eplist"><svg><use href="#i-list"/></svg>Серии</button></div>
     <button id="stop" data-c="stop">Остановить</button>
     <button id="devname"><svg><use href="#i-tv"/></svg><span></span></button>
@@ -731,6 +739,8 @@ async function play(m) {
   if (quality) req.quality = quality;
   const source = m.source ?? localStorage.source; // by name, so it carries over episodes
   if (source) req.source = source;
+  const drc = m.drc ?? localStorage.drc; // the router ignores it where it can't level
+  if (drc) req.drc = String(drc);
   req.style = styleSpec(subStyle || {}); // the receiver resets it on every load
   if (m.season != null) Object.assign(req, { season: String(m.season), episode: m.episode });
   pending = req;
@@ -939,6 +949,9 @@ function render(s) {
   options($('source'), srcs.map(n => [n, n]));
   $('quality').value = s.now?.quality || 'auto';
   if (s.now?.source) $('source').value = s.now.source;
+  // Only sources whose audio the router can level offer the switch.
+  $('drcrow').hidden = !s.now?.drc_ok;
+  $('drc').checked = !!s.now?.drc;
 }
 
 // Where playback is now, extrapolated from the last status.
@@ -1317,6 +1330,11 @@ const activeTrack = type => st?.media?.tracks?.find(t => t.type == type && t.act
 $('quality').onchange = e => {
   localStorage.quality = e.target.value;
   replay({ quality: e.target.value, audio: activeTrack('AUDIO'), subs: activeTrack('TEXT') || 'off' });
+};
+// The leveled audio is another stream for the TV, so it is replayed too.
+$('drc').onchange = e => {
+  localStorage.drc = e.target.checked ? '1' : '0';
+  replay({ drc: localStorage.drc, audio: activeTrack('AUDIO'), subs: activeTrack('TEXT') || 'off' });
 };
 // Another source has its own tracks, so audio and subtitles start fresh.
 $('source').onchange = e => {

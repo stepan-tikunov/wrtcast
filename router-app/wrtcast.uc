@@ -6,7 +6,7 @@
 // Configured in /etc/config/wrtcast.
 'use strict';
 
-import { popen, readfile, writefile, rename, unlink, lsdir, stdin, stdout } from 'fs';
+import { popen, readfile, writefile, rename, unlink, lsdir, mkdir, stat, access, stdin, stdout } from 'fs';
 import { cursor } from 'uci';
 
 const STATE = '/tmp/wrtcast.now.';         // + host key; what /play started
@@ -21,6 +21,7 @@ const DONE = 0.85;                           // an episode left this far in is w
 const TTL = 30 * 86400;                      // progress older than this is forgotten
 const DEVICES = '/tmp/wrtcast.devices.json'; // last discovery result
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
+const DRC = '/tmp/wrtcast.drc/';             // audio playlists and segments of the leveler
 const COMMANDS = {
 	pause: null, resume: null, stop: null, quit: null, mute: null, unmute: null,
 	seek: 'num', ff: 'num', rew: 'num', volume: 'num', audio: 'str', subs: 'str',
@@ -50,6 +51,9 @@ const USER_AGENT = conf('user_agent', 'Mozilla/5.0 (X11; Linux armv7l) ' +
 	'CrKey/1.56.500000');
 const HEADERS = conf('header', []);
 const PROGRESS_KEEP = conf('progress_file', '/etc/wrtcast.progress.json');
+// A minimal static ffmpeg (scripts/build-ffmpeg.sh); without it the volume
+// leveler is not offered.
+const FFMPEG = conf('ffmpeg', '/usr/bin/wrtcast-ffmpeg');
 
 function reply(code, body) {
 	printf('Status: %d %s\r\nContent-Type: application/json\r\n' +
@@ -452,7 +456,7 @@ function with_now(st, dev) {
 	if (now.qualities == null && PROXY) {
 		let u = match(now.url, /[?&]u=([^&]*)/);
 		now.src = u ? urldec(u[1]) : null;
-		let v = (now.src && proxy_target(now.src) ? qualities(now.src) : null) ?? [];
+		let v = (now.src && proxy_target(now.src) ? qualities(fetch_text(now.src)) : null) ?? [];
 		now.variants = v;
 		now.qualities = map(v, x => x.label);
 		now.quality = 'auto';
@@ -464,6 +468,8 @@ function with_now(st, dev) {
 		quality: now.quality ?? 'auto', qualities: now.qualities ?? [],
 		source: now.source ?? null,
 		sources: map(now.streams ?? [], s => s.name),
+		// Whether the volume leveler is on, and whether the source allows it.
+		drc: !!now.drc, drc_ok: !!now.drc_ok,
 	};
 	for (let t in st.media.tracks ?? []) {
 		t.label = now.labels?.[t.name] ?? t.name;
@@ -496,6 +502,12 @@ function fetch_cmd(url, h) {
 	for (let x in (valid_headers(h) ? split(h, '\n') : []))
 		cmd += ' --header=' + shq(x);
 	return `${cmd} -O - ${shq(url)} 2>/dev/null`;
+}
+
+// A playlist or another small text file; null when the fetch fails.
+function fetch_text(url, h) {
+	let r = run(fetch_cmd(url, h));
+	return r.code == 0 ? r.out : null;
 }
 
 // Only public http(s) URLs and title-api itself: the proxy must not reach
@@ -576,11 +588,11 @@ const quality_label = w => w >= 3200 ? '2160p' : w >= 2400 ? '1440p' :
 // be chosen.
 const playable = codecs => !match(codecs ?? '', /(av01|vp09|vp9|hvc1|hev1|dvh1)/);
 
-// [{ label, width }] of a master playlist, best first, one per label.
-// null when the master itself can't be fetched.
-function qualities(master, h) {
-	let r = run(fetch_cmd(master, h)), body = r.out, seen = {}, list = [];
-	if (r.code != 0)
+// [{ label, width }] of a master playlist body, best first, one per label.
+// null when the master itself couldn't be fetched.
+function qualities(body) {
+	let seen = {}, list = [];
+	if (body == null)
 		return null;
 	for (let inf in match(body, /#EXT-X-STREAM-INF:[^\n]*/g) ?? []) {
 		let m = match(inf[0], /RESOLUTION=([0-9]+)x[0-9]+/);
@@ -597,9 +609,8 @@ function qualities(master, h) {
 
 // Whether a master's media playlists use fragmented MP4 (#EXT-X-MAP); the
 // receiver assumes MPEG-TS segments unless told.
-function is_fmp4(master, h) {
-	let body = run(fetch_cmd(master, h)).out;
-	let child = match(body, /\n([^#\n][^\n]*)/);
+function is_fmp4(master, body, h) {
+	let child = match(body ?? '', /\n([^#\n][^\n]*)/);
 	return !!child && index(run(fetch_cmd(resolve(master, trim(child[1])), h)).out,
 		'#EXT-X-MAP') >= 0;
 }
@@ -625,7 +636,9 @@ function keep_variants(lines, keep) {
 	return out;
 }
 
-function rewrite_playlist(body, base, q, h) {
+// With drc the audio renditions of a master are asked for leveled (see
+// drc_playlist).
+function rewrite_playlist(body, base, q, h, drc) {
 	let fix = u => match(u, /^(data|skd):/) ? u : purl(resolve(base, u), null, null, h);
 	let lines = map(split(body, '\n'), line => rtrim(line, '\r'));
 	lines = keep_variants(lines, l => playable(match(l, /CODECS="([^"]*)"/)?.[1]));
@@ -636,7 +649,8 @@ function rewrite_playlist(body, base, q, h) {
 			return l;
 		if (substr(l, 0, 1) != '#')
 			return fix(trim(l));
-		return replace(l, /URI="([^"]*)"/g, (all, u) => `URI="${fix(u)}"`);
+		let flag = drc && match(l, /^#EXT-X-MEDIA:(.*,)?TYPE=AUDIO(,|$)/) ? '&drc=1' : '';
+		return replace(l, /URI="([^"]*)"/g, (all, u) => `URI="${fix(u)}${flag}"`);
 	}));
 }
 
@@ -647,7 +661,215 @@ function media_head(code, mime) {
 	       substr(mime, 0, 6) == 'image/' ? 'max-age=86400' : 'no-store');
 }
 
-function proxy(name, u, q, h) {
+// ---- volume leveler --------------------------------------------------------
+//
+// Films are mixed for cinemas: loud music, quiet speech. With the leveler on,
+// the audio segments are run through dynaudnorm, which evens loudness out
+// over a few seconds, and re-encoded. Only AAC in audio renditions of their
+// own on one MPEG-TS timeline qualifies; the video is relayed untouched.
+//
+// Each segment is leveled on its own, so it is decoded together with the end
+// of the previous one (the leveler's history) and the start of the next one
+// (its look-ahead, and the encoder's: without it every segment would fade at
+// the end). The output keeps the timestamps and frame count of the original,
+// which takes trimming the input to whole AAC frames before the segment
+// start and dropping the packets outside it. The raw segments are cached:
+// leveling N fetches N+1, which N+1 then needs itself, so the CDN sees each
+// segment once, plus the previous one after a seek.
+
+const DRC_FILTER = 'dynaudnorm=f=250:g=13:p=0.9:m=30:r=0.06:s=0,' +
+	'alimiter=limit=0.7:attack=5:release=100';
+const DRC_PRE = 5;   // seconds of history, well over the leveler's window
+const DRC_POST = 3;  // seconds of look-ahead, over half the window (250 ms × 13)
+
+// Whether the audio of a master (url and body) can be leveled.
+function drc_supported(master, body, h) {
+	if (body == null || !access(FFMPEG, 'x'))
+		return false;
+	let group = null;
+	for (let inf in match(body, /#EXT-X-STREAM-INF:[^\n]*/g) ?? []) {
+		let codecs = match(inf[0], /CODECS="([^"]*)"/)?.[1] ?? '';
+		if (!playable(codecs))
+			continue;
+		let g = match(inf[0], /AUDIO="([^"]*)"/)?.[1];
+		if (!g || !match(codecs, /mp4a\.40\.2/) ||
+		    match(codecs, /(ac-3|ec-3|mp4a\.40\.(5|29)|opus|flac)/))
+			return false;
+		group ??= g;
+	}
+	let uri = null;
+	for (let m in match(body, /#EXT-X-MEDIA:[^\n]*/g) ?? [])
+		if (!uri && match(m[0], /TYPE=AUDIO(,|$)/) &&
+		    match(m[0], /GROUP-ID="([^"]*)"/)?.[1] == group)
+			uri = match(m[0], /URI="([^"]*)"/)?.[1];
+	if (!group || !uri)
+		return false;
+	let pl = fetch_text(resolve(master, uri), h) ?? '';
+	let seg = trim(match(pl, /\n([^#\n][^\n]*)/)?.[1] ?? '');
+	return substr(pl, 0, 7) == '#EXTM3U' && index(pl, '#EXT-X-ENDLIST') >= 0 &&
+		!match(pl, /#EXT-X-(MAP|DISCONTINUITY|BYTERANGE)/) &&
+		!match(pl, /#EXT-X-KEY:(.*,)?METHOD=(AES|SAMPLE)/) &&
+		ext(match(seg, /^[^?#]*/)[0]) == 'ts';
+}
+
+// FNV-1a, for short file names.
+function hash(s) {
+	let h = 0x811c9dc5;
+	for (let i = 0; i < length(s); i++)
+		h = ((h ^ ord(s, i)) * 0x01000193) & 0xffffffff;
+	return sprintf('%08x', h);
+}
+
+// Rewrites an audio media playlist so its segments point at /api/a/<key>/<n>.ts
+// and keeps their upstream URLs and durations for that handler.
+function drc_playlist(body, url, h) {
+	let key = hash(match(url, /^[^?#]*/)[0]), segs = [], durs = [], dur = 10;
+	let out = map(split(body, '\n'), l => {
+		l = rtrim(l, '\r');
+		if (substr(l, 0, 8) == '#EXTINF:')
+			dur = +(match(l, /^#EXTINF:([0-9.]+)/)?.[1] ?? 10);
+		if (l == '' || substr(l, 0, 1) == '#')
+			return l;
+		push(segs, resolve(url, trim(l)));
+		push(durs, dur);
+		return `/api/a/${key}/${length(segs) - 1}.ts`;
+	});
+	mkdir(DRC);
+	save(`${DRC}${key}.json`, { segs, durs, h: valid_headers(h) ? h : null });
+	return join('\n', out);
+}
+
+// The first audio PES of an MPEG-TS chunk: { pts (90 kHz), rate (Hz, from
+// the ADTS header) }, or null.
+function ts_audio(s) {
+	const RATES = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
+		16000, 12000, 11025, 8000, 7350];
+	for (let at = 0; at + 188 <= length(s); at += 188) {
+		if (ord(s, at) != 0x47)
+			return null;
+		let afc = (ord(s, at + 3) >> 4) & 3, p = at + 4;
+		if (!(ord(s, at + 1) & 0x40) || !(afc & 1))
+			continue;
+		if (afc == 3)
+			p += 1 + ord(s, at + 4);
+		let sid = ord(s, p + 3);
+		if (substr(s, p, 3) != '\x00\x00\x01' || sid < 0xC0 || sid > 0xDF ||
+		    !(ord(s, p + 7) & 0x80))
+			continue;
+		let b = map(split(substr(s, p + 9, 5), ''), c => ord(c));
+		let a = p + 9 + ord(s, p + 8);
+		return {
+			pts: ((b[0] >> 1) & 7) * 1073741824 + (b[1] << 22) +
+				((b[2] >> 1) << 15) + (b[3] << 7) + (b[4] >> 1),
+			rate: ord(s, a) == 0xFF && (ord(s, a + 1) & 0xF0) == 0xF0 ?
+				RATES[(ord(s, a + 2) >> 2) & 15] : null,
+		};
+	}
+	return null;
+}
+
+const drc_file = (key, i) => `${DRC}${key}.${i}.ts`;
+
+// Segment i as fetched from upstream, cached; null when the fetch fails.
+function drc_raw(meta, key, i) {
+	let f = drc_file(key, i), s = readfile(f);
+	if (s != null)
+		return s;
+	let url = proxy_target(meta.segs[i]);
+	let pipe = url ? popen(fetch_cmd(url, meta.h)) : null;
+	s = pipe?.read('all');
+	if (!pipe || pipe.close() != 0 || ord(s ?? '', 0) != 0x47)
+		return null;
+	let tmp = `${f}.${clock()[1]}`;
+	if (writefile(tmp, s) != length(s) || !rename(tmp, f))
+		unlink(tmp);
+	return s;
+}
+
+// Segment i leveled; null when it can't be (the original is served then).
+function drc_level(meta, key, i, cur) {
+	let a = ts_audio(substr(cur, 0, 65536));
+	if (!a?.rate || !readfile(drc_file(key, i), 1))
+		return null;
+	let prev = i > 0 ? drc_raw(meta, key, i - 1) : null;
+	let next = i + 1 < length(meta.segs) ? drc_raw(meta, key, i + 1) : null;
+	let end = next != null ? ts_audio(substr(next, 0, 65536))?.pts : null;
+	if (end != null && end <= a.pts)
+		end = null;
+	// Just the parts of the neighbours that matter, in whole TS packets.
+	let part = (s, sec, dur) =>
+		188 * int(length(s) * min(1, (sec + 1) / (dur || 10)) / 188);
+	let inputs = [], tmp = [];
+	if (prev != null) {
+		let f = `${DRC}${key}.${i}.pre`, n = part(prev, DRC_PRE, meta.durs[i - 1]);
+		writefile(f, substr(prev, length(prev) - n));
+		push(inputs, f);
+		push(tmp, f);
+	}
+	push(inputs, drc_file(key, i));
+	if (end != null) {
+		let f = `${DRC}${key}.${i}.post`;
+		writefile(f, substr(next, 0, part(next, DRC_POST, meta.durs[i + 1])));
+		push(inputs, f);
+		push(tmp, f);
+	}
+	// 90 kHz ticks to samples; the encoder's frames start 1024 samples
+	// before its input, so the input starts a whole number of frames early.
+	let rate = a.rate, at = t => int((t * rate + 45000) / 90000);
+	let af = (prev != null ? `atrim=start_pts=${at(a.pts) - int(DRC_PRE * rate / 1024) * 1024},` : '') +
+		DRC_FILTER + (end != null ? `,atrim=end_pts=${at(end) + 4 * 1024}` : '');
+	// Half a frame of slack for rounding to 90 kHz.
+	let drop = `noise=drop=lt(pts*tb*90000\\,${a.pts - 900})` +
+		(end != null ? `+gte(pts*tb*90000\\,${end - 900})` : '');
+	let out = `${DRC}${key}.${i}.out`, part_out = `${out}.${clock()[1]}`;
+	let r = run(`${shq(FFMPEG)} -nostdin -v error -y -copyts ` +
+		`-i ${shq('concat:' + join('|', inputs))} -map 0:a:0 -af ${shq(af)} ` +
+		`-c:a aac -aac_coder fast -b:a 128k -bsf:a ${shq(drop)} ` +
+		`-f mpegts -muxdelay 0 -muxpreload 0 ${shq(part_out)}`);
+	for (let f in tmp)
+		unlink(f);
+	let s = r.code == 0 ? readfile(part_out) : null;
+	if (!s || ord(s, 0) != 0x47) {
+		unlink(part_out);
+		return null;
+	}
+	if (!rename(part_out, out))
+		unlink(part_out);
+	return s;
+}
+
+// Keeps the segments around the one just served, and other playlists'
+// files for a while (another TV may be playing them).
+function drc_gc(key, i) {
+	for (let f in lsdir(DRC) ?? []) {
+		let m = match(f, /^([0-9a-f]{8})\.(json|([0-9]+)\..*)$/);
+		if (!m)
+			continue;
+		let st = stat(DRC + f);
+		if (m[1] == key ? m[3] != null && (+m[3] < i - 2 || +m[3] > i + 2) :
+		    st && st.mtime < time() - (m[2] == 'json' ? 86400 : 600))
+			unlink(DRC + f);
+	}
+}
+
+function drc_segment(key, i) {
+	let meta = load(`${DRC}${key}.json`);
+	if (i >= length(meta?.segs ?? []))
+		fail(404, 'no such segment');
+	let s = readfile(`${DRC}${key}.${i}.out`);
+	if (s == null) {
+		let cur = drc_raw(meta, key, i);
+		if (cur == null)
+			fail(502, 'upstream fetch failed');
+		s = drc_level(meta, key, i, cur) ?? cur;
+	}
+	drc_gc(key, i);
+	media_head(200, MIME.ts);
+	stdout.write(s);
+	exit(0);
+}
+
+function proxy(name, u, q, h, drc) {
 	let url = proxy_target(u);
 	if (!url)
 		fail(400, 'bad url');
@@ -662,8 +884,11 @@ function proxy(name, u, q, h) {
 		let body = pipe.read('all') ?? '';
 		if (pipe.close() != 0 || substr(body, 0, 7) != '#EXTM3U')
 			fail(502, 'upstream playlist fetch failed');
+		let text = drc && index(body, '#EXTINF') >= 0 && access(FFMPEG, 'x') ?
+			drc_playlist(body, url, h) :
+			rewrite_playlist(body, url, match(q ?? '', /^[0-9]{1,5}$/) ? +q : null, h, drc);
 		media_head(200, MIME[e]);
-		print(rewrite_playlist(body, url, match(q ?? '', /^[0-9]{1,5}$/) ? +q : null, h), '\n');
+		print(text, '\n');
 		exit(0);
 	}
 
@@ -814,6 +1039,8 @@ const routes = {
 			fail(400, 'invalid subtitle style');
 		if (p.source != null && (length(p.source) > 100 || match(p.source, /[[:cntrl:]]/)))
 			fail(400, 'invalid source');
+		if (p.drc != null && !match(p.drc, /^[01]$/))
+			fail(400, 'invalid drc');
 		let dev = device(p);
 		let last = load(state_file(dev));
 		let list, fetched;
@@ -840,13 +1067,15 @@ const routes = {
 		if (s.variants == null) {
 			// title-api assembles a source's master on first request; a
 			// source the CDN rejects fails here instead of on the TV.
-			let v = qualities(s.url, h);
+			let body = fetch_text(s.url, h), v = qualities(body);
 			if (v == null)
 				reply(502, { error: 'source unavailable', source: s.name,
 					sources: map(list, x => x.name) });
 			s.variants = v;
-			s.fmp4 = is_fmp4(s.url, h);
+			s.fmp4 = is_fmp4(s.url, body, h);
+			s.drc = PROXY && !s.fmp4 && drc_supported(s.url, body, h);
 		}
+		let drc = p.drc == '1' && !!s.drc;
 		let quals = s.variants;
 		// The best quality unless asked otherwise; a missing one falls back
 		// to the best below it.
@@ -858,7 +1087,7 @@ const routes = {
 			width = v?.width;
 		}
 		let url = PROXY ? purl(s.url, public_base(), null, h) +
-			(width ? `&q=${width}` : '') : s.url;
+			(width ? `&q=${width}` : '') + (drc ? '&drc=1' : '') : s.url;
 		// Subtitles are separate WebVTT files, not part of the HLS manifest,
 		// so they are side-loaded; the receiver names them "sub<id>".
 		let args = ['play', url], labels = {};
@@ -895,6 +1124,7 @@ const routes = {
 			id, stream: n, source: s.name, url, host: host_of(dev),
 			title: p.title ?? null, season,
 			episode, labels, quality, qualities: map(quals, v => v.label),
+			drc, drc_ok: !!s.drc,
 			streams: list, fetched,
 			// Only our own proxy paths, so the UI never loads arbitrary URLs.
 			poster: length(p.poster ?? '') <= 4096 &&
@@ -926,15 +1156,23 @@ if (ARGV[0] == 'tick') {
 }
 
 // The uhttpd alias passes the full URL path (/api/x); direct CGI calls pass /x.
-// The media proxy is called by the receiver, which can't send a token, so it
-// is exempt from the token check; it only reaches public hosts.
+// The media proxy (and the leveled audio) is called by the receiver, which
+// can't send a token, so it is exempt from the token check; it only reaches
+// public hosts.
 let path = replace(rtrim(getenv('PATH_INFO') ?? '', '/'), /^\/api(\/|$)/, '/');
 let pm = match(path, /^\/p\/([^\/]*)$/);
 if (pm) {
 	if (getenv('REQUEST_METHOD') != 'GET')
 		fail(405, 'method not allowed');
 	let qs = parse_form(getenv('QUERY_STRING'), {});
-	proxy(pm[1], qs.u, qs.q, qs.h);
+	proxy(pm[1], qs.u, qs.q, qs.h, qs.drc == '1');
+}
+// Leveled audio segments (see drc_playlist).
+let am = match(path, /^\/a\/([0-9a-f]{8})\/([0-9]{1,6})\.ts$/);
+if (am) {
+	if (getenv('REQUEST_METHOD') != 'GET')
+		fail(405, 'method not allowed');
+	drc_segment(am[1], +am[2]);
 }
 // Subtitles of what /play started, by index (see the short links in /play).
 let sm = match(path, /^\/sub\/([0-9A-Za-z._]+)\/([0-9]+)\.vtt$/);
