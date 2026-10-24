@@ -51,6 +51,7 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #dbg{position:absolute;inset:-40px;background:center/cover;filter:blur(40px) brightness(.45);transform:scale(1.2)}
 #det .nav{position:relative;margin-left:-8px}
 #det .hero{position:relative;display:flex;gap:16px;align-items:flex-end}
+#det .hero>div{flex:1}
 #dposter{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--s2);box-shadow:0 8px 24px #0008}
 #det h1{margin:0 0 4px;font-size:22px;line-height:1.2}
 #dmeta{color:#c8c8cc;font-size:14px}
@@ -64,8 +65,13 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .facts{color:var(--mu);font-size:14px}
 .facts div{margin:4px 0}
 .facts b{color:var(--tx);font-weight:500}
-#dinfo .skl{height:13px;margin:8px 0}
-#dinfo .skl:last-child{width:60%}
+/* Until /title answers: a bar per line, inside the element its text goes to,
+   so the page keeps its layout when the text comes. */
+#det .skl{display:inline-block;vertical-align:middle;height:.8em;margin:0;border-radius:.4em}
+#det .rt .skl{width:58px;height:22px;padding:0;border-radius:7px}
+#det h1 .skl{max-width:12em}
+#dmeta .skl{max-width:20em}
+.facts .skl{max-width:50em}
 .pill{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;padding:0 20px;border:0;border-radius:26px;background:var(--s2);font-weight:600}
 .pill.ac{background:var(--ac);color:#111}
 #dplay{position:relative;width:100%;margin-top:18px}
@@ -188,7 +194,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .card img{opacity:0;transition:opacity .35s}
 .card img.ld{opacity:1}
 .sk{display:block;aspect-ratio:2/3;border-radius:12px}
-.sk,.skl{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
+.sk,.skl,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
 .skl{display:block;height:12px;margin-top:9px;border-radius:6px}
 .skl+.skl{width:40%}
 .badge.on{animation:bounce .35s ease-out}
@@ -197,6 +203,8 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 #dposter{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards}
 #dinfo>*,.rt{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
 #det h1,#dmeta,#dplay{animation:pop .4s .1s cubic-bezier(.2,.8,.2,1) backwards}
+#dposter.loading{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards,shim 1.2s linear infinite}
+#det.loading #dplay{opacity:1;color:transparent;animation:pop .4s .1s cubic-bezier(.2,.8,.2,1) backwards,shim 1.2s linear infinite}
 .ep.anim{animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 18ms)}
 .chip{transition:background .2s,color .2s}
 #pl,.sheet{animation:rise .3s cubic-bezier(.2,.8,.2,1)}
@@ -655,22 +663,39 @@ function renderInfo(t) {
     el('div', { className: 'facts' }, ...facts.map(([k, v]) => el('div', {}, el('b', {}, k + ': '), v.join(', ')))));
 }
 
+// Placeholder lines of the given widths, in %.
+const skl = w => el('span', { className: 'skl', style: `width:${w}%` });
+const sklLines = (...ws) => ws.map(w => el('div', {}, skl(w)));
+
+// Without a picture an img gets a frame from the browser; a blank one has none.
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+$('dposter').onload = $('dposter').onerror = e => {
+  if (e.target.getAttribute('src') != BLANK) e.target.classList.remove('loading');
+};
+
 // m comes from search results (id, title, year, poster); whether it is a movie
-// or a series is only known once /title answers.
+// or a series is only known once /title answers. Until then the page shows
+// placeholders where its parts will be; opened by its address it knows only the id.
 async function openDetails(m) {
   item = m;
-  $('dtitle').textContent = m.title || '';
-  $('dmeta').textContent = m.year || '';
+  $('det').classList.add('loading');
+  $('dtitle').replaceChildren(m.title || skl(70));
+  $('dmeta').replaceChildren(...sklLines(55), el('div', { className: 'rt' }, el('span', { className: 'skl' }), el('span', { className: 'skl' })));
   const showPoster = p => {
-    $('dposter').hidden = !p;
-    $('dposter').src = p || '';
+    $('dposter').src = p || BLANK;
+    $('dposter').classList.add('loading'); // until the picture comes
     $('dbg').style.backgroundImage = p ? `url("${p}")` : 'none';
   };
   showPoster(m.poster);
-  $('dplay').hidden = $('dfrom0').hidden = true;
+  $('dposter').hidden = false;
+  $('dplay').hidden = false;
+  $('dplay').disabled = true;
+  $('dplay').lastChild.textContent = 'Смотреть на ТВ'; // the width of the button on desktop
+  $('dfrom0').hidden = true;
   $('seasons').replaceChildren();
   $('eps').replaceChildren();
-  $('dinfo').replaceChildren(...[1, 2, 3].map(() => el('span', { className: 'skl' })));
+  $('dinfo').replaceChildren(el('p', { id: 'ddesc' }, ...sklLines(100, 100, 100, 70)),
+    el('div', { className: 'facts' }, ...sklLines(45, 35, 85)));
   // The blurred backdrop overflows .top; older engines can still scroll it.
   $('det').scrollTop = $('det').firstElementChild.scrollTop = 0;
   // From the player the page may already be open with another title.
@@ -683,14 +708,23 @@ async function openDetails(m) {
     t = await title(m.id);
     m.progress = await prog;
   } catch (e) {
-    if (item == m) $('dinfo').replaceChildren(el('p', { className: 'note' }, 'Не удалось загрузить'));
+    if (item == m) {
+      $('det').classList.remove('loading');
+      $('dtitle').textContent = m.title || '';
+      $('dmeta').textContent = m.year || '';
+      $('dposter').hidden = !m.poster;
+      $('dplay').hidden = true;
+      $('dinfo').replaceChildren(el('p', { className: 'note' }, 'Не удалось загрузить'));
+    }
     return toast(e);
   }
   if (item != m) return;
   // A saved poster can point at a host the provider has since left.
   if (t.poster && t.poster != m.poster) showPoster(t.poster);
   Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: t.poster || m.poster });
-  $('dtitle').textContent = t.title; // opened by its address, the page knew only the id
+  $('det').classList.remove('loading');
+  $('dposter').hidden = !m.poster;
+  $('dtitle').textContent = t.title;
   renderInfo(t);
   renderDetails();
   if (t.type != 'series') return;
