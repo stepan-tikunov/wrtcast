@@ -327,13 +327,31 @@ func (c *Client) get(ctx context.Context, current *session, target, referer stri
 	defer response.Body.Close()
 	current.absorbSetCookies(response.Request.URL.Host, response.Header.Values("Set-Cookie"))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, response.Request.URL, fmt.Errorf("GET %s returned %s", target, response.Status)
+		// Keep the start of the error page: it tells why the provider refused.
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 256<<10))
+		return nil, response.Request.URL, &statusError{
+			target: target,
+			status: response.Status,
+			code:   response.StatusCode,
+			body:   body,
+		}
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
 	if err != nil {
 		return nil, response.Request.URL, err
 	}
 	return body, response.Request.URL, nil
+}
+
+type statusError struct {
+	target string
+	status string
+	code   int
+	body   []byte
+}
+
+func (e *statusError) Error() string {
+	return fmt.Sprintf("GET %s returned %s", e.target, e.status)
 }
 
 func (c *Client) postForm(

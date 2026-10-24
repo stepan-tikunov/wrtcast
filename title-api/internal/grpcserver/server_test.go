@@ -27,6 +27,11 @@ func TestTitleServicePlaybackAndDetails(t *testing.T) {
 			_, _ = response.Write([]byte(`<div class="th-item"><a href="/filmy/42185-movie.html"><img src="/poster.jpg"><div class="th-title">Movie</div><div class="th-year">2021</div></a></div>`))
 		case "/index.php":
 			siteID := request.URL.Query().Get("newsid")
+			if siteID == "25975" {
+				response.WriteHeader(http.StatusForbidden)
+				_, _ = response.Write([]byte(`<div class="berrors">Этот материал доступен только зарегистрированным пользователям! Зарегистрируйтесь на сайте.</div>`))
+				return
+			}
 			embedID := "1"
 			title := "Movie"
 			if siteID == "20973" {
@@ -124,6 +129,16 @@ func TestTitleServicePlaybackAndDetails(t *testing.T) {
 	_, err = service.GetTitleDetails(ctx, &titlev1.GetTitleDetailsQuery{TitleId: "wrong-prefix-1"})
 	if code := status.Code(err); code != codes.InvalidArgument {
 		t.Fatalf("invalid title ID code = %s, want %s: %v", code, codes.InvalidArgument, err)
+	}
+
+	registeredOnlyID := client.ExternalTitleID("25975")
+	_, err = service.GetTitleDetails(ctx, &titlev1.GetTitleDetailsQuery{TitleId: registeredOnlyID})
+	if code := status.Code(err); code != codes.PermissionDenied {
+		t.Fatalf("registered-only details code = %s, want %s: %v", code, codes.PermissionDenied, err)
+	}
+	_, err = service.GetPlaybackStreams(ctx, &titlev1.GetPlaybackStreamsQuery{TitleId: registeredOnlyID})
+	if code := status.Code(err); code != codes.PermissionDenied {
+		t.Fatalf("registered-only playback code = %s, want %s: %v", code, codes.PermissionDenied, err)
 	}
 }
 

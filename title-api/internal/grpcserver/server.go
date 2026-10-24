@@ -154,6 +154,8 @@ func providerStatus(err error) error {
 	case errors.Is(err, provider.ErrNotMovie), errors.Is(err, provider.ErrNotSeries),
 		errors.Is(err, provider.ErrMediaTypeUnknown):
 		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, provider.ErrRegistrationRequired):
+		return status.Error(codes.PermissionDenied, err.Error())
 	default:
 		return status.Error(codes.Unavailable, err.Error())
 	}

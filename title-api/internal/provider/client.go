@@ -1,11 +1,13 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -222,9 +224,20 @@ func uniqueEmbedURLs(matches []string, scheme string) []string {
 
 var errAntiBotChallenge = errors.New("anti-bot challenge")
 
+// ErrRegistrationRequired: the provider shows the title to signed-in users only.
+var ErrRegistrationRequired = errors.New("title is available to registered provider users only")
+
+// The provider answers such titles with 403 and this notice.
+var registeredOnlyNotice = []byte("доступен только зарегистрированным пользователям")
+
 func (c *Client) moviePage(ctx context.Context, current *session, siteMovieID string) ([]byte, error) {
 	target := c.providerURL().ResolveReference(&url.URL{Path: "/index.php", RawQuery: "newsid=" + siteMovieID})
 	body, _, err := c.get(ctx, current, target.String(), "")
+	var refused *statusError
+	if errors.As(err, &refused) && refused.code == http.StatusForbidden &&
+		bytes.Contains(refused.body, registeredOnlyNotice) {
+		return nil, ErrRegistrationRequired
+	}
 	if err != nil {
 		return nil, fmt.Errorf("fetch movie page: %w", err)
 	}
