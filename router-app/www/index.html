@@ -93,19 +93,22 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 /* player */
 #shade{position:fixed;inset:0;z-index:5;background:#000a;animation:fade .2s}
 @keyframes fade{from{opacity:0}}
-#pl{position:fixed;left:0;right:0;bottom:0;z-index:6;padding:0 16px max(10px,env(safe-area-inset-bottom));background:var(--s1);border-radius:20px 20px 0 0;box-shadow:0 -6px 30px #000c}
+#pl{position:fixed;left:0;right:0;bottom:0;z-index:6;padding:0 16px max(10px,env(safe-area-inset-bottom));border-radius:20px 20px 0 0}
+/* The panel's own layer: it slides off the handle near the mini player. */
+#plbg{position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--s1);box-shadow:0 -6px 30px #000c}
 #prog{position:absolute;left:20px;right:20px;top:0;height:3px;border-radius:2px;background:var(--s3);overflow:hidden;pointer-events:none}
 #prog div{width:0;height:100%;background:var(--ac)}
 /* Faded out where the bar starts, under the handle, to fade in on folding. */
 #pl.open #prog{top:13px;opacity:0}
-#bar{display:flex;align-items:center;gap:12px;min-height:72px}
+#bar{position:relative;display:flex;align-items:center;gap:12px;min-height:72px}
 /* The poster grows with a transform so it does not lay the bar out. */
 #thumb{width:48px;height:72px;margin-right:-8px;object-fit:cover;border-radius:6px;background:var(--s2);transform:scale(.8333);transform-origin:left center}
 #bar .t{flex:1;min-width:0}
 #title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
 #st{display:flex;align-items:center;gap:6px;color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums}
 #tg{background:var(--tx);color:#111;width:46px;height:46px}
-#pl.open #tg{display:none}
+/* Out of the way where it stood in the mini player, to fade in on folding. */
+#pl.open #tg{position:absolute;right:0;top:13px;visibility:hidden}
 #handle{display:none;width:40px;height:5px;margin:8px auto 0;border-radius:3px;background:var(--s3)}
 #pl.open #handle{display:block}
 #pl.open #thumb{margin-right:0;transform:none;cursor:pointer}
@@ -211,7 +214,6 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 @keyframes sink{to{transform:translateY(100%)}}
 .dev{animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 40ms)}
 #pl:not(.open) #full{display:none}
-#thumb{transition:transform .3s,margin .3s}
 #shade.out{animation:fadeout .2s forwards}
 #pl.pending #thumb{animation:pulse 1.2s ease-in-out infinite}
 /* While switching, the controls would still describe the previous movie. */
@@ -296,6 +298,7 @@ svg.spring{animation:spring .3s ease-out}
 
 <div id="shade" hidden></div>
 <section id="pl" hidden>
+  <div id="plbg"></div>
   <div id="prog"><div></div></div>
   <div id="handle"></div>
   <div id="bar">
@@ -472,36 +475,54 @@ function showLayer(name, on) {
   if (name == 'pl') {
     foldPlayer(on);
     $('full').inert = !on || !!pending;
-    $('collapse').hidden = $('more').hidden = !on;
   }
 }
 
 // Opens the mini player into the full one and back. The panel slides
 // instead of changing its height: a height transition lays out and repaints
 // the page under it on every frame. The bar keeps its place on screen, the
-// controls slide in and out below it, past the bottom edge. The handle
-// above the bar is clipped off near the mini player, so the top edge with
-// the progress line on it moves without a jump.
+// controls slide in and out below it, past the bottom edge. Everything that
+// differs between the two goes along with the slide: the panel's background
+// uncovers the handle above the bar, so its top edge with the progress line
+// on it moves without a jump, the poster grows, the buttons swap.
 let slide = [];
 function foldPlayer(open) {
-  const p = $('pl'), top = e => $(e).getBoundingClientRect().top;
-  const from = top('bar'); // mid-slide too
+  const p = $('pl'), t = $('title').parentNode, box = e => e.getBoundingClientRect();
+  const from = box($('bar')).top; // mid-slide too
   slide.forEach(a => a.cancel());
-  p.classList.remove('open');
-  const mini = top('bar'), gap0 = mini - top('pl');
-  p.classList.add('open');
-  const full = top('bar'), gap = full - top('pl') - gap0;
-  if (p.hidden || mini == full || matchMedia('(prefers-reduced-motion:reduce)').matches)
-    return p.classList.toggle('open', open);
-  const k = (from - full) / (mini - full), to = open ? 0 : 1; // 0 open, 1 mini
-  const at = k => ({ transform: `translateY(${k * (mini - full)}px)`, clipPath: `inset(${k * gap}px 0 0 round 20px 20px 0 0)` });
+  const lay = on => {
+    p.classList.toggle('open', on);
+    return { y: box($('bar')).top, edge: box(p).top, w: box($('thumb')).width, x: box(t).left };
+  };
+  const m = lay(false), f = lay(true);
+  // The buttons of the other state are on screen while fading, not to be hit.
+  $('collapse').hidden = $('more').hidden = false;
+  $('collapse').inert = $('more').inert = !open;
+  $('tg').inert = open;
+  const done = () => {
+    p.classList.toggle('open', open);
+    $('collapse').hidden = $('more').hidden = !open;
+  };
+  if (p.hidden || m.y == f.y || matchMedia('(prefers-reduced-motion:reduce)').matches) return done();
+  const k = (from - f.y) / (m.y - f.y), to = open ? 0 : 1; // 0 open, 1 mini
+  const gap = (f.y - f.edge) - (m.y - m.edge), s = f.w ? m.w / f.w : 1;
   const opt = { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)' };
-  const a = p.animate([at(k), at(to)], opt);
-  slide = [a, $('prog').animate([{ opacity: k }, { opacity: to }], opt)];
+  const go = (e, at) => e.animate([at(k), at(to)], opt);
+  slide = [
+    go(p, k => ({ transform: `translateY(${k * (m.y - f.y)}px)` })),
+    go($('plbg'), k => ({ transform: `translateY(${k * gap}px)` })),
+    go($('handle'), k => ({ opacity: 1 - k })),
+    go($('prog'), k => ({ opacity: k })),
+    go($('thumb'), k => ({ transform: `scale(${1 - k * (1 - s)})` })),
+    go(t, k => ({ transform: `translateX(${k * (m.x - f.x)}px)` })),
+    go($('tg'), k => ({ opacity: k, transform: `scale(${.6 + .4 * k})`, visibility: 'visible' })),
+    ...[$('more'), $('collapse')].map(e => go(e, k => ({ opacity: 1 - k, transform: `scale(${1 - .4 * k})` }))),
+  ];
+  const a = slide[0];
   a.onfinish = () => {
     if (slide[0] != a) return;
     slide = [];
-    if (!open) p.classList.remove('open');
+    done();
   };
 }
 
