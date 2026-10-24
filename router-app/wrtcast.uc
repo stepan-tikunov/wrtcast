@@ -28,7 +28,7 @@ const COMMANDS = {
 	substyle: 'style',
 };
 const REASONS = {
-	'200': 'OK', '400': 'Bad Request', '401': 'Unauthorized',
+	'200': 'OK', '400': 'Bad Request', '401': 'Unauthorized', '403': 'Forbidden',
 	'404': 'Not Found', '405': 'Method Not Allowed', '502': 'Bad Gateway',
 	'503': 'Service Unavailable',
 };
@@ -139,13 +139,24 @@ function run(cmd) {
 }
 
 function api(path) {
-	let cmd = `uclient-fetch -q -T 20 -O - ${shq(API + path)}`;
-	let r = run(cmd);
+	// uclient-fetch drops the body of an error reply and only prints
+	// "HTTP error N" (not with -q): keep that line of stderr, the body goes
+	// to stdout through fd 3.
+	let cmd = `{ uclient-fetch -T 20 -O - ${shq(API + path)} 2>&1 >&3 | grep '^HTTP error'; } 3>&1`;
+	let fetch = () => {
+		let r = run(cmd);
+		let m = match(r.out, /^HTTP error ([0-9]+)$/);
+		return { status: m ? +m[1] : r.out == '' ? 0 : 200, out: r.out };
+	};
+	let r = fetch();
 	// The provider's players fail now and then; one retry usually helps.
-	if (r.code != 0)
-		r = run(cmd);
-	if (r.code != 0)
-		fail(502, 'title-api request failed');
+	// A 4xx won't change on retry.
+	if (r.status != 200 && (r.status < 400 || r.status >= 500))
+		r = fetch();
+	if (r.status == 403)
+		fail(403, 'Источник показывает этот тайтл только зарегистрированным пользователям');
+	if (r.status != 200)
+		fail(502, 'title-api request failed' + (r.status ? ` (HTTP ${r.status})` : ''));
 	let j = json(r.out);
 	if (type(j) != 'object')
 		fail(502, 'title-api returned invalid JSON');
