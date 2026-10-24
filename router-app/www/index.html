@@ -144,7 +144,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 /* A sheet over the player dims the player too. */
 #shade.top{z-index:7}
 /* Long lists scroll inside the sheet instead of pushing it off screen. */
-#devlist,#srclist{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+#optbody,#devlist,#srclist{min-height:0;overflow-y:auto;overscroll-behavior:contain}
 #devlist .dev,#srclist .dev{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;padding:8px 4px;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
 .dev span{flex:1;min-width:0}
 .dev b{display:block;font-weight:550}
@@ -213,7 +213,9 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .starting{display:none;flex-direction:column;align-items:center;gap:14px;padding:32px 0 40px;color:var(--mu);font-size:14px}
 .starting .spin{width:32px;height:32px;border-width:3px}
 #pl.pending .starting{display:flex}
-#pl.pending .live,#pl.pending #tg{display:none}
+#pl.pending .live,#pl.pending #tg,#pl.pending #more{display:none}
+#optbody{transition:opacity .2s}
+#opts.pending #optbody{opacity:.45}
 #prog div{transition:width .3s linear}
 svg.spring{animation:spring .3s ease-out}
 #toast{animation:tin .25s cubic-bezier(.2,.8,.2,1)}
@@ -261,6 +263,7 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-mute" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4z"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zm10-12v12h2V6h-2z"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></symbol>
   <symbol id="i-list" viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
@@ -294,6 +297,7 @@ svg.spring{animation:spring .3s ease-out}
     <img id="thumb" alt="">
     <div class="t"><b id="title"></b><span id="st"></span></div>
     <button class="ib" id="tg" data-c="toggle" aria-label="Пауза"><svg><use href="#i-play"/></svg></button>
+    <button class="ib" id="more" aria-label="Настройки" hidden><svg><use href="#i-tune"/></svg></button>
     <button class="ib" id="collapse" aria-label="Свернуть" hidden><svg><use href="#i-down"/></svg></button>
   </div>
   <div id="full"><div>
@@ -309,6 +313,13 @@ svg.spring{animation:spring .3s ease-out}
       <button class="ib ep-nav" id="next" aria-label="Следующая серия"><svg><use href="#i-next"/></svg></button>
     </div>
     <div class="row"><button class="ib" data-c="mute" id="mu" aria-label="Звук"><svg><use href="#i-vol"/></svg></button><input type="range" id="vol" min="0" max="100" step="5" aria-label="Громкость"></div>
+    </div>
+  </div></div>
+</section>
+<section id="opts" class="sheet" hidden>
+  <div class="handle"></div>
+  <h2><span>Настройки</span><button class="ib" id="optcollapse" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button></h2>
+  <div id="optbody">
     <div class="row"><div class="sel"><label for="audio">Озвучка</label><select id="audio"></select></div><div class="sel"><label for="subs">Субтитры</label><div class="pick"><select id="subs"></select><button class="ib" id="styb" aria-label="Вид субтитров">Aa</button></div></div></div>
     <div class="row" id="qrow"><div class="sel" id="srcsel"><label for="source">Источник</label><select id="source"></select></div><div class="sel" id="qsel"><label for="quality">Качество</label><select id="quality"></select></div></div>
     <div class="row" id="drcrow" hidden><label class="sw"><span>Выравнивать громкость<small>Тише музыка и взрывы, громче речь</small></span><input type="checkbox" id="drc"></label></div>
@@ -316,8 +327,7 @@ svg.spring{animation:spring .3s ease-out}
     <div class="row" id="eprow"><button class="pill" id="eplist"><svg><use href="#i-list"/></svg>Серии</button></div>
     <button id="stop" data-c="stop">Остановить</button>
     <button id="devname"><svg><use href="#i-tv"/></svg><span></span></button>
-    </div>
-  </div></div>
+  </div>
 </section>
 <section id="devs" class="sheet" hidden>
   <div class="handle"></div>
@@ -354,7 +364,7 @@ let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF defaul
 let devices = null;     // last /devices answer
 let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null = receiver default
 localStorage.removeItem('subStyle'); // older format with colors
-const SHEETS = { dev: 'devs', sty: 'sty', src: 'srcs' }; // layer name -> bottom sheet
+const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs' }; // layer name -> bottom sheet
 let recent = [];        // /progress list: recently watched titles, latest first
 let searching = 0;      // number of the search shown; 0 = the recent titles are
 let query = '';         // query of the search shown
@@ -457,7 +467,7 @@ function showLayer(name, on) {
   if (name == 'pl') {
     $('pl').classList.toggle('open', on);
     $('full').inert = !on || !!pending;
-    $('collapse').hidden = !on;
+    $('collapse').hidden = $('more').hidden = !on;
   }
 }
 
@@ -467,6 +477,13 @@ const closeTop = () => new Promise(r => {
   addEventListener('popstate', () => r(), { once: true });
   history.back();
 });
+
+// Closes the player along with the sheets opened over it.
+let closingPlayer = null;
+const closePlayer = () => closingPlayer ||= (async () => {
+  while (layers.includes('pl')) await closeTop();
+  closingPlayer = null;
+})();
 
 function closeLayer() {
   const name = layers.pop();
@@ -938,7 +955,7 @@ function renderBar() {
   const m = st?.media;
   $('pl').hidden = !pending && !m;
   if ($('pl').hidden) {
-    if (layers.at(-1) == 'pl') closeTop();
+    if (['pl', 'opt'].includes(layers.at(-1))) closePlayer();
     return;
   }
   $('title').textContent = n?.title ? n.title + epLabel(n) : 'Chromecast';
@@ -946,6 +963,9 @@ function renderBar() {
   if (n?.poster && $('thumb').getAttribute('src') != n.poster) $('thumb').src = n.poster;
   $('full').inert = !layers.includes('pl') || !!pending;
   $('pl').classList.toggle('pending', !!pending);
+  // Settings switched there replay the stream; they wait for it as well.
+  $('optbody').inert = !!pending;
+  $('opts').classList.toggle('pending', !!pending);
   if (pending) {
     $('st').replaceChildren(el('span', { className: 'spin' }), 'Запускаю на ТВ…');
     $('prog').firstChild.style.width = 0;
@@ -1331,6 +1351,11 @@ $('collapse').onclick = e => {
   e.stopPropagation();
   closeTop();
 };
+$('more').onclick = e => {
+  e.stopPropagation();
+  openLayer('opt');
+};
+$('optcollapse').onclick = closeTop;
 $('shade').onclick = closeTop;
 $('vol').oninput = () => drag = 'vol';
 $('vol').onchange = () => {
@@ -1430,7 +1455,7 @@ $('source').onchange = e => {
 async function openNow() {
   const n = st?.now;
   if (!n) return;
-  await closeTop();
+  await closePlayer();
   openDetails({ id: n.id, title: n.title, poster: n.poster });
 }
 $('eplist').onclick = openNow;
