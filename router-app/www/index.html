@@ -455,6 +455,7 @@ const note = text => $('msg').lastChild.textContent = text;
 // back and forward can tell which to close. url: the address of the
 // overlay, if it has its own.
 function openLayer(name, url) {
+  if (backs) return afterBack.push(() => openLayer(name, url));
   if (layers.includes(name)) return;
   layers.push(name);
   history.pushState({ depth: layers.length }, '', url);
@@ -526,10 +527,16 @@ function foldPlayer(open) {
   };
 }
 
-// Closes the topmost overlay through history so the back button stays in sync.
+// Closes the topmost overlay, and steps back in history so the back button
+// stays in sync. The overlay goes at once: browsers report the step back
+// late, iOS Safari about half a second. Overlays opened meanwhile wait for
+// it, or the late step would close them; resolves once history caught up.
+let backs = 0, afterBack = []; // steps asked for and not reported; who waits
 const closeTop = () => new Promise(r => {
   if (!layers.length) return r();
-  addEventListener('popstate', () => r(), { once: true });
+  closeLayer();
+  backs++;
+  afterBack.push(r);
   history.back();
 });
 
@@ -562,6 +569,10 @@ const urlQuery = () => location.pathname == '/search' && new URLSearchParams(loc
 // Brings the page in line with the address and the history entry: after
 // back and forward, and on load.
 function route() {
+  // closeTop has closed the overlays already; the steps it took on the
+  // way back would bring them back.
+  const caughtUp = backs > 0;
+  if (caughtUp && --backs) return;
   const depth = history.state?.depth || 0, id = urlTitle();
   while (layers.length > depth) closeLayer();
   // Forward to a title, or a reload, leaves the page to open again.
@@ -580,6 +591,7 @@ function route() {
     $('qx').hidden = false;
     search(q);
   } else if (!q && searching) showRecent();
+  if (caughtUp) afterBack.splice(0).forEach(f => f());
 }
 window.addEventListener('popstate', route);
 
