@@ -161,7 +161,6 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .dev.on i{visibility:visible}
 #devlist .note{padding:24px}
 #srclist .dev:disabled{opacity:.45}
-#srclist .note{display:flex;align-items:center;justify-content:center;gap:10px;padding:24px}
 .pick{display:flex;gap:6px}
 .pick select{flex:1;min-width:0}
 #styb{flex:none;width:46px;height:46px;border-radius:14px;background:var(--s2);font-weight:700;font-size:15px}
@@ -344,7 +343,7 @@ svg.spring{animation:spring .3s ease-out}
 </section>
 <section id="srcs" class="sheet" hidden>
   <div class="handle"></div>
-  <h2><span id="srctitle"></span></h2>
+  <h2><span>Источник недоступен</span></h2>
   <div id="srclist"></div>
 </section>
 <section id="sty" class="sheet" hidden>
@@ -837,8 +836,7 @@ async function play(m) {
     if (m[k] != null) req[k] = String(m[k]);
   const quality = m.quality ?? localStorage.quality;
   if (quality) req.quality = quality;
-  const source = m.source ?? localStorage.source; // by name, so it carries over episodes
-  if (source) req.source = source;
+  if (m.source) req.source = m.source; // without it the router takes the main player
   const drc = m.drc ?? localStorage.drc; // the router ignores it where it can't level
   if (drc) req.drc = String(drc);
   req.autonext = localStorage.autonext || '1'; // on unless turned off
@@ -879,43 +877,22 @@ async function reloadProgress(id) {
   }
 }
 
-// Starting from the details page asks for the source first. The router
-// remembers the list it shows, so playing costs no second provider request.
-async function start(m) {
-  if (pending) return;
-  arm(); // still inside the tap; the sheet may close it again
-  $('srctitle').textContent = 'Откуда смотреть';
-  $('srclist').replaceChildren(el('p', { className: 'note' }, el('span', { className: 'spin' }), 'Ищу источники…'));
-  openLayer('src');
-  const q = new URLSearchParams({ id: m.id });
-  if (m.season != null) q.set('season', m.season), q.set('episode', m.episode);
-  let names;
-  try {
-    names = (await api(withDevice('streams?' + q))).streams.map(s => s.name);
-  } catch (e) {
-    if (layers.at(-1) == 'src') await closeTop();
-    return toast('Не удалось найти источники: ' + e.message);
-  }
-  if (layers.at(-1) != 'src') return; // closed while loading
-  if (names.length < 2) {
-    await closeTop();
-    return play(m);
-  }
-  showSources(m, names, null);
+// Starting from the details page plays the main player; another source is
+// picked in the player settings.
+function start(m) {
+  arm(); // still inside the tap
+  play(m);
 }
 
-// bad: the source that just failed, if any.
+// bad: the source that just failed.
 function showSources(m, names, bad) {
-  const pref = names.includes(localStorage.source) ? localStorage.source : names[0];
-  $('srctitle').textContent = bad ? 'Источник недоступен' : 'Откуда смотреть';
   $('srclist').replaceChildren(...names.map((n, i) => {
-    const b = el('button', { className: 'dev' + (n == pref && !bad ? ' on' : ''), disabled: n == bad },
+    const b = el('button', { className: 'dev', disabled: n == bad },
       el('span', {}, el('b', {}, n), n == bad ? el('small', {}, 'не открылся') : ''), el('i'));
     b.style.setProperty('--i', i);
     b.onclick = async () => {
       arm();
       await closeTop();
-      localStorage.source = n;
       play({ ...m, source: n });
     };
     return b;
@@ -938,7 +915,7 @@ async function stepEpisode(dir) {
       e = s?.episodes.at(dir > 0 ? 0 : -1);
     }
     if (!e) return toast(dir > 0 ? 'Это последняя серия' : 'Это первая серия');
-    play({ id: now.id, title: now.title, poster: now.poster, season: s.season, episode: e.episode });
+    play({ id: now.id, title: now.title, poster: now.poster, season: s.season, episode: e.episode, source: now.source });
   } catch (e) {
     toast(e);
   }
@@ -1482,7 +1459,6 @@ $('autonext').onchange = async e => {
 };
 // Another source has its own tracks, so audio and subtitles start fresh.
 $('source').onchange = e => {
-  localStorage.source = e.target.value;
   replay({ source: e.target.value, quality: localStorage.quality });
 };
 // The page of what is on, under the player.
