@@ -14,13 +14,18 @@ var ErrInvalidPosterURL = errors.New("invalid poster URL")
 // Poster downloads a poster image from the provider site. The site serves
 // images behind the same anti-bot challenge as its pages, so clients without
 // the session cookies receive the challenge HTML instead of the image.
+//
+// Only the path and query of rawURL are used: the image is always fetched
+// from the current provider host. The provider rotates subdomains, so saved
+// poster links go stale, and no other host can be reached through here.
 func (c *Client) Poster(ctx context.Context, rawURL string) ([]byte, string, error) {
-	baseURL := c.providerURL()
-	target, err := url.Parse(rawURL)
-	if err != nil || target.Scheme != baseURL.Scheme ||
-		!strings.EqualFold(target.Hostname(), baseURL.Hostname()) {
-		return nil, "", fmt.Errorf("%w: must be on %s", ErrInvalidPosterURL, baseURL.Host)
+	source, err := url.Parse(rawURL)
+	if err != nil || (source.Scheme != "http" && source.Scheme != "https") ||
+		strings.Trim(source.Path, "/") == "" {
+		return nil, "", fmt.Errorf("%w: %q", ErrInvalidPosterURL, rawURL)
 	}
+	target := providerOrigin(c.providerURL())
+	target.Path, target.RawPath, target.RawQuery = source.Path, source.RawPath, source.RawQuery
 
 	current, err := c.currentSession()
 	if err != nil {
