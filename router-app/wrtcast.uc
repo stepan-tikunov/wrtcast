@@ -61,7 +61,15 @@ function reply(code, body) {
 	exit(0);
 }
 
-const fail = (code, msg) => reply(code, { error: msg });
+// Run before a failure reply: /play sets it while the state it wrote ahead
+// of castctl must be put back if the play fails.
+let undo = null;
+
+function fail(code, msg) {
+	if (undo)
+		undo();
+	reply(code, { error: msg });
+}
 
 // A state file as JSON, or null when it is missing or cut short (a full /tmp
 // truncates writes, and a parse error would otherwise abort the request).
@@ -1127,11 +1135,10 @@ const routes = {
 			labels[t.id] = t.name;
 		if (p.style != null)
 			push(args, '-y', p.style);
-		let st = castctl(dev, ...args);
-		for (let k in ['audio', 'subs'])
-			if (p[k] != null)
-				st = castctl_try(dev, k, p[k]) ?? st;
-		save(state_file(dev), {
+		// The state goes first: uhttpd may kill us (script_timeout, or the
+		// phone went away) while castctl waits for playback, and the TV then
+		// plays this stream all the same. A failed play puts the last one back.
+		let f = state_file(dev), now = {
 			id, stream: n, source: s.name, url, host: host_of(dev),
 			title: p.title ?? null, season,
 			episode, labels, quality, qualities: map(quals, v => v.label),
@@ -1140,7 +1147,22 @@ const routes = {
 			// Only our own proxy paths, so the UI never loads arbitrary URLs.
 			poster: length(p.poster ?? '') <= 4096 &&
 				match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
-		});
+		};
+		let put_back = () => last ? save(f, last) : unlink(f);
+		save(f, now);
+		undo = put_back;
+		let st = castctl(dev, ...args);
+		undo = null;
+		// castctl found the TV at a new address from DHCP: the state moves to
+		// its key, and the old key gets back what it had.
+		if (host_of(dev) != now.host) {
+			now.host = host_of(dev);
+			save(state_file(dev), now);
+			put_back();
+		}
+		for (let k in ['audio', 'subs'])
+			if (p[k] != null)
+				st = castctl_try(dev, k, p[k]) ?? st;
 		return with_now(st, dev);
 	},
 
