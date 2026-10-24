@@ -30,6 +30,8 @@ if [ "$(uci -q get uhttpd.cast)" != uhttpd ]; then
 fi
 uci -q delete uhttpd.cast.alias || true
 uci add_list uhttpd.cast.alias='/api=/cgi-bin/wrtcast'
+# /search and /title/<id> are the page's own addresses.
+uci set uhttpd.cast.error_page='/index.html'
 # The receiver fetches audio and video segments in parallel with UI polling.
 uci set uhttpd.cast.max_requests='10'
 uci set uhttpd.cast.script_timeout='60'

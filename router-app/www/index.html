@@ -356,6 +356,7 @@ localStorage.removeItem('subStyle'); // older format with colors
 const SHEETS = { dev: 'devs', sty: 'sty', src: 'srcs' }; // layer name -> bottom sheet
 let recent = [];        // /progress list: recently watched titles, latest first
 let searching = 0;      // number of the search shown; 0 = the recent titles are
+let query = '';         // query of the search shown
 localStorage.removeItem('last'); // searches are no longer restored
 localStorage.removeItem('q');
 
@@ -370,7 +371,7 @@ async function api(path, body) {
     o.headers['Content-Type'] = 'application/json';
     o.body = JSON.stringify(body);
   }
-  const r = await fetch('api/' + path, o);
+  const r = await fetch('/api/' + path, o); // pages live at /title/… too
   const j = await r.json().catch(() => ({ error: r.statusText }));
   if (r.status == 401 && (token = prompt('Токен доступа') || '')) {
     localStorage.token = token;
@@ -431,10 +432,13 @@ const note = text => $('msg').lastChild.textContent = text;
 
 // ---- overlays and the back button ----------------------------------------
 
-function openLayer(name) {
+// Every overlay is a history entry; the entry knows how many are open, so
+// back and forward can tell which to close. url: the address of the
+// overlay, if it has its own.
+function openLayer(name, url) {
   if (layers.includes(name)) return;
   layers.push(name);
-  history.pushState({ layer: name }, '');
+  history.pushState({ depth: layers.length }, '', url);
   showLayer(name, true);
 }
 
@@ -463,14 +467,48 @@ const closeTop = () => new Promise(r => {
   history.back();
 });
 
-window.addEventListener('popstate', () => {
+function closeLayer() {
   const name = layers.pop();
-  if (name) showLayer(name, false);
+  showLayer(name, false);
   if (name == 'det') {
     item = null;
     loadRecent(); // what was just watched moves to the front
   }
-});
+}
+
+// ---- addresses ----------------------------------------------------------
+//
+// / is the watch history, /search?q=<query> a search, /title/<id> a title's
+// page over either of them.
+
+const titleUrl = id => '/title/' + encodeURIComponent(id);
+const searchUrl = q => '/search?q=' + encodeURIComponent(q);
+const urlTitle = () => /^\/title\/([^/]+)$/.exec(location.pathname)?.[1];
+const urlQuery = () => location.pathname == '/search' && new URLSearchParams(location.search).get('q') || '';
+
+// Brings the page in line with the address and the history entry: after
+// back and forward, and on load.
+function route() {
+  const depth = history.state?.depth || 0, id = urlTitle();
+  while (layers.length > depth) closeLayer();
+  // Forward to a title, or a reload, leaves the page to open again.
+  if (!id && layers.includes('det')) while (layers.length) closeLayer();
+  if (id && !layers.includes('det')) {
+    while (layers.length) closeLayer();
+    layers.push('det');
+    showLayer('det', true);
+  }
+  if (id && item?.id != decodeURIComponent(id)) openDetails({ id: decodeURIComponent(id) });
+  // Overlays forward of here are not brought back.
+  if (depth != layers.length) history.replaceState({ ...history.state, depth: layers.length }, '');
+  const q = urlQuery();
+  if (q && q != query) {
+    $('q').value = q;
+    $('qx').hidden = false;
+    search(q);
+  } else if (!q && searching) showRecent();
+}
+window.addEventListener('popstate', route);
 
 // ---- search -------------------------------------------------------------
 
@@ -542,6 +580,7 @@ function renderRecent() {
 
 function showRecent() {
   searching = 0;
+  query = '';
   $('q').value = '';
   $('qx').hidden = true;
   renderRecent();
@@ -559,6 +598,7 @@ function markPlaying() {
 
 async function search(q) {
   const n = searching = Date.now();
+  query = q;
   $('msg').hidden = $('rtitle').hidden = true;
   $('grid').replaceChildren(...Array.from({ length: 9 }, () =>
     el('div', {}, el('span', { className: 'sk' }), el('span', { className: 'skl' }), el('span', { className: 'skl' }))));
@@ -601,7 +641,7 @@ function renderInfo(t) {
 // or a series is only known once /title answers.
 async function openDetails(m) {
   item = m;
-  $('dtitle').textContent = m.title;
+  $('dtitle').textContent = m.title || '';
   $('dmeta').textContent = m.year || '';
   const showPoster = p => {
     $('dposter').hidden = !p;
@@ -615,7 +655,9 @@ async function openDetails(m) {
   $('dinfo').replaceChildren(...[1, 2, 3].map(() => el('span', { className: 'skl' })));
   // The blurred backdrop overflows .top; older engines can still scroll it.
   $('det').scrollTop = $('det').firstElementChild.scrollTop = 0;
-  openLayer('det');
+  // From the player the page may already be open with another title.
+  if (!layers.includes('det')) openLayer('det', titleUrl(m.id));
+  else if (urlTitle() != encodeURIComponent(m.id)) history.replaceState(history.state, '', titleUrl(m.id));
   // Watch progress changes between visits, so unlike /title it isn't cached.
   const prog = api('progress?id=' + encodeURIComponent(m.id)).then(r => r.progress, () => null);
   let t;
@@ -630,6 +672,7 @@ async function openDetails(m) {
   // A saved poster can point at a host the provider has since left.
   if (t.poster && t.poster != m.poster) showPoster(t.poster);
   Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: t.poster || m.poster });
+  $('dtitle').textContent = t.title; // opened by its address, the page knew only the id
   renderInfo(t);
   renderDetails();
   if (t.type != 'series') return;
@@ -1247,8 +1290,18 @@ $('f').onsubmit = e => {
   const q = $('q').value.trim();
   if (q.length < 3) return toast('Введите хотя бы 3 символа');
   $('q').blur();
+  // The first search is a step back from the history; the next ones replace it.
+  if (q == query); // a retry
+  else if (searching) history.replaceState(history.state, '', searchUrl(q));
+  else history.pushState({ depth: 0, search: 1 }, '', searchUrl(q));
   search(q);
 };
+// Back to the history: through back, if the search was entered here.
+function clearSearch() {
+  if (history.state?.search) history.back();
+  else history.replaceState({ depth: 0 }, '', '/');
+  showRecent();
+}
 document.querySelectorAll('[data-c]').forEach(b => b.onclick = e => {
   e.stopPropagation();
   const c = b.dataset.c;
@@ -1385,12 +1438,19 @@ document.addEventListener('visibilitychange', () => {
 });
 $('q').oninput = () => {
   $('qx').hidden = !$('q').value;
-  if (!$('q').value && searching) showRecent();
+  if (!$('q').value && searching) clearSearch();
 };
 $('qx').onclick = () => {
-  showRecent();
+  clearSearch();
   $('q').focus();
 };
+// Opened by a title's address, back leads to the history underneath.
+if (urlTitle() && !history.state) {
+  const url = location.href;
+  history.replaceState({ depth: 0 }, '', '/');
+  history.pushState({ depth: 1 }, '', url);
+}
+route();
 poll();
 loadRecent();
 loadDevices(false);
