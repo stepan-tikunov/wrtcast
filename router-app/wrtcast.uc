@@ -154,7 +154,10 @@ function discover() {
 	list = map(list, d => ({
 		id: d.id, name: d.name, model: d.model, host: d.host, port: d.port,
 	}));
-	writefile(DEVICES, sprintf('%J', { time: time(), devices: list }));
+	// A TV in standby may miss the scan; an empty one keeps the last devices
+	// for lookups, but without a fresh time, so /devices scans again.
+	if (length(list) || !length(cached() ?? []))
+		save(DEVICES, { time: time(), devices: list });
 	return list;
 }
 
@@ -187,10 +190,16 @@ function device(p) {
 	if (want == '')
 		want = CAST_HOST;
 	if (want != '' && is_host(want)) {
+		// A bare address means castctl's default port, so a TV keeps one
+		// state key whether or not the last discovery saw it (a speaker
+		// group on the same address has a port of its own).
+		if (index(want, ':') < 0)
+			want += ':8009';
 		for (let d in cached() ?? [])
 			if (want == d.host || want == `${d.host}:${d.port}`)
 				return d;
-		return { host: want };
+		let m = match(want, /^([^:]+):([0-9]+)$/);
+		return m ? { host: m[1], port: +m[2] } : { host: want };
 	}
 	let d = pick(cached(), want) ?? pick(discover(), want);
 	if (!d)
@@ -423,7 +432,9 @@ function tick() {
 	for (let name in lsdir('/tmp') ?? []) {
 		let k = match(name, /^wrtcast\.now\.(.+)$/)?.[1];
 		let now = k ? load(STATE + k) : null;
-		if (!now?.host || !now.url)
+		// The key must be the host's own: save() leaves "<key>.<ns>" temp
+		// files for a moment, and host keys have dots too.
+		if (!now?.host || !now.url || state_key({ host: now.host }) != k)
 			continue;
 		let w = load(WATCH + k);
 		let misses = w?.url == now.url ? w.misses : 0;
@@ -460,7 +471,7 @@ function with_now(st, dev) {
 		now.variants = v;
 		now.qualities = map(v, x => x.label);
 		now.quality = 'auto';
-		writefile(state_file(dev), sprintf('%J', now));
+		save(state_file(dev), now);
 	}
 	st.now = {
 		id: now.id, stream: now.stream, title: now.title, poster: now.poster,
@@ -1120,7 +1131,7 @@ const routes = {
 		for (let k in ['audio', 'subs'])
 			if (p[k] != null)
 				st = castctl_try(dev, k, p[k]) ?? st;
-		writefile(state_file(dev), sprintf('%J', {
+		save(state_file(dev), {
 			id, stream: n, source: s.name, url, host: host_of(dev),
 			title: p.title ?? null, season,
 			episode, labels, quality, qualities: map(quals, v => v.label),
@@ -1129,7 +1140,7 @@ const routes = {
 			// Only our own proxy paths, so the UI never loads arbitrary URLs.
 			poster: length(p.poster ?? '') <= 4096 &&
 				match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
-		}));
+		});
 		return with_now(st, dev);
 	},
 
