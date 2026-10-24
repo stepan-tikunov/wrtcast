@@ -312,6 +312,7 @@ svg.spring{animation:spring .3s ease-out}
     <div class="row"><div class="sel"><label for="audio">Озвучка</label><select id="audio"></select></div><div class="sel"><label for="subs">Субтитры</label><div class="pick"><select id="subs"></select><button class="ib" id="styb" aria-label="Вид субтитров">Aa</button></div></div></div>
     <div class="row" id="qrow"><div class="sel" id="srcsel"><label for="source">Источник</label><select id="source"></select></div><div class="sel" id="qsel"><label for="quality">Качество</label><select id="quality"></select></div></div>
     <div class="row" id="drcrow" hidden><label class="sw"><span>Выравнивать громкость<small>Тише музыка и взрывы, громче речь</small></span><input type="checkbox" id="drc"></label></div>
+    <div class="row" id="nextrow" hidden><label class="sw"><span>Следующая серия<small>Включится сама, когда эта закончится</small></span><input type="checkbox" id="autonext"></label></div>
     <div class="row" id="eprow"><button class="pill" id="eplist"><svg><use href="#i-list"/></svg>Серии</button></div>
     <button id="stop" data-c="stop">Остановить</button>
     <button id="devname"><svg><use href="#i-tv"/></svg><span></span></button>
@@ -789,6 +790,7 @@ async function play(m) {
   if (source) req.source = source;
   const drc = m.drc ?? localStorage.drc; // the router ignores it where it can't level
   if (drc) req.drc = String(drc);
+  req.autonext = localStorage.autonext || '1'; // on unless turned off
   req.style = styleSpec(subStyle || {}); // the receiver resets it on every load
   if (m.season != null) Object.assign(req, { season: String(m.season), episode: m.episode });
   pending = req;
@@ -796,19 +798,9 @@ async function play(m) {
   try {
     const s = await api(withDevice('play'), req);
     pending = null;
+    const moved = otherEpisode(s); // then render reloads it
     render(s);
-    loadRecent();
-    // The details page stays open; the router may have just marked the
-    // previous episode watched.
-    if (item?.id == m.id) {
-      const shown = item;
-      const { progress } = await api('progress?id=' + encodeURIComponent(m.id)).catch(() => ({}));
-      if (item == shown && progress !== undefined) {
-        item.progress = progress;
-        renderDetails();
-        renderEpisodes();
-      }
-    }
+    if (!moved) reloadProgress(m.id);
   } catch (e) {
     pending = null;
     refresh();
@@ -819,6 +811,20 @@ async function play(m) {
       openLayer('src');
       showSources(m, sources, bad);
     } else toast('Не удалось запустить: ' + e.message);
+  }
+}
+
+// The details page stays open; the router may have just marked the
+// previous episode watched.
+async function reloadProgress(id) {
+  loadRecent();
+  if (item?.id != id) return;
+  const shown = item;
+  const { progress } = await api('progress?id=' + encodeURIComponent(id)).catch(() => ({}));
+  if (item == shown && progress !== undefined) {
+    item.progress = progress;
+    renderDetails();
+    renderEpisodes();
   }
 }
 
@@ -959,8 +965,18 @@ function refresh() {
   renderEpisodes();
 }
 
+// Another episode of the same series is on than the last one seen, e.g.
+// the router started the next one itself (with nothing on in between).
+let lastNow = null;
+function otherEpisode(s) {
+  const was = lastNow, n = s.now;
+  return !!(was && n && n.id == was.id && (n.season != was.season || n.episode != was.episode));
+}
+
 let autoArmed = false;
 function render(s) {
+  if (otherEpisode(s)) reloadProgress(s.now.id);
+  if (s.now) lastNow = s.now;
   st = s;
   statusAt = Date.now();
   // Something is already on after a reload: try the widget right away. iOS
@@ -976,6 +992,8 @@ function render(s) {
   if (!m) return;
   const series = s.now?.season != null;
   $('eprow').hidden = !series;
+  $('nextrow').hidden = !series;
+  $('autonext').checked = !!s.now?.autonext;
   $('ctl').classList.toggle('series', series);
   for (const b of document.querySelectorAll('.ep-nav')) b.hidden = !series;
   if (drag != 'vol' && s.volume != null) $('vol').value = Math.round(s.volume * 100);
@@ -1393,6 +1411,15 @@ $('quality').onchange = e => {
 $('drc').onchange = e => {
   localStorage.drc = e.target.checked ? '1' : '0';
   replay({ drc: localStorage.drc, audio: activeTrack('AUDIO'), subs: activeTrack('TEXT') || 'off' });
+};
+// The router starts the next episode itself, also with the page closed.
+$('autonext').onchange = async e => {
+  localStorage.autonext = e.target.checked ? '1' : '0';
+  try {
+    render(await api(withDevice('autonext'), { on: localStorage.autonext }));
+  } catch (err) {
+    toast(err);
+  }
 };
 // Another source has its own tracks, so audio and subtitles start fresh.
 $('source').onchange = e => {

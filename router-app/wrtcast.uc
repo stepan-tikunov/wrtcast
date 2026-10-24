@@ -13,6 +13,8 @@ const STATE = '/tmp/wrtcast.now.';         // + host key; what /play started
 const SUBS = '/tmp/wrtcast.subs.';         // + host key; subtitle URLs for /sub
 const LIST = '/tmp/wrtcast.list.';         // + host key; streams last asked for
 const WATCH = '/tmp/wrtcast.watch.';       // + host key; failed tick checks
+const SEEN = '/tmp/wrtcast.seen.';         // + host key; when what /play started last played
+const NEXT = '/tmp/wrtcast.next.';         // + host key; lock while the next episode starts
 const PROGRESS = '/tmp/wrtcast.progress.json'; // watch progress, copied to flash
 const MAX_TITLES = 200;                      // progress kept for this many titles
 const MAX_EPISODES = 50;                     // and this many episodes of each
@@ -436,6 +438,46 @@ function next_episode(id, season, episode) {
 	flush(P, true);
 }
 
+// Whether the episode now has played to the end and the next one is due
+// (see play_next). The receiver drops the media session at the end, so the
+// end is told by the episode going away within its last minute and a half
+// about when it would have run out, while playing, not stopped from the
+// page (which forgets seen) or with another reason, and with the media
+// receiver still up (casting not ended).
+function ended(now, st, seen) {
+	let m = st.media, left = seen?.dur - seen?.pos, ago = time() - (seen?.t ?? 0);
+	if (!now.autonext || now.season == null || now.next_at ||
+	    st.app?.id != 'CC1AD845')
+		return false;
+	if (m && ((m.url ?? '') != '' && m.url != now.url ||
+	          m.state != 'IDLE' || m.idleReason && m.idleReason != 'FINISHED'))
+		return false;
+	return !!seen?.playing && seen.url == now.url && seen.dur > 0 &&
+		left <= 90 && ago < 600 && (m?.idleReason == 'FINISHED' || ago >= left - 10);
+}
+
+// Records when now was last seen on the TV and, once it has ended, starts
+// the next episode. Another process does that, so the status request or
+// the tick neither waits for title-api and the TV nor fails with them; a
+// lock keeps polls and ticks from starting it twice.
+function watch_end(now, st) {
+	let key = state_key({ host: now.host }), m = st.media;
+	if (m?.url == now.url && index(['PLAYING', 'BUFFERING', 'PAUSED'], m.state) >= 0) {
+		let active = type => now.labels?.[filter(m.tracks ?? [], t => t.type == type && t.active)[0]?.name];
+		save(SEEN + key, {
+			url: now.url, pos: +(m.time ?? 0), dur: +(m.duration ?? 0),
+			playing: m.state != 'PAUSED', t: time(),
+			audio: active('AUDIO'), subs: active('TEXT'),
+		});
+		return;
+	}
+	if (!ended(now, st, load(SEEN + key)))
+		return;
+	let lock = NEXT + key;
+	system(`(mkdir ${shq(lock)} && { ${shq(sourcepath())} next ${shq(key)}; ` +
+	       `rmdir ${shq(lock)}; }) </dev/null >/dev/null 2>&1 &`);
+}
+
 // The position to resume a movie or an episode from; null to start over.
 function resume_at(id, season, episode) {
 	let e = progress().titles[id];
@@ -459,7 +501,9 @@ function tick() {
 		let misses = w?.url == now.url ? w.misses : 0;
 		if (misses >= 5)
 			continue;
-		let m = castctl_try({ host: now.host }, 'status')?.media;
+		let st = castctl_try({ host: now.host }, 'status'), m = st?.media;
+		if (st)
+			watch_end(now, st);
 		if (m?.url == now.url)
 			remember(now, m);
 		misses = m?.url == now.url && m.state != 'IDLE' ? 0 : misses + 1;
@@ -479,6 +523,8 @@ function tick() {
 function with_now(st, dev) {
 	st.device = { id: dev.id ?? null, name: dev.name ?? host_of(dev) };
 	let now = load(state_file(dev));
+	if (now)
+		watch_end(now, st);
 	if (!now || !st.media || st.media.url != now.url)
 		return st;
 	// Started before qualities were recorded: look them up once from the
@@ -500,6 +546,8 @@ function with_now(st, dev) {
 		sources: map(now.streams ?? [], s => s.name),
 		// Whether the volume leveler is on, and whether the source allows it.
 		drc: !!now.drc, drc_ok: !!now.drc_ok,
+		// Whether the router starts the next episode once this one ends.
+		autonext: !!now.autonext,
 	};
 	for (let t in st.media.tracks ?? []) {
 		t.label = now.labels?.[t.name] ?? t.name;
@@ -938,9 +986,11 @@ function proxy(name, u, q, h, drc) {
 	exit(0);
 }
 
-// Absolute proxy base for URLs handed to the receiver.
+// Absolute proxy base for URLs handed to the receiver. play_next has no
+// request and takes the base of the last play.
+let next_base = null;
 function public_base() {
-	return rtrim(conf('public_url', '') || `http://${getenv('HTTP_HOST')}`, '/');
+	return next_base ?? rtrim(conf('public_url', '') || `http://${getenv('HTTP_HOST')}`, '/');
 }
 
 // Poster images sit behind the provider's anti-bot page; title-api fetches
@@ -950,6 +1000,190 @@ function poster(u) {
 		return null;
 	let via_api = `${API}/v1/posters?url=${urlenc(u)}`;
 	return PROXY ? purl(via_api, null, 'poster.jpg') : via_api;
+}
+
+// Starts a movie or an episode; play also switches the quality or the source
+// of what is on: with reuse=1 it takes the streams from the last play of the
+// same title if they are still fresh (title-api keeps synthetic masters for
+// 6 hours), and start/audio/subs restore the position and tracks. keep, from
+// play_next: { audio, subs } track names to pick when audio/subs are not
+// given.
+function play(dev, p, keep) {
+	let id = title_id(p), season = null, episode = null;
+	if (p.season != null || p.episode != null) {
+		if (!match(p.season ?? '', /^[0-9]{1,4}$/) ||
+		    !match(p.episode ?? '', /^[0-9A-Za-z._-]{1,16}$/))
+			fail(400, 'invalid season or episode');
+		season = +p.season;
+		episode = p.episode;
+	}
+	for (let k in ['audio', 'subs'])
+		if (p[k] != null && !match(p[k], /^[0-9A-Za-z._-]{1,64}$/))
+			fail(400, `invalid ${k}`);
+	if (p.start != null && !match(p.start, /^[0-9]+(\.[0-9]+)?$/))
+		fail(400, 'invalid start');
+	if (p.quality != null && !match(p.quality, /^(auto|[0-9]{3,4}p)$/))
+		fail(400, 'invalid quality');
+	if (p.style != null && !valid_style(p.style))
+		fail(400, 'invalid subtitle style');
+	if (p.source != null && (length(p.source) > 100 || match(p.source, /[[:cntrl:]]/)))
+		fail(400, 'invalid source');
+	for (let k in ['drc', 'autonext'])
+		if (p[k] != null && !match(p[k], /^[01]$/))
+			fail(400, `invalid ${k}`);
+	let last = load(state_file(dev));
+	let list, fetched;
+	if (p.reuse == '1' && last?.streams && last.id == id &&
+	    last.season == season && last.episode == episode &&
+	    time() - last.fetched < 19800) {
+		list = last.streams;
+		fetched = last.fetched;
+	} else {
+		let c = title_streams(dev, id, season, episode);
+		list = c.streams;
+		fetched = c.fetched;
+	}
+	// The source is picked by name, so a preference survives episodes
+	// whose stream order differs; stream=<n> is the fallback.
+	let n = 0;
+	for (let i, x in list)
+		if (p.source != null ? x.name == p.source : i == +(p.stream ?? 0))
+			n = i;
+	let s = list[n];
+	if (!s || !s.url)
+		fail(404, 'stream not found');
+	// The next episode started by the router keeps the dub and the
+	// subtitles of the last one, found by name: track ids may differ.
+	if (keep?.audio && p.audio == null)
+		p.audio = filter(s.audio, a => a.name == keep.audio)[0]?.id;
+	let ks = keep?.subs ? filter(s.subs, t => t.url && t.name == keep.subs)[0] : null;
+	if (ks && p.subs == null)
+		p.subs = 'sub' + ks.id;
+	let h = s.headers ?? '';
+	if (s.variants == null) {
+		// title-api assembles a source's master on first request; a
+		// source the CDN rejects fails here instead of on the TV.
+		let body = fetch_text(s.url, h), v = qualities(body);
+		if (v == null)
+			reply(502, { error: 'source unavailable', source: s.name,
+				sources: map(list, x => x.name) });
+		s.variants = v;
+		s.fmp4 = is_fmp4(s.url, body, h);
+		s.drc = PROXY && !s.fmp4 && drc_supported(s.url, body, h);
+	}
+	let drc = p.drc == '1' && !!s.drc;
+	let quals = s.variants;
+	// The best quality unless asked otherwise; a missing one falls back
+	// to the best below it.
+	let quality = p.quality ?? quals[0]?.label ?? 'auto', width = null;
+	if (quality != 'auto') {
+		let want = +replace(quality, 'p', '');
+		let v = filter(quals, v => +replace(v.label, 'p', '') <= want)[0] ?? quals[-1];
+		quality = v?.label ?? 'auto';
+		width = v?.width;
+	}
+	let url = PROXY ? purl(s.url, public_base(), null, h) +
+		(width ? `&q=${width}` : '') + (drc ? '&drc=1' : '') : s.url;
+	// Subtitles are separate WebVTT files, not part of the HLS manifest,
+	// so they are side-loaded; the receiver names them "sub<id>".
+	let args = ['play', url], labels = {};
+	// Without start (or reuse) the title resumes where it was left off;
+	// start=0 plays it from the beginning.
+	let start = p.start ?? (p.reuse == '1' ? null : resume_at(id, season, episode));
+	if (season != null)
+		next_episode(id, season, episode);
+	if (+(start ?? 0) > 0)
+		push(args, '-p', sprintf('%.1f', +start));
+	if (s.fmp4)
+		push(args, '-f', 'fmp4');
+	// Signed subtitle URLs can be ~2 KB each through the proxy, too much
+	// for the 64 KB LOAD message, so the receiver gets short /sub/<tv>/<n>
+	// links that look the real URL up in a file written beforehand.
+	let picked = pick_subs(s.subs);
+	writefile(SUBS + state_key(dev), sprintf('%J', {
+		urls: map(picked, t => t.url), headers: h,
+	}));
+	for (let i, t in picked) {
+		push(args, '-s', PROXY ? `${public_base()}/api/sub/${state_key(dev)}/${i}.vtt` : t.url,
+		     t.lang || 'und', 'sub' + t.id);
+		labels['sub' + t.id] = t.name;
+	}
+	for (let t in s.audio)
+		labels[t.id] = t.name;
+	if (p.style != null)
+		push(args, '-y', p.style);
+	// The state goes first: uhttpd may kill us (script_timeout, or the
+	// phone went away) while castctl waits for playback, and the TV then
+	// plays this stream all the same. A failed play puts the last one back.
+	let f = state_file(dev), now = {
+		id, stream: n, source: s.name, url, host: host_of(dev),
+		title: p.title ?? null, season,
+		episode, labels, quality, qualities: map(quals, v => v.label),
+		drc, drc_ok: !!s.drc,
+		// Kept for the next episode the router starts itself (see play_next).
+		// Without autonext a replay of the same title (an older page)
+		// keeps what was set.
+		autonext: p.autonext != null ? p.autonext == '1' : last?.id == id && !!last.autonext,
+		style: p.style ?? null,
+		streams: list, fetched,
+		// Only our own proxy paths, so the UI never loads arbitrary URLs.
+		poster: length(p.poster ?? '') <= 4096 &&
+			match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
+	};
+	let put_back = () => last ? save(f, last) : unlink(f);
+	save(f, now);
+	undo = put_back;
+	let st = castctl(dev, ...args);
+	undo = null;
+	// castctl found the TV at a new address from DHCP: the state moves to
+	// its key, and the old key gets back what it had.
+	if (host_of(dev) != now.host) {
+		now.host = host_of(dev);
+		save(state_file(dev), now);
+		put_back();
+	}
+	for (let k in ['audio', 'subs'])
+		if (p[k] != null)
+			st = castctl_try(dev, k, p[k]) ?? st;
+	return with_now(st, dev);
+}
+
+// Plays the episode after the one that has just ended on the TV of key (see
+// ended), crossing into the next season, with the source, quality, leveler,
+// subtitle style, dub and subtitles of the last one.
+function play_next(key) {
+	let f = STATE + key, now = load(f), seen = load(SEEN + key);
+	let dev = { host: now?.host }, st = now?.host ? castctl_try(dev, 'status') : null;
+	if (!st || !ended(now, st, seen))
+		return;
+	// One try per episode: a failed play puts this state back, and a
+	// failure here leaves it as well.
+	now.next_at = time();
+	save(f, now);
+	let S = api(`/v1/titles/${now.id}`).seasons ?? [], si = -1, ei = -1;
+	for (let i, x in S)
+		if (`${x.seasonNumber}` == `${now.season}`) {
+			si = i;
+			for (let j, e in x.episodes ?? [])
+				if (`${e.episodeNumber}` == `${now.episode}`)
+					ei = j;
+		}
+	if (si < 0 || ei < 0)
+		return;
+	let s = S[si], e = s.episodes[ei + 1];
+	if (!e) {
+		s = S[si + 1];
+		e = s?.episodes?.[0];
+	}
+	if (!e)
+		return; // the last episode
+	next_base = match(now.url, /^(.*)\/api\/p\//)?.[1];
+	play(dev, {
+		id: now.id, title: now.title, poster: now.poster,
+		season: `${s.seasonNumber}`, episode: `${e.episodeNumber}`,
+		source: now.source, quality: now.quality, drc: now.drc ? '1' : '0',
+		autonext: '1', style: now.style,
+	}, { audio: seen.audio, subs: seen.subs });
 }
 
 const routes = {
@@ -1045,136 +1279,18 @@ const routes = {
 		return with_now(castctl(dev, 'status'), dev);
 	},
 
-	// play also switches the quality or the source of what is on: with
-	// reuse=1 it takes the streams from the last play of the same title if
-	// they are still fresh (title-api keeps synthetic masters for 6 hours),
-	// and start/audio/subs restore the position and tracks.
-	'POST /play': p => {
-		let id = title_id(p), season = null, episode = null;
-		if (p.season != null || p.episode != null) {
-			if (!match(p.season ?? '', /^[0-9]{1,4}$/) ||
-			    !match(p.episode ?? '', /^[0-9A-Za-z._-]{1,16}$/))
-				fail(400, 'invalid season or episode');
-			season = +p.season;
-			episode = p.episode;
+	'POST /play': p => play(device(p), p),
+
+	// Turns the next episode on or off for what is on (see ended).
+	'POST /autonext': p => {
+		if (!match(p.on ?? '', /^[01]$/))
+			fail(400, 'invalid on');
+		let dev = device(p), f = state_file(dev), now = load(f);
+		if (now) {
+			now.autonext = p.on == '1';
+			save(f, now);
 		}
-		for (let k in ['audio', 'subs'])
-			if (p[k] != null && !match(p[k], /^[0-9A-Za-z._-]{1,64}$/))
-				fail(400, `invalid ${k}`);
-		if (p.start != null && !match(p.start, /^[0-9]+(\.[0-9]+)?$/))
-			fail(400, 'invalid start');
-		if (p.quality != null && !match(p.quality, /^(auto|[0-9]{3,4}p)$/))
-			fail(400, 'invalid quality');
-		if (p.style != null && !valid_style(p.style))
-			fail(400, 'invalid subtitle style');
-		if (p.source != null && (length(p.source) > 100 || match(p.source, /[[:cntrl:]]/)))
-			fail(400, 'invalid source');
-		if (p.drc != null && !match(p.drc, /^[01]$/))
-			fail(400, 'invalid drc');
-		let dev = device(p);
-		let last = load(state_file(dev));
-		let list, fetched;
-		if (p.reuse == '1' && last?.streams && last.id == id &&
-		    last.season == season && last.episode == episode &&
-		    time() - last.fetched < 19800) {
-			list = last.streams;
-			fetched = last.fetched;
-		} else {
-			let c = title_streams(dev, id, season, episode);
-			list = c.streams;
-			fetched = c.fetched;
-		}
-		// The source is picked by name, so a preference survives episodes
-		// whose stream order differs; stream=<n> is the fallback.
-		let n = 0;
-		for (let i, x in list)
-			if (p.source != null ? x.name == p.source : i == +(p.stream ?? 0))
-				n = i;
-		let s = list[n];
-		if (!s || !s.url)
-			fail(404, 'stream not found');
-		let h = s.headers ?? '';
-		if (s.variants == null) {
-			// title-api assembles a source's master on first request; a
-			// source the CDN rejects fails here instead of on the TV.
-			let body = fetch_text(s.url, h), v = qualities(body);
-			if (v == null)
-				reply(502, { error: 'source unavailable', source: s.name,
-					sources: map(list, x => x.name) });
-			s.variants = v;
-			s.fmp4 = is_fmp4(s.url, body, h);
-			s.drc = PROXY && !s.fmp4 && drc_supported(s.url, body, h);
-		}
-		let drc = p.drc == '1' && !!s.drc;
-		let quals = s.variants;
-		// The best quality unless asked otherwise; a missing one falls back
-		// to the best below it.
-		let quality = p.quality ?? quals[0]?.label ?? 'auto', width = null;
-		if (quality != 'auto') {
-			let want = +replace(quality, 'p', '');
-			let v = filter(quals, v => +replace(v.label, 'p', '') <= want)[0] ?? quals[-1];
-			quality = v?.label ?? 'auto';
-			width = v?.width;
-		}
-		let url = PROXY ? purl(s.url, public_base(), null, h) +
-			(width ? `&q=${width}` : '') + (drc ? '&drc=1' : '') : s.url;
-		// Subtitles are separate WebVTT files, not part of the HLS manifest,
-		// so they are side-loaded; the receiver names them "sub<id>".
-		let args = ['play', url], labels = {};
-		// Without start (or reuse) the title resumes where it was left off;
-		// start=0 plays it from the beginning.
-		let start = p.start ?? (p.reuse == '1' ? null : resume_at(id, season, episode));
-		if (season != null)
-			next_episode(id, season, episode);
-		if (+(start ?? 0) > 0)
-			push(args, '-p', sprintf('%.1f', +start));
-		if (s.fmp4)
-			push(args, '-f', 'fmp4');
-		// Signed subtitle URLs can be ~2 KB each through the proxy, too much
-		// for the 64 KB LOAD message, so the receiver gets short /sub/<tv>/<n>
-		// links that look the real URL up in a file written beforehand.
-		let picked = pick_subs(s.subs);
-		writefile(SUBS + state_key(dev), sprintf('%J', {
-			urls: map(picked, t => t.url), headers: h,
-		}));
-		for (let i, t in picked) {
-			push(args, '-s', PROXY ? `${public_base()}/api/sub/${state_key(dev)}/${i}.vtt` : t.url,
-			     t.lang || 'und', 'sub' + t.id);
-			labels['sub' + t.id] = t.name;
-		}
-		for (let t in s.audio)
-			labels[t.id] = t.name;
-		if (p.style != null)
-			push(args, '-y', p.style);
-		// The state goes first: uhttpd may kill us (script_timeout, or the
-		// phone went away) while castctl waits for playback, and the TV then
-		// plays this stream all the same. A failed play puts the last one back.
-		let f = state_file(dev), now = {
-			id, stream: n, source: s.name, url, host: host_of(dev),
-			title: p.title ?? null, season,
-			episode, labels, quality, qualities: map(quals, v => v.label),
-			drc, drc_ok: !!s.drc,
-			streams: list, fetched,
-			// Only our own proxy paths, so the UI never loads arbitrary URLs.
-			poster: length(p.poster ?? '') <= 4096 &&
-				match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
-		};
-		let put_back = () => last ? save(f, last) : unlink(f);
-		save(f, now);
-		undo = put_back;
-		let st = castctl(dev, ...args);
-		undo = null;
-		// castctl found the TV at a new address from DHCP: the state moves to
-		// its key, and the old key gets back what it had.
-		if (host_of(dev) != now.host) {
-			now.host = host_of(dev);
-			save(state_file(dev), now);
-			put_back();
-		}
-		for (let k in ['audio', 'subs'])
-			if (p[k] != null)
-				st = castctl_try(dev, k, p[k]) ?? st;
-		return with_now(st, dev);
+		return with_now(castctl(dev, 'status'), dev);
 	},
 
 	'POST /cmd': p => {
@@ -1182,6 +1298,9 @@ const routes = {
 		if (!exists(COMMANDS, c))
 			fail(400, 'unknown command');
 		let dev = device(p);
+		// Stopped from the page, the episode has not ended (see ended).
+		if (c == 'stop' || c == 'quit')
+			unlink(SEEN + state_key(dev));
 		if (kind == null)
 			return with_now(castctl(dev, c), dev);
 		if (kind == 'num' && !match(arg, /^[0-9]+(\.[0-9]+)?$/))
@@ -1196,6 +1315,10 @@ const routes = {
 
 if (ARGV[0] == 'tick') {
 	tick();
+	exit(0);
+}
+if (ARGV[0] == 'next' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
+	play_next(ARGV[1]);
 	exit(0);
 }
 
