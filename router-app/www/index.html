@@ -485,7 +485,9 @@ function showLayer(name, on) {
 // controls slide in and out below it, past the bottom edge. Everything that
 // differs between the two goes along with the slide: the panel's background
 // uncovers the handle above the bar, so its top edge with the progress line
-// on it moves without a jump, the poster grows, the buttons swap.
+// on it moves without a jump, the poster grows, the buttons swap. Below the
+// bar the panel is cut where the mini player ends: on a desktop it floats
+// above the bottom edge, and the controls would show under it.
 let slide = [];
 function foldPlayer(open) {
   const p = $('pl'), t = $('title').parentNode, box = e => e.getBoundingClientRect();
@@ -507,10 +509,21 @@ function foldPlayer(open) {
   if (p.hidden || m.y == f.y || matchMedia('(prefers-reduced-motion:reduce)').matches) return done();
   const k = (from - f.y) / (m.y - f.y), to = open ? 0 : 1; // 0 open, 1 mini
   const gap = (f.y - f.edge) - (m.y - m.edge), s = f.w ? m.w / f.w : 1;
+  const r = getComputedStyle(p).borderBottomLeftRadius;
   const opt = { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)' };
   const go = (e, at) => e.animate([at(k), at(to)], opt);
   slide = [
-    go(p, k => ({ transform: `translateY(${k * (m.y - f.y)}px)` })),
+    // Room above for the shadow.
+    go(p, k => ({
+      transform: `translateY(${k * (m.y - f.y)}px)`,
+      clipPath: `inset(-60px 0 ${k * (m.y - f.y)}px round 0 0 ${r} ${r})`,
+    })),
+    // Gone by the middle of the slide: it shows under the bar till the end.
+    $('full').animate([
+      { opacity: Math.max(0, 1 - 2 * k) },
+      ...(k - .5) * (to - .5) < 0 ? [{ opacity: 0, offset: (.5 - k) / (to - k) }] : [],
+      { opacity: Math.max(0, 1 - 2 * to) },
+    ], opt),
     go($('plbg'), k => ({ transform: `translateY(${k * gap}px)` })),
     go($('handle'), k => ({ opacity: 1 - k })),
     go($('prog'), k => ({ opacity: k })),
