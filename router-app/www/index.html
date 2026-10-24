@@ -603,9 +603,12 @@ async function openDetails(m) {
   item = m;
   $('dtitle').textContent = m.title;
   $('dmeta').textContent = m.year || '';
-  $('dposter').hidden = !m.poster;
-  $('dposter').src = m.poster || '';
-  $('dbg').style.backgroundImage = m.poster ? `url("${m.poster}")` : 'none';
+  const showPoster = p => {
+    $('dposter').hidden = !p;
+    $('dposter').src = p || '';
+    $('dbg').style.backgroundImage = p ? `url("${p}")` : 'none';
+  };
+  showPoster(m.poster);
   $('dplay').hidden = $('dfrom0').hidden = true;
   $('seasons').replaceChildren();
   $('eps').replaceChildren();
@@ -624,7 +627,9 @@ async function openDetails(m) {
     return toast(e);
   }
   if (item != m) return;
-  Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: m.poster || t.poster });
+  // A saved poster can point at a host the provider has since left.
+  if (t.poster && t.poster != m.poster) showPoster(t.poster);
+  Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: t.poster || m.poster });
   renderInfo(t);
   renderDetails();
   if (t.type != 'series') return;
