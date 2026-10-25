@@ -19,6 +19,9 @@ type storedMaster struct {
 	body      []byte
 	resolve   func(context.Context) ([]byte, error)
 	expiresAt time.Time
+	// The alternative player's source the master is of; nil for a ready
+	// playlist.
+	source *alternativeSource
 }
 
 type masterStore struct {
@@ -38,6 +41,10 @@ func (store *masterStore) put(body []byte) string {
 
 func (store *masterStore) putLazy(resolve func(context.Context) ([]byte, error)) string {
 	return store.add(&storedMaster{resolve: resolve})
+}
+
+func (store *masterStore) putSource(source *alternativeSource) string {
+	return store.add(&storedMaster{resolve: source.resolve, source: source})
 }
 
 func (store *masterStore) add(entry *storedMaster) string {
@@ -65,15 +72,32 @@ func (store *masterStore) add(entry *storedMaster) string {
 }
 
 func (store *masterStore) get(ctx context.Context, id string) ([]byte, error) {
+	entry, err := store.entry(id)
+	if err != nil {
+		return nil, err
+	}
+	body, err := entry.playlist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(nil), body...), nil
+}
+
+func (store *masterStore) entry(id string) (*storedMaster, error) {
 	store.mu.Lock()
+	defer store.mu.Unlock()
 	store.cleanup(time.Now())
 	entry, ok := store.entries[id]
-	store.mu.Unlock()
 	if !ok {
 		return nil, ErrMasterNotFound
 	}
-	// Concurrent requests for one master wait for a single resolution; a
-	// failed one is retried by the next request.
+	return entry, nil
+}
+
+// playlist resolves the master on first request. Concurrent requests for
+// one master wait for a single resolution; a failed one is retried by the
+// next request.
+func (entry *storedMaster) playlist(ctx context.Context) ([]byte, error) {
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
 	if entry.body == nil {
@@ -83,7 +107,7 @@ func (store *masterStore) get(ctx context.Context, id string) ([]byte, error) {
 		}
 		entry.body, entry.resolve = body, nil
 	}
-	return append([]byte(nil), entry.body...), nil
+	return entry.body, nil
 }
 
 func (store *masterStore) cleanup(now time.Time) {
@@ -96,4 +120,32 @@ func (store *masterStore) cleanup(now time.Time) {
 
 func (c *Client) MasterPlaylist(ctx context.Context, id string) ([]byte, error) {
 	return c.masters.get(ctx, id)
+}
+
+// MediaHeaders are the headers the CDN requests of a media need now: the
+// player's, with the edge_hash of its playback socket once there is one.
+// The request keeps the socket open (see playbackSession) and reports the
+// quality and the position the router plays. A master no one asked for yet
+// is resolved first, as the master endpoint would: its CDN requests come
+// from it, and the socket opens with it.
+func (c *Client) MediaHeaders(ctx context.Context, id string, report PlaybackReport) (MediaHeaders, error) {
+	entry, err := c.masters.entry(id)
+	if err != nil {
+		return MediaHeaders{}, err
+	}
+	if _, err := entry.playlist(ctx); err != nil {
+		return MediaHeaders{}, err
+	}
+	if entry.source == nil {
+		return MediaHeaders{TTL: mediaHeadersTTL}, nil
+	}
+	return entry.source.headers(report), nil
+}
+
+// EndMediaSession tells the playback socket of a media, if it has one open,
+// that the playback ended, and closes it.
+func (c *Client) EndMediaSession(id string) {
+	if entry, err := c.masters.entry(id); err == nil && entry.source != nil {
+		entry.source.end()
+	}
 }

@@ -61,17 +61,39 @@ type alternativeFile struct {
 }
 
 type alternativePlayback struct {
-	HLSSource []struct {
-		Label   string            `json:"label"`
-		Quality map[string]string `json:"quality"`
-	} `json:"hlsSource"`
-	Tracks []struct {
+	HLSSource []alternativeHLSSource `json:"hlsSource"`
+	Tracks    []struct {
 		Kind     string `json:"kind"`
 		Label    string `json:"label"`
 		Source   string `json:"src"`
 		Language string `json:"language"`
 		Default  bool   `json:"default"`
 	} `json:"tracks"`
+	// The playback socket, when the reply names one (see playbackSession).
+	Pnr string `json:"pnr"`
+	Pnk string `json:"pnk"`
+}
+
+type alternativeHLSSource struct {
+	Label   string            `json:"label"`
+	Quality map[string]string `json:"quality"`
+	AudioID playerID          `json:"audioId"`
+}
+
+// playerID is an id the player sends as a string or as a number.
+type playerID string
+
+func (id *playerID) UnmarshalJSON(data []byte) error {
+	var text string
+	if json.Unmarshal(data, &text) == nil {
+		*id = playerID(text)
+		return nil
+	}
+	var number json.Number
+	if json.Unmarshal(data, &number) == nil {
+		*id = playerID(number.String())
+	}
+	return nil
 }
 
 func alternativePlayerURLs(page []byte, scheme string) []string {
@@ -103,10 +125,16 @@ type alternativePlayer struct {
 // the CDN, from the master to the segments: the device fingerprint, the
 // bundle's guard and the page it plays on.
 func (player *alternativePlayer) cdnHeaders() []ProxyHeader {
+	return player.cdnHeadersWith(player.fingerprint)
+}
+
+// cdnHeadersWith has control in Accepts-Controls: the fingerprint, or the
+// edge_hash of a playback socket once it has one.
+func (player *alternativePlayer) cdnHeadersWith(control string) []ProxyHeader {
 	return []ProxyHeader{
 		{Name: "Origin", Value: player.playerURL.Scheme + "://" + player.playerURL.Host},
 		{Name: "Referer", Value: player.playerURL.String()},
-		{Name: "Accepts-Controls", Value: player.fingerprint},
+		{Name: "Accepts-Controls", Value: control},
 		{Name: "Authorizations", Value: "Bearer " + alternativeGuard},
 	}
 }
@@ -397,12 +425,20 @@ func (c *Client) alternativePlaybackStreams(player *alternativePlayer, fileID in
 		subtitles = append(subtitles, SubtitleTrack{ID: strconv.Itoa(index + 1), Name: track.Label, Language: track.Language, PlaylistURL: source})
 	}
 	streams := make([]MovieStream, 0, len(playback.HLSSource))
-	for _, source := range playback.HLSSource {
+	for index, source := range playback.HLSSource {
 		if len(source.Quality) == 0 {
 			continue
 		}
 		label := strings.TrimSpace(source.Label)
-		id := c.masters.putLazy(c.alternativeMaster(player, fileID, source.Label, source.Quality))
+		// The ids look like 1-based indexes, which stand in for a missing one.
+		trackID := string(source.AudioID)
+		if trackID == "" {
+			trackID = strconv.Itoa(index + 1)
+		}
+		id := c.masters.putSource(&alternativeSource{
+			client: c, fileID: fileID, label: source.Label, trackID: trackID,
+			player: player, qualities: source.Quality, pnr: playback.Pnr, pnk: playback.Pnk,
+		})
 		streams = append(streams, MovieStream{
 			Name:              label,
 			MasterPlaylistURL: c.mediaBaseURL + "/v1/media/" + id + "/master.m3u8",
@@ -414,68 +450,137 @@ func (c *Client) alternativePlaybackStreams(player *alternativePlayer, fileID in
 	return streams
 }
 
-// alternativeMaster resolves one source's qualities into a master. The CDN
-// now and then rejects every freshly signed link at once (403, X-VD:
+// alternativeSource is one source (a dub) of a file of the alternative
+// player. Its master is assembled on first request, and when the playback
+// reply named a socket (pnr, pnk) the source gets a playbackSession then.
+type alternativeSource struct {
+	client  *Client
+	fileID  int64
+	label   string
+	trackID string
+
+	// Replaced by the retries of resolve, which the master store runs one
+	// at a time, and read under mu.
+	mu        sync.Mutex
+	player    *alternativePlayer
+	qualities map[string]string
+	pnr, pnk  string
+	session   *playbackSession
+}
+
+// cdnHeaders are the player's, with the edge_hash once the socket has one.
+func (source *alternativeSource) cdnHeaders() []ProxyHeader {
+	source.mu.Lock()
+	player, session := source.player, source.session
+	source.mu.Unlock()
+	if session != nil {
+		return player.cdnHeadersWith(session.control())
+	}
+	return player.cdnHeaders()
+}
+
+// headers answers a headers request of the router: those of the socket,
+// which the request keeps open, or the player's own without one.
+func (source *alternativeSource) headers(report PlaybackReport) MediaHeaders {
+	source.mu.Lock()
+	player, session := source.player, source.session
+	source.mu.Unlock()
+	if session != nil {
+		return session.touch(report)
+	}
+	return MediaHeaders{Headers: player.cdnHeaders(), TTL: mediaHeadersTTL}
+}
+
+// end closes the socket, if any, saying the playback ended.
+func (source *alternativeSource) end() {
+	source.mu.Lock()
+	session := source.session
+	source.mu.Unlock()
+	if session != nil {
+		session.end()
+	}
+}
+
+// resolve assembles the source's qualities into a master. The CDN now and
+// then rejects every freshly signed link at once (403, X-VD:
 // token_decrypt) and accepts new ones later, so a failed attempt asks the
 // player to sign the source again: with the challenge its last reply handed
 // on, or, should that be refused, with a fresh copy of the page and its
 // viewporti nonce. A CDN that blocks the client itself ends the attempts.
-func (c *Client) alternativeMaster(
-	player *alternativePlayer,
-	fileID int64,
-	label string,
-	qualities map[string]string,
-) func(context.Context) ([]byte, error) {
-	return func(ctx context.Context) ([]byte, error) {
-		var lastErr error
-		for attempt, delay := range []time.Duration{0, time.Second, 3 * time.Second} {
-			if attempt > 0 {
-				select {
-				case <-ctx.Done():
-					return nil, ctx.Err()
-				case <-time.After(delay):
-				}
-				playback, err := c.requestAlternativePlayback(ctx, player, fileID)
-				if _, blocked := cdnBlocked(err); err != nil && !blocked && ctx.Err() == nil {
-					fresh, loadErr := c.loadAlternativePlayer(ctx, player.playerURL.String())
-					if loadErr != nil {
-						return nil, loadErr
-					}
-					player = fresh
-					playback, err = c.requestAlternativePlayback(ctx, player, fileID)
-				}
-				if vd, blocked := cdnBlocked(err); blocked {
-					return nil, fmt.Errorf("%w (X-VD: %s)", ErrCDNBlocked, vd)
-				}
-				if err != nil {
-					return nil, err
-				}
-				for _, source := range playback.HLSSource {
-					if source.Label == label {
-						qualities = source.Quality
-					}
-				}
+// The playback socket opens with the master, as the player opens it with
+// the stream.
+func (source *alternativeSource) resolve(ctx context.Context) ([]byte, error) {
+	c := source.client
+	source.mu.Lock()
+	player, qualities := source.player, source.qualities
+	source.mu.Unlock()
+	var lastErr error
+	for attempt, delay := range []time.Duration{0, time.Second, 3 * time.Second} {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
 			}
-			master, err := c.syntheticMaster(ctx, player, qualities)
-			if err == nil {
-				return master, nil
+			playback, err := c.requestAlternativePlayback(ctx, player, source.fileID)
+			if _, blocked := cdnBlocked(err); err != nil && !blocked && ctx.Err() == nil {
+				fresh, loadErr := c.loadAlternativePlayer(ctx, player.playerURL.String())
+				if loadErr != nil {
+					return nil, loadErr
+				}
+				player = fresh
+				playback, err = c.requestAlternativePlayback(ctx, player, source.fileID)
 			}
 			if vd, blocked := cdnBlocked(err); blocked {
 				return nil, fmt.Errorf("%w (X-VD: %s)", ErrCDNBlocked, vd)
 			}
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
+			if err != nil {
+				return nil, err
 			}
-			lastErr = err
+			for _, item := range playback.HLSSource {
+				if item.Label == source.label {
+					qualities = item.Quality
+				}
+			}
+			source.mu.Lock()
+			source.player, source.qualities, source.pnr, source.pnk = player, qualities, playback.Pnr, playback.Pnk
+			source.mu.Unlock()
 		}
-		return nil, fmt.Errorf("no quality of %q resolved: %w", strings.TrimSpace(label), lastErr)
+		master, err := c.syntheticMaster(ctx, player, source.cdnHeaders(), qualities)
+		if err == nil {
+			source.startSession()
+			return master, nil
+		}
+		if vd, blocked := cdnBlocked(err); blocked {
+			return nil, fmt.Errorf("%w (X-VD: %s)", ErrCDNBlocked, vd)
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		lastErr = err
+	}
+	return nil, fmt.Errorf("no quality of %q resolved: %w", strings.TrimSpace(source.label), lastErr)
+}
+
+// startSession opens the playback socket of a resolved source whose
+// playback reply named one; other sources stay as they are.
+func (source *alternativeSource) startSession() {
+	source.mu.Lock()
+	if source.session == nil && source.pnk != "" &&
+		(strings.HasPrefix(source.pnr, "wss://") || strings.HasPrefix(source.pnr, "ws://")) {
+		source.session = newPlaybackSession(source.client, source.player, source.pnr, source.pnk, source.trackID, source.qualities)
+	}
+	session := source.session
+	source.mu.Unlock()
+	if session != nil {
+		session.touch(PlaybackReport{})
 	}
 }
 
 // syntheticMaster resolves the qualities one after another, as the player
 // loads one at a time. A 403 is the CDN refusing the signature or the
 // client, which the remaining links would only repeat.
-func (c *Client) syntheticMaster(ctx context.Context, player *alternativePlayer, qualities map[string]string) ([]byte, error) {
+func (c *Client) syntheticMaster(ctx context.Context, player *alternativePlayer, headers []ProxyHeader, qualities map[string]string) ([]byte, error) {
 	type variant struct {
 		quality                    int
 		link, attributes, mediaURL string
@@ -496,7 +601,7 @@ func (c *Client) syntheticMaster(ctx context.Context, player *alternativePlayer,
 	resolved := make([]variant, 0, len(pending))
 	lastErr := errors.New("no quality has a link")
 	for _, item := range pending {
-		attributes, mediaURL, err := c.resolveAlternativeVariant(ctx, player, item.link)
+		attributes, mediaURL, err := c.resolveAlternativeVariant(ctx, player, headers, item.link)
 		if err != nil {
 			if _, blocked := cdnBlocked(err); blocked || ctx.Err() != nil {
 				return nil, err
@@ -526,13 +631,13 @@ func (c *Client) syntheticMaster(ctx context.Context, player *alternativePlayer,
 	return []byte(master.String()), nil
 }
 
-func (c *Client) resolveAlternativeVariant(ctx context.Context, player *alternativePlayer, rawURL string) (string, string, error) {
+func (c *Client) resolveAlternativeVariant(ctx context.Context, player *alternativePlayer, headers []ProxyHeader, rawURL string) (string, string, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", "", err
 	}
 	request.Header.Set("User-Agent", c.userAgent)
-	for _, header := range player.cdnHeaders() {
+	for _, header := range headers {
 		request.Header.Set(header.Name, header.Value)
 	}
 	response, err := player.client.Do(request)

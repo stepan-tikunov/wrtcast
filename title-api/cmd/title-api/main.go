@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -62,6 +65,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	// The playback sockets close with a close frame on the way out.
+	defer client.Close()
 	log.Printf("initializing provider anti-bot session for %s", baseURL)
 	if err := client.Start(ctx); err != nil {
 		return err
@@ -92,15 +97,23 @@ func run() error {
 		_ = httpListener.Close()
 		return err
 	}
-	if err := gateway.HandlePath(http.MethodGet, "/v1/posters", posterHandler(client)); err != nil {
-		_ = grpcListener.Close()
-		_ = httpListener.Close()
-		return err
-	}
-	if err := gateway.HandlePath(http.MethodGet, "/v1/media/{id}/master.m3u8", masterPlaylistHandler(client)); err != nil {
-		_ = grpcListener.Close()
-		_ = httpListener.Close()
-		return err
+	for _, route := range []struct {
+		method, path string
+		handler      runtime.HandlerFunc
+	}{
+		{http.MethodGet, "/v1/posters", posterHandler(client)},
+		{http.MethodGet, "/v1/media/{id}/master.m3u8", masterPlaylistHandler(client)},
+		{http.MethodGet, "/v1/media/{id}/headers", mediaHeadersHandler(client)},
+		{http.MethodDelete, "/v1/media/{id}/session", mediaSessionHandler(client)},
+		// The same for clients that can only GET and POST, like the router's
+		// uclient-fetch.
+		{http.MethodPost, "/v1/media/{id}/session/end", mediaSessionHandler(client)},
+	} {
+		if err := gateway.HandlePath(route.method, route.path, route.handler); err != nil {
+			_ = grpcListener.Close()
+			_ = httpListener.Close()
+			return err
+		}
 	}
 	httpServer := &http.Server{
 		Handler:           allowAllOrigins(gateway),
@@ -148,22 +161,91 @@ type masterPlaylistSource interface {
 func masterPlaylistHandler(source masterPlaylistSource) runtime.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
 		body, err := source.MasterPlaylist(request.Context(), pathParams["id"])
-		if errors.Is(err, provider.ErrMasterNotFound) {
-			http.Error(response, err.Error(), http.StatusNotFound)
-			return
-		}
-		// A 403 reaches the receiver as one, and it does not retry that.
-		if errors.Is(err, provider.ErrCDNBlocked) {
-			http.Error(response, err.Error(), http.StatusForbidden)
-			return
-		}
-		if err != nil {
-			http.Error(response, err.Error(), http.StatusBadGateway)
+		if mediaError(response, err) {
 			return
 		}
 		response.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
 		response.Header().Set("Cache-Control", "private, max-age=300")
 		_, _ = response.Write(body)
+	}
+}
+
+// mediaError answers a failed master or headers request.
+func mediaError(response http.ResponseWriter, err error) bool {
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, provider.ErrMasterNotFound):
+		http.Error(response, err.Error(), http.StatusNotFound)
+	// A 403 reaches the receiver as one, and it does not retry that.
+	case errors.Is(err, provider.ErrCDNBlocked):
+		http.Error(response, err.Error(), http.StatusForbidden)
+	default:
+		http.Error(response, err.Error(), http.StatusBadGateway)
+	}
+	return true
+}
+
+type mediaHeadersSource interface {
+	MediaHeaders(ctx context.Context, id string, report provider.PlaybackReport) (provider.MediaHeaders, error)
+	EndMediaSession(id string)
+}
+
+var (
+	resolutionPattern = regexp.MustCompile(`^[0-9]{1,5}$`)
+	positionPattern   = regexp.MustCompile(`^[0-9]{1,7}(\.[0-9]+)?$`)
+)
+
+type mediaHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// mediaHeadersHandler serves GET /v1/media/{id}/headers?q=<720>&t=<seconds>:
+// the headers a media proxy sends with the media's CDN requests now, and for
+// how many seconds it may keep them. It keeps the playback socket of the
+// media open and reports the quality and the position played, both
+// optional.
+func mediaHeadersHandler(source mediaHeadersSource) runtime.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
+		query := request.URL.Query()
+		report := provider.PlaybackReport{Resolution: query.Get("q")}
+		if report.Resolution != "" && !resolutionPattern.MatchString(report.Resolution) {
+			http.Error(response, "invalid q", http.StatusBadRequest)
+			return
+		}
+		if position := query.Get("t"); position != "" {
+			if !positionPattern.MatchString(position) {
+				http.Error(response, "invalid t", http.StatusBadRequest)
+				return
+			}
+			report.Position, _ = strconv.ParseFloat(position, 64)
+			report.HasPosition = true
+		}
+		headers, err := source.MediaHeaders(request.Context(), pathParams["id"], report)
+		if mediaError(response, err) {
+			return
+		}
+		body := struct {
+			Headers []mediaHeader `json:"headers"`
+			TTL     int64         `json:"ttl"`
+		}{Headers: make([]mediaHeader, 0, len(headers.Headers)), TTL: int64(headers.TTL / time.Second)}
+		for _, header := range headers.Headers {
+			body.Headers = append(body.Headers, mediaHeader{Name: header.Name, Value: header.Value})
+		}
+		response.Header().Set("Content-Type", "application/json")
+		response.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(response).Encode(body)
+	}
+}
+
+// mediaSessionHandler serves DELETE /v1/media/{id}/session and POST
+// /v1/media/{id}/session/end: the playback ended, so its socket says so and
+// closes. Answers 204 either way.
+func mediaSessionHandler(source mediaHeadersSource) runtime.HandlerFunc {
+	return func(response http.ResponseWriter, _ *http.Request, pathParams map[string]string) {
+		source.EndMediaSession(pathParams["id"])
+		response.WriteHeader(http.StatusNoContent)
 	}
 }
 
@@ -202,7 +284,7 @@ func posterHandler(source posterSource) runtime.HandlerFunc {
 func allowAllOrigins(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set("Access-Control-Allow-Origin", "*")
-		response.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		response.Header().Set("Access-Control-Allow-Methods", "GET, DELETE, OPTIONS")
 		response.Header().Set("Access-Control-Allow-Headers", "*")
 
 		if request.Method == http.MethodOptions {

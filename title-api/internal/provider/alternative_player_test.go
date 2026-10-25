@@ -87,10 +87,7 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 		t.Fatal(err)
 	}
 	var playback alternativePlayback
-	playback.HLSSource = append(playback.HLSSource, struct {
-		Label   string            `json:"label"`
-		Quality map[string]string `json:"quality"`
-	}{Label: "(Russian) Dub", Quality: map[string]string{
+	playback.HLSSource = append(playback.HLSSource, alternativeHLSSource{Label: "(Russian) Dub", Quality: map[string]string{
 		"720": server.URL + "/720/master.m3u8",
 	}})
 	playback.Tracks = append(playback.Tracks, struct {

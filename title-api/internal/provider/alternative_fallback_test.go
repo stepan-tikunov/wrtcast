@@ -86,12 +86,14 @@ func TestAlternativePlayerFallback(t *testing.T) {
 // The page's viewporti nonce is single-use and each accepted playback
 // request hands on the next challenge in Borth (unless chain is off). Links
 // signed by the playback request numbered goodFrom or later are accepted by
-// the CDN; the rest get cdnRefusal as X-VD.
+// the CDN; the rest get cdnRefusal as X-VD. With pnr set the playback
+// reply names a socket.
 type fakeAlternativePlayer struct {
 	t          *testing.T
 	chain      bool
 	goodFrom   int
 	cdnRefusal string
+	pnr, pnk   string
 
 	mu          sync.Mutex
 	player, cdn *httptest.Server
@@ -157,7 +159,12 @@ func (fake *fakeAlternativePlayer) servePlayer(response http.ResponseWriter, req
 		fake.challenge = fmt.Sprintf("chained-challenge-%d", fake.playbacks)
 		response.Header().Set("Borth", fake.challenge)
 	}
-	_, _ = fmt.Fprintf(response, `{"hlsSource":[{"label":"(Russian) Dub","quality":{"480":"%[1]s/480.m3u8?sig=%[2]d","720":"%[1]s/720.m3u8?sig=%[2]d"}}]}`, fake.cdn.URL, fake.playbacks)
+	socket := ""
+	if fake.pnr != "" {
+		socket = fmt.Sprintf(`,"pnr":%q,"pnk":%q`, fake.pnr, fake.pnk)
+	}
+	_, _ = fmt.Fprintf(response, `{"hlsSource":[{"label":"(Russian) Dub","audioId":2,"quality":{"480":"%[1]s/480.m3u8?sig=%[2]d","720":"%[1]s/720.m3u8?sig=%[2]d"}}]%[3]s}`,
+		fake.cdn.URL, fake.playbacks, socket)
 }
 
 func (fake *fakeAlternativePlayer) serveCDN(response http.ResponseWriter, request *http.Request) {

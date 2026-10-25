@@ -59,6 +59,16 @@ type Client struct {
 	fingerprintMu    sync.Mutex
 	fingerprint      string
 
+	// Playback sockets of the alternative player (see playbackSession),
+	// until Close.
+	sessionTiming  sessionTiming
+	wsTransport    http.RoundTripper
+	sessionsCtx    context.Context
+	stopSessions   context.CancelFunc
+	sessionsMu     sync.Mutex
+	sessionsClosed bool
+	sessions       sync.WaitGroup
+
 	mu             sync.RWMutex
 	session        *session
 	nextGeneration uint64
@@ -102,9 +112,22 @@ func NewClient(config Config) (*Client, error) {
 		masters:          newMasterStore(6*time.Hour, 4096),
 		urlStore:         config.URLStore,
 		fingerprintStore: config.FingerprintStore,
+		sessionTiming:    defaultSessionTiming,
+		wsTransport:      newWSTransport(),
 	}
+	client.sessionsCtx, client.stopSessions = context.WithCancel(context.Background())
 	client.baseURL.Store(baseURL)
 	return client, nil
+}
+
+// Close closes the playback sockets, each with a close frame, and waits
+// for them.
+func (c *Client) Close() {
+	c.sessionsMu.Lock()
+	c.sessionsClosed = true
+	c.sessionsMu.Unlock()
+	c.stopSessions()
+	c.sessions.Wait()
 }
 
 func (c *Client) DomainPrefix() string {
