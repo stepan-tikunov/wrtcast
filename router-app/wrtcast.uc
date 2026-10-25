@@ -24,6 +24,7 @@ const TTL = 30 * 86400;                      // progress older than this is forg
 const DEVICES = '/tmp/wrtcast.devices.json'; // last discovery result
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const DRC = '/tmp/wrtcast.drc/';             // audio playlists and segments of the leveler
+const ERR = '/tmp/wrtcast.err.';           // + ns; stderr of a proxied fetch
 const COMMANDS = {
 	pause: null, resume: null, stop: null, quit: null, mute: null, unmute: null,
 	seek: 'num', ff: 'num', rew: 'num', volume: 'num', audio: 'str', subs: 'str',
@@ -522,6 +523,12 @@ function tick() {
 		if (misses != w?.misses || w?.url != now.url)
 			save(WATCH + k, { url: now.url, misses });
 	}
+	// Error files of proxied fetches the web server cut short.
+	for (let name in lsdir('/tmp') ?? []) {
+		let st = match(name, /^wrtcast\.err\.[0-9]+$/) ? stat('/tmp/' + name) : null;
+		if (st && st.mtime < time() - 60)
+			unlink('/tmp/' + name);
+	}
 	// The last position before playback stopped would otherwise stay in
 	// /tmp only.
 	let P = load(PROGRESS);
@@ -585,13 +592,26 @@ function valid_headers(h) {
 			!match(l, /^[A-Za-z0-9-]{1,40}: [ -~]+$/))) == 0;
 }
 
-function fetch_cmd(url, h) {
-	let cmd = `uclient-fetch -q -T 20 -U ${shq(USER_AGENT)}`;
+// With err, stderr goes to that file and keeps the "HTTP error N" line of
+// a refused fetch, which -q leaves out.
+function fetch_cmd(url, h, err) {
+	let cmd = `uclient-fetch ${err ? '' : '-q '}-T 20 -U ${shq(USER_AGENT)}`;
 	for (let x in (type(HEADERS) == 'array' ? HEADERS : [HEADERS]))
 		cmd += ' --header=' + shq(x);
 	for (let x in (valid_headers(h) ? split(h, '\n') : []))
 		cmd += ' --header=' + shq(x);
-	return `${cmd} -O - ${shq(url)} 2>/dev/null`;
+	return `${cmd} -O - ${shq(url)} 2>${err ? shq(err) : '/dev/null'}`;
+}
+
+// Answers a failed proxied fetch: a 403 stays a 403, which receivers don't
+// retry (a CDN that blocks the client would only be asked again and
+// again), anything else is a 502.
+function fetch_fail(err, msg) {
+	let m = match(readfile(err) ?? '', /HTTP error ([0-9]+)/);
+	unlink(err);
+	if (m && +m[1] == 403)
+		fail(403, 'upstream refused (HTTP 403)');
+	fail(502, msg + (m ? ` (HTTP ${m[1]})` : ''));
 }
 
 // A playlist or another small text file; null when the fetch fails.
@@ -698,11 +718,31 @@ function qualities(body) {
 }
 
 // Whether a master's media playlists use fragmented MP4 (#EXT-X-MAP); the
-// receiver assumes MPEG-TS segments unless told.
-function is_fmp4(master, body, h) {
-	let child = match(body ?? '', /\n([^#\n][^\n]*)/);
-	return !!child && index(run(fetch_cmd(resolve(master, trim(child[1])), h)).out,
-		'#EXT-X-MAP') >= 0;
+// receiver assumes MPEG-TS segments unless told. Of the variants it asks
+// for the one that will play: the first playable one of the chosen width,
+// else the first playable one, so no other playlist is fetched.
+function is_fmp4(master, body, h, width) {
+	let inf = null, first = null, uri = null;
+	for (let l in split(body ?? '', '\n')) {
+		l = trim(l);
+		if (substr(l, 0, 18) == '#EXT-X-STREAM-INF:') {
+			inf = l;
+		} else if (inf != null && l != '' && substr(l, 0, 1) != '#') {
+			if (playable(match(inf, /CODECS="([^"]*)"/)?.[1])) {
+				first ??= l;
+				if (width && +(match(inf, /RESOLUTION=([0-9]+)x/)?.[1] ?? 0) == width) {
+					uri = l;
+					break;
+				}
+			}
+			inf = null;
+		}
+	}
+	uri ??= first;
+	// A media playlist rather than a master tells by itself.
+	if (uri == null)
+		return index(body ?? '', '#EXT-X-MAP') >= 0;
+	return index(fetch_text(resolve(master, uri), h) ?? '', '#EXT-X-MAP') >= 0;
 }
 
 // Drops the variants (#EXT-X-STREAM-INF and its URI line) that fail keep,
@@ -965,15 +1005,18 @@ function proxy(name, u, q, h, drc) {
 		fail(400, 'bad url');
 	if (h != null && !valid_headers(h))
 		fail(400, 'bad headers');
-	let e = ext(name);
-	let pipe = popen(fetch_cmd(url, h));
-	if (!pipe)
+	let e = ext(name), err = ERR + clock()[1];
+	let pipe = popen(fetch_cmd(url, h, err));
+	if (!pipe) {
+		unlink(err);
 		fail(502, 'popen failed');
+	}
 
 	if (e == 'm3u8' || e == 'm3u') {
 		let body = pipe.read('all') ?? '';
 		if (pipe.close() != 0 || substr(body, 0, 7) != '#EXTM3U')
-			fail(502, 'upstream playlist fetch failed');
+			fetch_fail(err, 'upstream playlist fetch failed');
+		unlink(err);
 		let text = drc && index(body, '#EXTINF') >= 0 && access(FFMPEG, 'x') ?
 			drc_playlist(body, url, h) :
 			rewrite_playlist(body, url, match(q ?? '', /^[0-9]{1,5}$/) ? +q : null, h, drc);
@@ -983,12 +1026,15 @@ function proxy(name, u, q, h, drc) {
 	}
 
 	// Hold back the headers until the first chunk so upstream failures
-	// (e.g. 410 on a stale signature) become a 502 instead of an empty 200.
+	// (e.g. 410 on a stale signature) become an error reply instead of an
+	// empty 200.
 	let chunk = pipe.read(65536);
 	if (chunk == null || chunk == '') {
 		pipe.close();
-		fail(502, 'upstream fetch failed');
+		fetch_fail(err, 'upstream fetch failed');
 	}
+	// Gone before the stream, which the receiver may cut short.
+	unlink(err);
 	media_head(200, MIME[e] ?? 'application/octet-stream');
 	while (chunk != null && chunk != '') {
 		stdout.write(chunk);
@@ -1071,19 +1117,16 @@ function play(dev, p, keep) {
 	let ks = keep?.subs ? filter(s.subs, t => t.url && t.name == keep.subs)[0] : null;
 	if (ks && p.subs == null)
 		p.subs = 'sub' + ks.id;
-	let h = s.headers ?? '';
+	let h = s.headers ?? '', body = null;
 	if (s.variants == null) {
 		// title-api assembles a source's master on first request; a
 		// source the CDN rejects fails here instead of on the TV.
-		let body = fetch_text(s.url, h), v = qualities(body);
-		if (v == null)
+		body = fetch_text(s.url, h);
+		s.variants = qualities(body);
+		if (s.variants == null)
 			reply(502, { error: 'source unavailable', source: s.name,
 				sources: map(list, x => x.name) });
-		s.variants = v;
-		s.fmp4 = is_fmp4(s.url, body, h);
-		s.drc = PROXY && !s.fmp4 && drc_supported(s.url, body, h);
 	}
-	let drc = p.drc == '1' && !!s.drc;
 	let quals = s.variants;
 	// The best quality unless asked otherwise; a missing one falls back
 	// to the best below it.
@@ -1094,6 +1137,12 @@ function play(dev, p, keep) {
 		quality = v?.label ?? 'auto';
 		width = v?.width;
 	}
+	// Probed once per source, on the variant this play picks.
+	if (body != null) {
+		s.fmp4 = is_fmp4(s.url, body, h, width);
+		s.drc = PROXY && !s.fmp4 && drc_supported(s.url, body, h);
+	}
+	let drc = p.drc == '1' && !!s.drc;
 	let url = PROXY ? purl(s.url, public_base(), null, h) +
 		(width ? `&q=${width}` : '') + (drc ? '&drc=1' : '') : s.url;
 	// Subtitles are separate WebVTT files, not part of the HLS manifest,
