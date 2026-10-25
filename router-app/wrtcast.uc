@@ -253,6 +253,15 @@ function media_end(m) {
 
 // ---- devices ---------------------------------------------------------------
 
+// Cached device list no older than max_age seconds (any age when null).
+function cached(max_age) {
+	let c = load(DEVICES);
+	if (type(c) != 'object' || type(c.devices) != 'array' ||
+	    (max_age != null && time() - c.time >= max_age))
+		return null;
+	return c.devices;
+}
+
 function discover() {
 	let r = run('castctl discover -t 1.5');
 	let list = r.code == 0 ? json(r.out) : null;
@@ -266,15 +275,6 @@ function discover() {
 	if (length(list) || !length(cached() ?? []))
 		save(DEVICES, { time: time(), devices: list });
 	return list;
-}
-
-// Cached device list no older than max_age seconds (any age when null).
-function cached(max_age) {
-	let c = load(DEVICES);
-	if (type(c) != 'object' || type(c.devices) != 'array' ||
-	    (max_age != null && time() - c.time >= max_age))
-		return null;
-	return c.devices;
 }
 
 // Device by id or friendly name; the first one when want is empty.
@@ -632,46 +632,6 @@ function tick() {
 		flush(P);
 }
 
-// Adds the device, the movie started via /play and human-readable track
-// labels: the receiver names tracks by the manifest NAME, which is the
-// title-api track id.
-function with_now(st, dev) {
-	st.device = { id: dev.id ?? null, name: dev.name ?? host_of(dev) };
-	let now = load(state_file(dev));
-	if (now)
-		watch_end(now, st);
-	if (!now || !st.media || st.media.url != now.url)
-		return st;
-	// Started before qualities were recorded: look them up once from the
-	// master playlist the receiver is playing (it plays every variant).
-	if (now.qualities == null && PROXY) {
-		let u = match(now.url, /[?&]u=([^&]*)/);
-		now.src = u ? urldec(u[1]) : null;
-		let v = (now.src && proxy_target(now.src) ? qualities(fetch_text(now.src)) : null) ?? [];
-		now.variants = v;
-		now.qualities = map(v, x => x.label);
-		now.quality = 'auto';
-		save(state_file(dev), now);
-	}
-	st.now = {
-		id: now.id, stream: now.stream, title: now.title, poster: now.poster,
-		season: now.season, episode: now.episode,
-		quality: now.quality ?? 'auto', qualities: now.qualities ?? [],
-		source: now.source ?? null,
-		sources: map(now.streams ?? [], s => s.name),
-		// Whether the volume leveler is on, and whether the source allows it.
-		drc: !!now.drc, drc_ok: !!now.drc_ok,
-		// Whether the router starts the next episode once this one ends.
-		autonext: !!now.autonext,
-	};
-	for (let t in st.media.tracks ?? []) {
-		t.label = now.labels?.[t.name] ?? t.name;
-		t.lang = replace(t.lang ?? '', /-x-.*$/, ''); // see unique_audio_langs
-	}
-	remember(now, st.media);
-	return st;
-}
-
 // ---- media proxy -----------------------------------------------------------
 //
 // /api/p/<name>?u=<url> fetches <url> with our User-Agent and extra headers.
@@ -819,6 +779,46 @@ function qualities(body) {
 		}
 	}
 	return sort(list, (a, b) => b.width - a.width);
+}
+
+// Adds the device, the movie started via /play and human-readable track
+// labels: the receiver names tracks by the manifest NAME, which is the
+// title-api track id.
+function with_now(st, dev) {
+	st.device = { id: dev.id ?? null, name: dev.name ?? host_of(dev) };
+	let now = load(state_file(dev));
+	if (now)
+		watch_end(now, st);
+	if (!now || !st.media || st.media.url != now.url)
+		return st;
+	// Started before qualities were recorded: look them up once from the
+	// master playlist the receiver is playing (it plays every variant).
+	if (now.qualities == null && PROXY) {
+		let u = match(now.url, /[?&]u=([^&]*)/);
+		now.src = u ? urldec(u[1]) : null;
+		let v = (now.src && proxy_target(now.src) ? qualities(fetch_text(now.src)) : null) ?? [];
+		now.variants = v;
+		now.qualities = map(v, x => x.label);
+		now.quality = 'auto';
+		save(state_file(dev), now);
+	}
+	st.now = {
+		id: now.id, stream: now.stream, title: now.title, poster: now.poster,
+		season: now.season, episode: now.episode,
+		quality: now.quality ?? 'auto', qualities: now.qualities ?? [],
+		source: now.source ?? null,
+		sources: map(now.streams ?? [], s => s.name),
+		// Whether the volume leveler is on, and whether the source allows it.
+		drc: !!now.drc, drc_ok: !!now.drc_ok,
+		// Whether the router starts the next episode once this one ends.
+		autonext: !!now.autonext,
+	};
+	for (let t in st.media.tracks ?? []) {
+		t.label = now.labels?.[t.name] ?? t.name;
+		t.lang = replace(t.lang ?? '', /-x-.*$/, ''); // see unique_audio_langs
+	}
+	remember(now, st.media);
+	return st;
 }
 
 // Whether a master's media playlists use fragmented MP4 (#EXT-X-MAP); the
