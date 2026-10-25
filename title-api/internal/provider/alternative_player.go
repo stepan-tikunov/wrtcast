@@ -21,10 +21,21 @@ import (
 )
 
 var (
-	playerViewportPattern = regexp.MustCompile(`<meta\s+name=["']viewporti["']\s+content=["']([^"']+)["']`)
-	playerTokenPattern    = regexp.MustCompile(`(?s)const\s+userParam\s*=.*?\btoken\s*:\s*'([^']+)'`)
-	playerFilesPattern    = regexp.MustCompile(`(?s)const\s+fileList\s*=\s*JSON\.parse\('((?:\\.|[^'])*)'\)`)
+	playerViewportPattern    = regexp.MustCompile(`<meta\s+name=["']viewporti["']\s+content=["']([^"']+)["']`)
+	playerTokenPattern       = regexp.MustCompile(`(?s)const\s+userParam\s*=.*?\btoken\s*:\s*'([^']+)'`)
+	playerFilesPattern       = regexp.MustCompile(`(?s)const\s+fileList\s*=\s*JSON\.parse\('((?:\\.|[^'])*)'\)`)
+	playerFingerprintPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
+
+// alternativeGuard is a constant of the player bundle. Its HLS loader sends
+// it as "Authorizations: Bearer <guard>" with every CDN request, and
+// subtitle links get it as t=.
+const alternativeGuard = "pXzvbyDGLYyB6VkwsWZDv3iMKZtsXNzpzRyxZUcsKHXxsSeaYakbo3hw9mBFRc5VQTpqAX6BW8aDEqyLaHYcXSQiV6KHYTVTK6MYRphNAy5sBjtrevqkDzKmLqNdfMZGEU9NELjmtKfZy3RNGzCd767sNh1mXEj4tCcvqndHtzmwAbZNkhm4ghDEasodotMBewypNQ56uotJAQGX11csfeRfBAPk8DcUWWkkqzxca8vbnEw12vUFbBzT6hz8ZB3F3dzUhUXoL2cr1WM1bXQArRCS1MUNMz3X5WDMMQoZKxj2AMTRqp7QQX4dDB9B7VzEZTmyFULhm1AcHHMkoMvSVvKYoBoAKLycYAgMHeD4ECJcGEAGpnkJhrV57zQ7"
+
+// ErrCDNBlocked: the alternative player's CDN refuses this client or its
+// session (403 with X-VD client_blocked or session_blocked). More requests
+// only keep the block going.
+var ErrCDNBlocked = errors.New("the CDN blocked this client")
 
 type alternativeCatalog struct {
 	Type   string          `json:"type"`
@@ -75,11 +86,64 @@ func alternativePlayerURLs(page []byte, scheme string) []string {
 // session, the values the playback request is signed with, and the catalog
 // of files (one movie, or translations per season and episode).
 type alternativePlayer struct {
-	client    *http.Client
-	playerURL *url.URL
-	viewport  string
-	token     string
-	catalog   alternativeCatalog
+	client      *http.Client
+	playerURL   *url.URL
+	fingerprint string
+	token       string
+	catalog     alternativeCatalog
+
+	// challenge signs the next playback request. It starts as the page's
+	// viewporti nonce, which is single-use, and each accepted request
+	// answers with the next one in its Borth header.
+	mu        sync.Mutex
+	challenge string
+}
+
+// cdnHeaders are what the player's HLS loader sends with every request to
+// the CDN, from the master to the segments: the device fingerprint, the
+// bundle's guard and the page it plays on.
+func (player *alternativePlayer) cdnHeaders() []ProxyHeader {
+	return []ProxyHeader{
+		{Name: "Origin", Value: player.playerURL.Scheme + "://" + player.playerURL.Host},
+		{Name: "Referer", Value: player.playerURL.String()},
+		{Name: "Accepts-Controls", Value: player.fingerprint},
+		{Name: "Authorizations", Value: "Bearer " + alternativeGuard},
+	}
+}
+
+// playerFingerprint is the device fingerprint the alternative player knows
+// us by: in Borth of playback requests and in Accepts-Controls of CDN
+// requests. The real player derives a stable sha256 from the browser; a
+// random one is made once and kept in the fingerprint store, or for the
+// life of the Client without one.
+func (c *Client) playerFingerprint(ctx context.Context) (string, error) {
+	c.fingerprintMu.Lock()
+	defer c.fingerprintMu.Unlock()
+	if c.fingerprint != "" {
+		return c.fingerprint, nil
+	}
+	if c.fingerprintStore != nil {
+		stored, err := c.fingerprintStore.LoadPlayerFingerprint(ctx)
+		if err != nil {
+			return "", err
+		}
+		if playerFingerprintPattern.MatchString(stored) {
+			c.fingerprint = stored
+			return stored, nil
+		}
+	}
+	random := make([]byte, 32)
+	if _, err := rand.Read(random); err != nil {
+		return "", fmt.Errorf("create player fingerprint: %w", err)
+	}
+	fingerprint := hex.EncodeToString(random)
+	if c.fingerprintStore != nil {
+		if err := c.fingerprintStore.SavePlayerFingerprint(ctx, fingerprint); err != nil {
+			return "", err
+		}
+	}
+	c.fingerprint = fingerprint
+	return fingerprint, nil
 }
 
 func (catalog alternativeCatalog) isSeries() bool {
@@ -114,6 +178,10 @@ func (c *Client) loadAlternativePlayer(ctx context.Context, rawPlayerURL string)
 	playerURL, err := url.Parse(rawPlayerURL)
 	if err != nil || playerURL.Scheme == "" || playerURL.Hostname() == "" {
 		return nil, errors.New("invalid alternative player URL")
+	}
+	fingerprint, err := c.playerFingerprint(ctx)
+	if err != nil {
+		return nil, err
 	}
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -154,7 +222,8 @@ func (c *Client) loadAlternativePlayer(ctx context.Context, rawPlayerURL string)
 		return nil, fmt.Errorf("decode player catalog %q: %w", preview, err)
 	}
 	return &alternativePlayer{
-		client: client, playerURL: playerURL, viewport: viewport, token: token, catalog: catalog,
+		client: client, playerURL: playerURL, fingerprint: fingerprint, token: token, catalog: catalog,
+		challenge: viewport,
 	}, nil
 }
 
@@ -179,31 +248,37 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 	return streams, nil
 }
 
+// requestAlternativePlayback asks the player for the signed links of a file
+// the way its jQuery call does, and keeps the challenge the reply hands on.
 func (c *Client) requestAlternativePlayback(ctx context.Context, player *alternativePlayer, fileID int64) (alternativePlayback, error) {
-	client, playerURL, viewport, token := player.client, player.playerURL, player.viewport, player.token
-	fingerprint := make([]byte, 32)
-	if _, err := rand.Read(fingerprint); err != nil {
-		return alternativePlayback{}, fmt.Errorf("create player fingerprint: %w", err)
-	}
-	form := url.Values{"token": {token}, "av1": {"true"}, "autoplay": {"0"}, "audio": {""}, "subtitle": {""}}
+	player.mu.Lock()
+	defer player.mu.Unlock()
+	playerURL := player.playerURL
+	// The fields in the player's order, which url.Values.Encode would sort.
+	// The receiver can't decode AV1.
+	form := "token=" + url.QueryEscape(player.token) + "&av1=false&autoplay=0&audio=&subtitle="
 	endpoint := playerURL.ResolveReference(&url.URL{Path: "/bnsi/movies/" + strconv.FormatInt(fileID, 10)})
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), strings.NewReader(form.Encode()))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), strings.NewReader(form))
 	if err != nil {
 		return alternativePlayback{}, err
 	}
 	request.Header.Set("User-Agent", c.userAgent)
-	request.Header.Set("Accept", "application/json, text/plain, */*")
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Accept", "*/*")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+	request.Header.Set("X-Requested-With", "XMLHttpRequest")
 	request.Header.Set("Origin", playerURL.Scheme+"://"+playerURL.Host)
 	request.Header.Set("Referer", playerURL.String())
-	request.Header.Set("Borth", hex.EncodeToString(fingerprint)+"|"+playerChallenge(viewport))
-	response, err := client.Do(request)
+	request.Header.Set("Borth", player.fingerprint+"|"+playerChallenge(player.challenge))
+	response, err := player.client.Do(request)
 	if err != nil {
 		return alternativePlayback{}, fmt.Errorf("request playback: %w", err)
 	}
 	body, err := readAlternativeResponse(response)
 	if err != nil {
 		return alternativePlayback{}, fmt.Errorf("request playback: %w", err)
+	}
+	if next := response.Header.Get("Borth"); next != "" {
+		player.challenge = next
 	}
 	var playback alternativePlayback
 	if err := json.Unmarshal(body, &playback); err != nil {
@@ -215,16 +290,41 @@ func (c *Client) requestAlternativePlayback(ctx context.Context, player *alterna
 	return playback, nil
 }
 
+// alternativeStatusError is a refusal from the player or its CDN, which
+// tells why in X-VD.
+type alternativeStatusError struct {
+	status string
+	code   int
+	vd     string
+}
+
+func (e *alternativeStatusError) Error() string {
+	if e.vd != "" {
+		return fmt.Sprintf("returned %s (X-VD: %s)", e.status, e.vd)
+	}
+	return "returned " + e.status
+}
+
 func readAlternativeResponse(response *http.Response) ([]byte, error) {
 	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-	if err != nil {
-		return nil, err
-	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("returned %s", response.Status)
+		return nil, &alternativeStatusError{
+			status: response.Status,
+			code:   response.StatusCode,
+			vd:     response.Header.Get("X-VD"),
+		}
 	}
-	return body, nil
+	return io.ReadAll(io.LimitReader(response.Body, 4<<20))
+}
+
+// cdnBlocked tells whether err is the CDN's refusal of the client itself,
+// with its X-VD value, as opposed to a rejected link.
+func cdnBlocked(err error) (string, bool) {
+	var refused *alternativeStatusError
+	if !errors.As(err, &refused) || refused.code != http.StatusForbidden {
+		return "", false
+	}
+	return refused.vd, refused.vd == "client_blocked" || refused.vd == "session_blocked"
 }
 
 func firstSubmatch(pattern *regexp.Regexp, body []byte) string {
@@ -292,7 +392,9 @@ func (c *Client) alternativePlaybackStreams(player *alternativePlayer, fileID in
 		if track.Source == "" {
 			continue
 		}
-		subtitles = append(subtitles, SubtitleTrack{ID: strconv.Itoa(index + 1), Name: track.Label, Language: track.Language, PlaylistURL: track.Source})
+		// As the player does, even when the link has a query already.
+		source := track.Source + "?t=" + alternativeGuard + "&b=" + player.fingerprint
+		subtitles = append(subtitles, SubtitleTrack{ID: strconv.Itoa(index + 1), Name: track.Label, Language: track.Language, PlaylistURL: source})
 	}
 	streams := make([]MovieStream, 0, len(playback.HLSSource))
 	for _, source := range playback.HLSSource {
@@ -306,10 +408,7 @@ func (c *Client) alternativePlaybackStreams(player *alternativePlayer, fileID in
 			MasterPlaylistURL: c.mediaBaseURL + "/v1/media/" + id + "/master.m3u8",
 			AudioTracks:       []AudioTrack{{ID: "alternative", Name: label, Language: languageFromLabel(source.Label), Default: true}},
 			Subtitles:         subtitles,
-			ProxyHeaders: []ProxyHeader{{
-				Name:  "Origin",
-				Value: player.playerURL.Scheme + "://" + player.playerURL.Host,
-			}},
+			ProxyHeaders:      player.cdnHeaders(),
 		})
 	}
 	return streams
@@ -318,8 +417,9 @@ func (c *Client) alternativePlaybackStreams(player *alternativePlayer, fileID in
 // alternativeMaster resolves one source's qualities into a master. The CDN
 // now and then rejects every freshly signed link at once (403, X-VD:
 // token_decrypt) and accepts new ones later, so a failed attempt asks the
-// player to sign the source again. Its token is single-use, which takes a
-// fresh copy of the player page.
+// player to sign the source again: with the challenge its last reply handed
+// on, or, should that be refused, with a fresh copy of the page and its
+// viewporti nonce. A CDN that blocks the client itself ends the attempts.
 func (c *Client) alternativeMaster(
 	player *alternativePlayer,
 	fileID int64,
@@ -327,6 +427,7 @@ func (c *Client) alternativeMaster(
 	qualities map[string]string,
 ) func(context.Context) ([]byte, error) {
 	return func(ctx context.Context) ([]byte, error) {
+		var lastErr error
 		for attempt, delay := range []time.Duration{0, time.Second, 3 * time.Second} {
 			if attempt > 0 {
 				select {
@@ -334,36 +435,52 @@ func (c *Client) alternativeMaster(
 					return nil, ctx.Err()
 				case <-time.After(delay):
 				}
-				fresh, err := c.loadAlternativePlayer(ctx, player.playerURL.String())
+				playback, err := c.requestAlternativePlayback(ctx, player, fileID)
+				if _, blocked := cdnBlocked(err); err != nil && !blocked && ctx.Err() == nil {
+					fresh, loadErr := c.loadAlternativePlayer(ctx, player.playerURL.String())
+					if loadErr != nil {
+						return nil, loadErr
+					}
+					player = fresh
+					playback, err = c.requestAlternativePlayback(ctx, player, fileID)
+				}
+				if vd, blocked := cdnBlocked(err); blocked {
+					return nil, fmt.Errorf("%w (X-VD: %s)", ErrCDNBlocked, vd)
+				}
 				if err != nil {
 					return nil, err
 				}
-				playback, err := c.requestAlternativePlayback(ctx, fresh, fileID)
-				if err != nil {
-					return nil, err
-				}
-				player = fresh
 				for _, source := range playback.HLSSource {
 					if source.Label == label {
 						qualities = source.Quality
 					}
 				}
 			}
-			if master := c.syntheticMaster(ctx, player.client, player.playerURL, qualities); len(master) > 0 {
+			master, err := c.syntheticMaster(ctx, player, qualities)
+			if err == nil {
 				return master, nil
 			}
+			if vd, blocked := cdnBlocked(err); blocked {
+				return nil, fmt.Errorf("%w (X-VD: %s)", ErrCDNBlocked, vd)
+			}
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			lastErr = err
 		}
-		return nil, fmt.Errorf("no quality of %q resolved", strings.TrimSpace(label))
+		return nil, fmt.Errorf("no quality of %q resolved: %w", strings.TrimSpace(label), lastErr)
 	}
 }
 
-func (c *Client) syntheticMaster(ctx context.Context, client *http.Client, playerURL *url.URL, qualities map[string]string) []byte {
+// syntheticMaster resolves the qualities one after another, as the player
+// loads one at a time. A 403 is the CDN refusing the signature or the
+// client, which the remaining links would only repeat.
+func (c *Client) syntheticMaster(ctx context.Context, player *alternativePlayer, qualities map[string]string) ([]byte, error) {
 	type variant struct {
-		quality              int
-		attributes, mediaURL string
+		quality                    int
+		link, attributes, mediaURL string
 	}
-	variants := make(chan variant, len(qualities))
-	var wait sync.WaitGroup
+	pending := make([]variant, 0, len(qualities))
 	for qualityText, alternatives := range qualities {
 		quality, err := strconv.Atoi(qualityText)
 		if err != nil {
@@ -373,24 +490,29 @@ func (c *Client) syntheticMaster(ctx context.Context, client *http.Client, playe
 		if link == "" {
 			continue
 		}
-		wait.Add(1)
-		go func(quality int, link string) {
-			defer wait.Done()
-			attributes, mediaURL, err := c.resolveAlternativeVariant(ctx, client, playerURL, link)
-			if err == nil {
-				variants <- variant{quality: quality, attributes: attributes, mediaURL: mediaURL}
-			}
-		}(quality, link)
+		pending = append(pending, variant{quality: quality, link: link})
 	}
-	wait.Wait()
-	close(variants)
-	resolved := make([]variant, 0, len(qualities))
-	for item := range variants {
+	sort.Slice(pending, func(i, j int) bool { return pending[i].quality < pending[j].quality })
+	resolved := make([]variant, 0, len(pending))
+	lastErr := errors.New("no quality has a link")
+	for _, item := range pending {
+		attributes, mediaURL, err := c.resolveAlternativeVariant(ctx, player, item.link)
+		if err != nil {
+			if _, blocked := cdnBlocked(err); blocked || ctx.Err() != nil {
+				return nil, err
+			}
+			lastErr = err
+			var refused *alternativeStatusError
+			if errors.As(err, &refused) && refused.code == http.StatusForbidden {
+				break
+			}
+			continue
+		}
+		item.attributes, item.mediaURL = attributes, mediaURL
 		resolved = append(resolved, item)
 	}
-	sort.Slice(resolved, func(i, j int) bool { return resolved[i].quality < resolved[j].quality })
 	if len(resolved) == 0 {
-		return nil
+		return nil, lastErr
 	}
 	var master strings.Builder
 	master.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n")
@@ -401,18 +523,19 @@ func (c *Client) syntheticMaster(ctx context.Context, client *http.Client, playe
 		master.WriteString(item.mediaURL)
 		master.WriteByte('\n')
 	}
-	return []byte(master.String())
+	return []byte(master.String()), nil
 }
 
-func (c *Client) resolveAlternativeVariant(ctx context.Context, client *http.Client, playerURL *url.URL, rawURL string) (string, string, error) {
+func (c *Client) resolveAlternativeVariant(ctx context.Context, player *alternativePlayer, rawURL string) (string, string, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", "", err
 	}
 	request.Header.Set("User-Agent", c.userAgent)
-	request.Header.Set("Origin", playerURL.Scheme+"://"+playerURL.Host)
-	request.Header.Set("Referer", playerURL.String())
-	response, err := client.Do(request)
+	for _, header := range player.cdnHeaders() {
+		request.Header.Set(header.Name, header.Value)
+	}
+	response, err := player.client.Do(request)
 	if err != nil {
 		return "", "", err
 	}

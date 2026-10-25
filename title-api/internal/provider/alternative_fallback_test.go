@@ -2,10 +2,14 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -78,52 +82,177 @@ func TestAlternativePlayerFallback(t *testing.T) {
 	}
 }
 
+// fakeAlternativePlayer is a player page, its /bnsi endpoint and its CDN.
+// The page's viewporti nonce is single-use and each accepted playback
+// request hands on the next challenge in Borth (unless chain is off). Links
+// signed by the playback request numbered goodFrom or later are accepted by
+// the CDN; the rest get cdnRefusal as X-VD.
+type fakeAlternativePlayer struct {
+	t          *testing.T
+	chain      bool
+	goodFrom   int
+	cdnRefusal string
+
+	mu          sync.Mutex
+	player, cdn *httptest.Server
+	pages       int
+	playbacks   int
+	cdnRequests int
+	challenge   string
+	used        map[string]bool
+	fingerprint string
+}
+
+func newFakeAlternativePlayer(t *testing.T, chain bool, goodFrom int, cdnRefusal string) *fakeAlternativePlayer {
+	fake := &fakeAlternativePlayer{t: t, chain: chain, goodFrom: goodFrom, cdnRefusal: cdnRefusal, used: map[string]bool{}}
+	fake.cdn = httptest.NewServer(http.HandlerFunc(fake.serveCDN))
+	fake.player = httptest.NewServer(http.HandlerFunc(fake.servePlayer))
+	t.Cleanup(fake.cdn.Close)
+	t.Cleanup(fake.player.Close)
+	return fake
+}
+
+func (fake *fakeAlternativePlayer) url() string {
+	return fake.player.URL + "/?token_movie=abc&token=tok"
+}
+
+func (fake *fakeAlternativePlayer) servePlayer(response http.ResponseWriter, request *http.Request) {
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if request.Method != http.MethodPost {
+		fake.pages++
+		fake.challenge = fmt.Sprintf("viewport-nonce-%d", fake.pages)
+		_, _ = fmt.Fprintf(response, `<meta name="viewporti" content="%s">
+<script>const userParam = { token: 'tok' }; const fileList = JSON.parse('{"type":"movie","active":{"id":7,"translation":"Dub"},"all":{}}');</script>`, fake.challenge)
+		return
+	}
+	body, _ := io.ReadAll(request.Body)
+	for name, want := range map[string]string{
+		"Accept":           "*/*",
+		"Content-Type":     "application/x-www-form-urlencoded; charset=UTF-8",
+		"X-Requested-With": "XMLHttpRequest",
+		"Origin":           fake.player.URL,
+		"Referer":          fake.url(),
+	} {
+		if got := request.Header.Get(name); got != want {
+			fake.t.Errorf("playback request %s = %q, want %q", name, got, want)
+		}
+	}
+	if string(body) != "token=tok&av1=false&autoplay=0&audio=&subtitle=" {
+		fake.t.Errorf("playback request body = %q", body)
+	}
+	fingerprint, signed, _ := strings.Cut(request.Header.Get("Borth"), "|")
+	if !playerFingerprintPattern.MatchString(fingerprint) ||
+		fake.fingerprint != "" && fingerprint != fake.fingerprint {
+		fake.t.Errorf("playback request fingerprint = %q, earlier %q", fingerprint, fake.fingerprint)
+	}
+	fake.fingerprint = fingerprint
+	if signed != playerChallenge(fake.challenge) || fake.used[fake.challenge] {
+		response.WriteHeader(http.StatusForbidden)
+		return
+	}
+	fake.used[fake.challenge] = true
+	fake.playbacks++
+	if fake.chain {
+		fake.challenge = fmt.Sprintf("chained-challenge-%d", fake.playbacks)
+		response.Header().Set("Borth", fake.challenge)
+	}
+	_, _ = fmt.Fprintf(response, `{"hlsSource":[{"label":"(Russian) Dub","quality":{"480":"%[1]s/480.m3u8?sig=%[2]d","720":"%[1]s/720.m3u8?sig=%[2]d"}}]}`, fake.cdn.URL, fake.playbacks)
+}
+
+func (fake *fakeAlternativePlayer) serveCDN(response http.ResponseWriter, request *http.Request) {
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	fake.cdnRequests++
+	for name, want := range map[string]string{
+		"Accepts-Controls": fake.fingerprint,
+		"Authorizations":   "Bearer " + alternativeGuard,
+		"Origin":           fake.player.URL,
+		"Referer":          fake.url(),
+	} {
+		if got := request.Header.Get(name); got != want {
+			fake.t.Errorf("CDN request %s = %q, want %q", name, got, want)
+		}
+	}
+	if sig, _ := strconv.Atoi(request.URL.Query().Get("sig")); sig < fake.goodFrom {
+		response.Header().Set("X-VD", fake.cdnRefusal)
+		response.WriteHeader(http.StatusForbidden)
+		return
+	}
+	_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720\nmedia.m3u8\n"))
+}
+
+func (fake *fakeAlternativePlayer) counts() (pages, playbacks, cdnRequests int) {
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	return fake.pages, fake.playbacks, fake.cdnRequests
+}
+
+func alternativeMasterID(t *testing.T, client *Client, fake *fakeAlternativePlayer) string {
+	t.Helper()
+	streams, err := client.alternativeStreams(context.Background(), fake.url(), 0, "")
+	if pages, playbacks, cdnRequests := fake.counts(); err != nil || len(streams) != 1 ||
+		pages != 1 || playbacks != 1 || cdnRequests != 0 {
+		t.Fatalf("streams = %+v, err = %v after %d pages, %d playback and %d CDN requests",
+			streams, err, pages, playbacks, cdnRequests)
+	}
+	return strings.TrimSuffix(strings.TrimPrefix(streams[0].MasterPlaylistURL, "https://api.example.com/v1/media/"), "/master.m3u8")
+}
+
 // The CDN sometimes rejects every freshly signed link (403 token_decrypt);
 // a new playback request a moment later gets links that work. Sources are
-// listed without CDN requests and only the requested one is resolved.
+// listed without CDN requests and only the requested one is resolved, one
+// quality at a time. The new request is signed with the challenge the last
+// reply handed on, or, when there is none, from a fresh copy of the page.
 func TestAlternativePlayerRetriesRejectedLinks(t *testing.T) {
 	t.Parallel()
-
-	var cdnURL string
-	playbacks := 0
-	cdn := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.URL.Query().Get("sig") != "2" {
-			response.Header().Set("X-VD", "token_decrypt")
-			response.WriteHeader(http.StatusForbidden)
-			return
-		}
-		_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720\nmedia.m3u8\n"))
-	}))
-	defer cdn.Close()
-	cdnURL = cdn.URL
-	player := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.Method == http.MethodPost {
-			// The token is single-use, as on the real player.
-			if request.FormValue("token") != fmt.Sprintf("tok%d", playbacks) {
-				response.WriteHeader(http.StatusNotFound)
-				return
+	for _, test := range []struct {
+		name  string
+		chain bool
+		pages int
+	}{
+		{name: "chained challenge", chain: true, pages: 1},
+		{name: "fresh page", chain: false, pages: 2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			fake := newFakeAlternativePlayer(t, test.chain, 2, "token_decrypt")
+			client, err := NewClient(Config{BaseURL: "https://example.com", MediaBaseURL: "https://api.example.com"})
+			if err != nil {
+				t.Fatal(err)
 			}
-			playbacks++
-			_, _ = fmt.Fprintf(response, `{"hlsSource":[{"label":"(Russian) Dub","quality":{"720":"%s/720.m3u8?sig=%d"}}]}`, cdnURL, playbacks)
-			return
-		}
-		_, _ = fmt.Fprintf(response, `<meta name="viewporti" content="abc">
-<script>const userParam = { token: 'tok%d' }; const fileList = JSON.parse('{"type":"movie","active":{"id":7,"translation":"Dub"},"all":{}}');</script>`, playbacks)
-	}))
-	defer player.Close()
+			id := alternativeMasterID(t, client, fake)
+			master, err := client.MasterPlaylist(context.Background(), id)
+			pages, playbacks, cdnRequests := fake.counts()
+			// The first link's 403 stops the first attempt; both links
+			// of the second attempt resolve.
+			if err != nil || !strings.Contains(string(master), "media.m3u8") ||
+				pages != test.pages || playbacks != 2 || cdnRequests != 3 {
+				t.Fatalf("master = %q, err = %v after %d pages, %d playback and %d CDN requests",
+					master, err, pages, playbacks, cdnRequests)
+			}
+		})
+	}
+}
 
-	client, err := NewClient(Config{BaseURL: "https://example.com", MediaBaseURL: "https://api.example.com"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	streams, err := client.alternativeStreams(ctx, player.URL+"/?token_movie=abc", 0, "")
-	if err != nil || len(streams) != 1 || playbacks != 1 {
-		t.Fatalf("streams = %+v, err = %v after %d playback requests", streams, err, playbacks)
-	}
-	id := strings.TrimSuffix(strings.TrimPrefix(streams[0].MasterPlaylistURL, "https://api.example.com/v1/media/"), "/master.m3u8")
-	master, err := client.MasterPlaylist(ctx, id)
-	if err != nil || !strings.Contains(string(master), "media.m3u8") || playbacks != 2 {
-		t.Fatalf("master = %q, err = %v after %d playback requests", master, err, playbacks)
+// A CDN that blocks the client is not asked again, nor is the player.
+func TestAlternativePlayerStopsWhenCDNBlocksClient(t *testing.T) {
+	t.Parallel()
+	for _, refusal := range []string{"client_blocked", "session_blocked"} {
+		t.Run(refusal, func(t *testing.T) {
+			t.Parallel()
+			fake := newFakeAlternativePlayer(t, true, 1000, refusal)
+			client, err := NewClient(Config{BaseURL: "https://example.com", MediaBaseURL: "https://api.example.com"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			id := alternativeMasterID(t, client, fake)
+			_, err = client.MasterPlaylist(context.Background(), id)
+			pages, playbacks, cdnRequests := fake.counts()
+			if !errors.Is(err, ErrCDNBlocked) || !strings.Contains(err.Error(), refusal) ||
+				pages != 1 || playbacks != 1 || cdnRequests != 1 {
+				t.Fatalf("err = %v after %d pages, %d playback and %d CDN requests", err, pages, playbacks, cdnRequests)
+			}
+		})
 	}
 }

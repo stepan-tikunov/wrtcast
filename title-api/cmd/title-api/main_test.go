@@ -104,6 +104,8 @@ type fakeMasters map[string][]byte
 
 func (masters fakeMasters) MasterPlaylist(_ context.Context, id string) ([]byte, error) {
 	switch body, ok := masters[id]; {
+	case id == "blocked":
+		return nil, provider.ErrCDNBlocked
 	case !ok:
 		return nil, provider.ErrMasterNotFound
 	case body == nil:
@@ -119,7 +121,10 @@ func TestMasterPlaylistHandler(t *testing.T) {
 	for _, test := range []struct {
 		id     string
 		status int
-	}{{"known", http.StatusOK}, {"missing", http.StatusNotFound}, {"rejected", http.StatusBadGateway}} {
+	}{
+		{"known", http.StatusOK}, {"missing", http.StatusNotFound},
+		{"rejected", http.StatusBadGateway}, {"blocked", http.StatusForbidden},
+	} {
 		response := httptest.NewRecorder()
 		handler(response, httptest.NewRequest(http.MethodGet, "/", nil), map[string]string{"id": test.id})
 		if response.Code != test.status {

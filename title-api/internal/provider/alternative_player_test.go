@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -68,9 +69,16 @@ func TestPlayerChallenge(t *testing.T) {
 
 func TestAlternativePlaybackStreams(t *testing.T) {
 	t.Parallel()
+	const fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		requests++
+		if request.Header.Get("Accepts-Controls") != fingerprint ||
+			request.Header.Get("Authorizations") != "Bearer "+alternativeGuard ||
+			request.Header.Get("Origin") != "https://player.example" ||
+			request.Header.Get("Referer") != "https://player.example/?token_movie=abc&token=def" {
+			t.Errorf("CDN request headers: %v", request.Header)
+		}
 		_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720\nmedia.m3u8\n"))
 	}))
 	defer server.Close()
@@ -91,24 +99,97 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 		Source   string `json:"src"`
 		Language string `json:"language"`
 		Default  bool   `json:"default"`
-	}{Kind: "captions", Label: "Russian", Source: "https://cdn.example/sub.vtt", Language: "rus", Default: true})
+	}{Kind: "captions", Label: "Russian", Source: "https://cdn.example/sub.vtt?lang=ru", Language: "rus", Default: true})
 
-	playerURL, _ := url.Parse("https://player.example/")
-	player := &alternativePlayer{client: server.Client(), playerURL: playerURL}
+	playerURL, _ := url.Parse("https://player.example/?token_movie=abc&token=def")
+	player := &alternativePlayer{client: server.Client(), playerURL: playerURL, fingerprint: fingerprint}
 	streams := client.alternativePlaybackStreams(player, 7, playback)
 	if requests != 0 {
 		t.Fatalf("listing sources made %d CDN requests", requests)
 	}
 	if len(streams) != 1 || streams[0].Name != "(Russian) Dub" ||
 		streams[0].AudioTracks[0].Name != "(Russian) Dub" ||
-		streams[0].AudioTracks[0].Language != "ru" || len(streams[0].Subtitles) != 1 ||
-		len(streams[0].ProxyHeaders) != 1 || streams[0].ProxyHeaders[0].Name != "Origin" ||
-		streams[0].ProxyHeaders[0].Value != "https://player.example" {
+		streams[0].AudioTracks[0].Language != "ru" || len(streams[0].Subtitles) != 1 {
 		t.Fatalf("unexpected streams: %+v", streams)
+	}
+	// Appended as the player does, though the link has a query already.
+	if got, want := streams[0].Subtitles[0].PlaylistURL,
+		"https://cdn.example/sub.vtt?lang=ru?t="+alternativeGuard+"&b="+fingerprint; got != want {
+		t.Fatalf("subtitle URL = %q, want %q", got, want)
+	}
+	headers := map[string]string{}
+	for _, header := range streams[0].ProxyHeaders {
+		headers[header.Name] = header.Value
+		// The router's limits for &h= lines (valid_headers in wrtcast.uc).
+		if line := header.Name + ": " + header.Value; len(line) > 512 ||
+			!regexp.MustCompile(`^[A-Za-z0-9-]{1,40}: [ -~]+$`).MatchString(line) {
+			t.Errorf("proxy header %q breaks the router's limits", line)
+		}
+	}
+	if len(streams[0].ProxyHeaders) > 8 || len(headers) != 4 ||
+		headers["Origin"] != "https://player.example" ||
+		headers["Referer"] != "https://player.example/?token_movie=abc&token=def" ||
+		headers["Accepts-Controls"] != fingerprint ||
+		headers["Authorizations"] != "Bearer "+alternativeGuard {
+		t.Fatalf("unexpected proxy headers: %+v", streams[0].ProxyHeaders)
 	}
 	id := strings.Split(strings.TrimSuffix(streams[0].MasterPlaylistURL, "/master.m3u8"), "/")
 	master, err := client.MasterPlaylist(context.Background(), id[len(id)-1])
 	if err != nil || requests != 1 || !strings.Contains(string(master), server.URL+"/720/media.m3u8") {
 		t.Fatalf("unexpected synthetic master: %q", master)
+	}
+}
+
+type memoryFingerprintStore struct {
+	value string
+	saves int
+}
+
+func (s *memoryFingerprintStore) LoadPlayerFingerprint(context.Context) (string, error) {
+	return s.value, nil
+}
+
+func (s *memoryFingerprintStore) SavePlayerFingerprint(_ context.Context, value string) error {
+	s.value = value
+	s.saves++
+	return nil
+}
+
+// The player's fingerprint is made once and outlives the Client when there
+// is a store for it.
+func TestPlayerFingerprintIsStable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	newClient := func(store PlayerFingerprintStore) *Client {
+		client, err := NewClient(Config{BaseURL: "https://example.com", FingerprintStore: store})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return client
+	}
+	fingerprints := func(client *Client) (string, string) {
+		first, err := client.playerFingerprint(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		second, err := client.playerFingerprint(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return first, second
+	}
+
+	first, second := fingerprints(newClient(nil))
+	if !playerFingerprintPattern.MatchString(first) || first != second {
+		t.Fatalf("fingerprints without a store = %q, %q", first, second)
+	}
+
+	store := &memoryFingerprintStore{value: "not a fingerprint"}
+	first, second = fingerprints(newClient(store))
+	if !playerFingerprintPattern.MatchString(first) || first != second || store.value != first || store.saves != 1 {
+		t.Fatalf("fingerprints = %q, %q; stored %q after %d saves", first, second, store.value, store.saves)
+	}
+	if again, _ := fingerprints(newClient(store)); again != first || store.saves != 1 {
+		t.Fatalf("restarted client fingerprint = %q, want %q (%d saves)", again, first, store.saves)
 	}
 }

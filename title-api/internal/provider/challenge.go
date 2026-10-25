@@ -27,12 +27,13 @@ const defaultUserAgent = "Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 " +
 var ErrInvalidTitleID = errors.New("invalid movie ID")
 
 type Config struct {
-	BaseURL         string
-	MediaBaseURL    string
-	RefreshInterval time.Duration
-	HTTPTimeout     time.Duration
-	UserAgent       string
-	URLStore        ProviderURLStore
+	BaseURL          string
+	MediaBaseURL     string
+	RefreshInterval  time.Duration
+	HTTPTimeout      time.Duration
+	UserAgent        string
+	URLStore         ProviderURLStore
+	FingerprintStore PlayerFingerprintStore
 }
 
 type session struct {
@@ -53,6 +54,10 @@ type Client struct {
 	mediaBaseURL    string
 	masters         *masterStore
 	urlStore        ProviderURLStore
+
+	fingerprintStore PlayerFingerprintStore
+	fingerprintMu    sync.Mutex
+	fingerprint      string
 
 	mu             sync.RWMutex
 	session        *session
@@ -88,14 +93,15 @@ func NewClient(config Config) (*Client, error) {
 
 	digest := sha1.Sum([]byte(strings.ToLower(baseURL.Hostname())))
 	client := &Client{
-		bootstrapURL:    baseURL,
-		domainPrefix:    hex.EncodeToString(digest[:])[:8],
-		refreshInterval: config.RefreshInterval,
-		httpTimeout:     config.HTTPTimeout,
-		userAgent:       config.UserAgent,
-		mediaBaseURL:    strings.TrimRight(mediaBaseURL.String(), "/"),
-		masters:         newMasterStore(6*time.Hour, 4096),
-		urlStore:        config.URLStore,
+		bootstrapURL:     baseURL,
+		domainPrefix:     hex.EncodeToString(digest[:])[:8],
+		refreshInterval:  config.RefreshInterval,
+		httpTimeout:      config.HTTPTimeout,
+		userAgent:        config.UserAgent,
+		mediaBaseURL:     strings.TrimRight(mediaBaseURL.String(), "/"),
+		masters:          newMasterStore(6*time.Hour, 4096),
+		urlStore:         config.URLStore,
+		fingerprintStore: config.FingerprintStore,
 	}
 	client.baseURL.Store(baseURL)
 	return client, nil

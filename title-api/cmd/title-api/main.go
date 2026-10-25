@@ -52,11 +52,12 @@ func run() error {
 	defer urlStore.Close()
 
 	client, err := provider.NewClient(provider.Config{
-		BaseURL:         baseURL,
-		MediaBaseURL:    mediaBaseURL,
-		RefreshInterval: 5 * time.Minute,
-		UserAgent:       providerUserAgent,
-		URLStore:        urlStore,
+		BaseURL:          baseURL,
+		MediaBaseURL:     mediaBaseURL,
+		RefreshInterval:  5 * time.Minute,
+		UserAgent:        providerUserAgent,
+		URLStore:         urlStore,
+		FingerprintStore: urlStore,
 	})
 	if err != nil {
 		return err
@@ -149,6 +150,11 @@ func masterPlaylistHandler(source masterPlaylistSource) runtime.HandlerFunc {
 		body, err := source.MasterPlaylist(request.Context(), pathParams["id"])
 		if errors.Is(err, provider.ErrMasterNotFound) {
 			http.Error(response, err.Error(), http.StatusNotFound)
+			return
+		}
+		// A 403 reaches the receiver as one, and it does not retry that.
+		if errors.Is(err, provider.ErrCDNBlocked) {
+			http.Error(response, err.Error(), http.StatusForbidden)
 			return
 		}
 		if err != nil {
