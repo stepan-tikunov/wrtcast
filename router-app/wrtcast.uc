@@ -25,6 +25,7 @@ const DEVICES = '/tmp/wrtcast.devices.json'; // last discovery result
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const DRC = '/tmp/wrtcast.drc/';             // audio playlists and segments of the leveler
 const ERR = '/tmp/wrtcast.err.';           // + ns; stderr of a proxied fetch
+const HDR = '/tmp/wrtcast.hdr.';           // + media id; its CDN headers from title-api
 const COMMANDS = {
 	pause: null, resume: null, stop: null, quit: null, mute: null, unmute: null,
 	seek: 'num', ff: 'num', rew: 'num', volume: 'num', audio: 'str', subs: 'str',
@@ -164,6 +165,90 @@ function api(path) {
 	if (type(j) != 'object')
 		fail(502, 'title-api returned invalid JSON');
 	return j;
+}
+
+// One title-api request that may fail: the object it answered, or null.
+function api_try(path) {
+	let r = run(`uclient-fetch -q -T 5 -O - ${shq(API + path)}`);
+	try {
+		let j = r.code == 0 ? json(r.out) : null;
+		return type(j) == 'object' ? j : null;
+	} catch (e) {
+		return null;
+	}
+}
+
+// ---- title-api media headers -----------------------------------------------
+//
+// The alternative player's CDN wants headers that change during a playback:
+// title-api holds the player's playback socket, whose edge_hash replaces the
+// device fingerprint. So the proxy URLs of a stream that is a title-api
+// master carry its media id (&m=) instead of the headers (&h=), and fetches
+// take the headers from HDR<id>, kept for the ttl title-api gives.
+
+// Per-stream upstream headers travel in the proxy URL (&h=, "Name: value"
+// lines) and are inherited by every URL a rewritten playlist points to.
+function valid_headers(h) {
+	let lines = split(h ?? '', '\n');
+	return h != null && h != '' && length(lines) <= 8 &&
+		length(filter(lines, l => length(l) > 512 ||
+			!match(l, /^[A-Za-z0-9-]{1,40}: [ -~]+$/))) == 0;
+}
+
+// The title-api media id of a stream URL (its synthetic master), or null.
+function media_id(u) {
+	return match(u ?? '', /^https?:\/\/[^\/?#]+\/v1\/media\/([0-9a-f]{32})\/master\.m3u8$/)?.[1];
+}
+
+function valid_media(m) {
+	return type(m) == 'string' && !!match(m, /^[0-9a-f]{32}$/);
+}
+
+// "720" of the quality label "720p"; null for auto.
+function quality_digits(l) {
+	return match(l ?? '', /^([0-9]{3,4})p$/)?.[1];
+}
+
+// The headers of media m as "Name: value" lines; null without any. Stale
+// ones (or with force) are asked for again, which tells title-api the
+// playback goes on, with q, the quality's digits, and t, the position,
+// when known. One request refreshes them while the others go on with what
+// there is for a few seconds (a few may still refresh at once); a failed
+// refresh keeps the stale ones too.
+function media_headers(m, q, t, force) {
+	let f = HDR + m, c = load(f), now = time();
+	let claimed = now - (c?.claimed ?? 0) < 10;
+	if (type(c?.headers) != 'array')
+		c = null;
+	if (!force && (c && now - c.fetched < c.ttl || claimed))
+		return c?.headers;
+	if (c)
+		c.claimed = now;
+	save(f, c ?? { claimed: now });
+	let qs = [];
+	if (q != null)
+		push(qs, `q=${q}`);
+	if (type(t) in ['int', 'double'] && t >= 0)
+		push(qs, sprintf('t=%d', t));
+	let r = api_try(`/v1/media/${m}/headers` + (length(qs) ? '?' + join('&', qs) : ''));
+	let lines = map(filter(r?.headers ?? [], x => type(x?.name) == 'string' &&
+		type(x?.value) == 'string'), x => `${x.name}: ${x.value}`);
+	if (type(r?.headers) == 'array' && (!length(lines) || valid_headers(join('\n', lines)))) {
+		c = { headers: lines, fetched: time(), ttl: +r.ttl > 0 ? +r.ttl : 60 };
+		save(f, c);
+	}
+	return c?.headers;
+}
+
+// Tells title-api the playback of media m ended, so its socket says so and
+// closes. In the background: it takes title-api a moment, and a failure
+// changes nothing. uclient-fetch can't send DELETE, hence the POST.
+function media_end(m) {
+	if (!valid_media(m))
+		return;
+	unlink(HDR + m);
+	system(`uclient-fetch -q -T 5 -O /dev/null --post-data= ` +
+		`${shq(API + '/v1/media/' + m + '/session/end')} </dev/null >/dev/null 2>&1 &`);
 }
 
 // ---- devices ---------------------------------------------------------------
@@ -522,11 +607,22 @@ function tick() {
 		misses = m?.url == now.url && m.state != 'IDLE' ? 0 : misses + 1;
 		if (misses != w?.misses || w?.url != now.url)
 			save(WATCH + k, { url: now.url, misses });
+		// title-api keeps the playback socket open while the headers are
+		// asked for, also while the receiver has enough buffered to fetch
+		// nothing, and learns the position.
+		if (now.media && misses == 0)
+			media_headers(now.media, quality_digits(now.quality), m.time, true);
+		// Playback ended (see above).
+		if (misses == 5)
+			media_end(now.media);
 	}
-	// Error files of proxied fetches the web server cut short.
+	// Error files of proxied fetches the web server cut short, and the
+	// headers of media not played for a day.
 	for (let name in lsdir('/tmp') ?? []) {
-		let st = match(name, /^wrtcast\.err\.[0-9]+$/) ? stat('/tmp/' + name) : null;
-		if (st && st.mtime < time() - 60)
+		let age = match(name, /^wrtcast\.err\.[0-9]+$/) ? 60 :
+			match(name, /^wrtcast\.hdr\./) ? 86400 : null;
+		let st = age ? stat('/tmp/' + name) : null;
+		if (st && st.mtime < time() - age)
 			unlink('/tmp/' + name);
 	}
 	// The last position before playback stopped would otherwise stay in
@@ -583,22 +679,29 @@ function with_now(st, dev) {
 // extension. Playlists are rewritten so every URI points back at the proxy;
 // everything else is streamed through.
 
-// Per-stream upstream headers travel in the proxy URL (&h=, "Name: value"
-// lines) and are inherited by every URL a rewritten playlist points to.
-function valid_headers(h) {
-	let lines = split(h ?? '', '\n');
-	return h != null && h != '' && length(lines) <= 8 &&
-		length(filter(lines, l => length(l) > 512 ||
-			!match(l, /^[A-Za-z0-9-]{1,40}: [ -~]+$/))) == 0;
-}
-
 // With err, stderr goes to that file and keeps the "HTTP error N" line of
-// a refused fetch, which -q leaves out.
-function fetch_cmd(url, h, err) {
+// a refused fetch, which -q leaves out. With m, the headers of that
+// title-api media (see media_headers) replace the same-named ones of h,
+// which stand in for them only while there are none; the master from
+// title-api itself needs none.
+function fetch_cmd(url, h, err, m) {
 	let cmd = `uclient-fetch ${err ? '' : '-q '}-T 20 -U ${shq(USER_AGENT)}`;
 	for (let x in (type(HEADERS) == 'array' ? HEADERS : [HEADERS]))
 		cmd += ' --header=' + shq(x);
-	for (let x in (valid_headers(h) ? split(h, '\n') : []))
+	let lines = valid_headers(h) ? split(h, '\n') : [];
+	if (valid_media(m) && !media_id(url)) {
+		let dyn = media_headers(m);
+		if (dyn == null && !length(lines)) {
+			if (err)
+				unlink(err);
+			fail(502, 'no CDN headers for the media');
+		}
+		let name = l => lc(split(l, ':')[0]), own = {};
+		for (let l in dyn ?? [])
+			own[name(l)] = true;
+		lines = [...filter(lines, l => !own[name(l)]), ...(dyn ?? [])];
+	}
+	for (let x in lines)
 		cmd += ' --header=' + shq(x);
 	return `${cmd} -O - ${shq(url)} 2>${err ? shq(err) : '/dev/null'}`;
 }
@@ -615,8 +718,8 @@ function fetch_fail(err, msg) {
 }
 
 // A playlist or another small text file; null when the fetch fails.
-function fetch_text(url, h) {
-	let r = run(fetch_cmd(url, h));
+function fetch_text(url, h, m) {
+	let r = run(fetch_cmd(url, h, null, m));
 	return r.code == 0 ? r.out : null;
 }
 
@@ -641,12 +744,13 @@ function ext(name) {
 }
 
 // Proxy path for an upstream URL; root-relative unless a base is given.
-// The name defaults to the upstream file name.
-function purl(u, base, name, h) {
-	let m = match(u, /^[^?#]*\/([^\/?#]*)/);
-	name = replace(name ?? m?.[1] ?? '', /[^A-Za-z0-9._-]/g, '') || 'file';
+// The name defaults to the upstream file name. A title-api media id (m)
+// stands for the headers.
+function purl(u, base, name, h, m) {
+	let f = match(u, /^[^?#]*\/([^\/?#]*)/);
+	name = replace(name ?? f?.[1] ?? '', /[^A-Za-z0-9._-]/g, '') || 'file';
 	return `${base ?? ''}/api/p/${name}?u=${urlenc(u)}` +
-		(valid_headers(h) ? `&h=${urlenc(h)}` : '');
+		(valid_media(m) ? `&m=${m}` : valid_headers(h) ? `&h=${urlenc(h)}` : '');
 }
 
 function resolve(base, ref) {
@@ -721,7 +825,7 @@ function qualities(body) {
 // receiver assumes MPEG-TS segments unless told. Of the variants it asks
 // for the one that will play: the first playable one of the chosen width,
 // else the first playable one, so no other playlist is fetched.
-function is_fmp4(master, body, h, width) {
+function is_fmp4(master, body, h, width, m) {
 	let inf = null, first = null, uri = null;
 	for (let l in split(body ?? '', '\n')) {
 		l = trim(l);
@@ -742,7 +846,7 @@ function is_fmp4(master, body, h, width) {
 	// A media playlist rather than a master tells by itself.
 	if (uri == null)
 		return index(body ?? '', '#EXT-X-MAP') >= 0;
-	return index(fetch_text(resolve(master, uri), h) ?? '', '#EXT-X-MAP') >= 0;
+	return index(fetch_text(resolve(master, uri), h, m) ?? '', '#EXT-X-MAP') >= 0;
 }
 
 // Drops the variants (#EXT-X-STREAM-INF and its URI line) that fail keep,
@@ -768,8 +872,8 @@ function keep_variants(lines, keep) {
 
 // With drc the audio renditions of a master are asked for leveled (see
 // drc_playlist).
-function rewrite_playlist(body, base, q, h, drc) {
-	let fix = u => match(u, /^(data|skd):/) ? u : purl(resolve(base, u), null, null, h);
+function rewrite_playlist(body, base, q, h, drc, m) {
+	let fix = u => match(u, /^(data|skd):/) ? u : purl(resolve(base, u), null, null, h, m);
 	let lines = map(split(body, '\n'), line => rtrim(line, '\r'));
 	lines = keep_variants(lines, l => playable(match(l, /CODECS="([^"]*)"/)?.[1]));
 	if (q)
@@ -813,7 +917,7 @@ const DRC_PRE = 5;   // seconds of history, well over the leveler's window
 const DRC_POST = 3;  // seconds of look-ahead, over half the window (250 ms × 13)
 
 // Whether the audio of a master (url and body) can be leveled.
-function drc_supported(master, body, h) {
+function drc_supported(master, body, h, m) {
 	if (body == null || !access(FFMPEG, 'x'))
 		return false;
 	let group = null;
@@ -834,7 +938,7 @@ function drc_supported(master, body, h) {
 			uri = match(m[0], /URI="([^"]*)"/)?.[1];
 	if (!group || !uri)
 		return false;
-	let pl = fetch_text(resolve(master, uri), h) ?? '';
+	let pl = fetch_text(resolve(master, uri), h, m) ?? '';
 	let seg = trim(match(pl, /\n([^#\n][^\n]*)/)?.[1] ?? '');
 	return substr(pl, 0, 7) == '#EXTM3U' && index(pl, '#EXT-X-ENDLIST') >= 0 &&
 		!match(pl, /#EXT-X-(MAP|DISCONTINUITY|BYTERANGE)/) &&
@@ -852,7 +956,7 @@ function hash(s) {
 
 // Rewrites an audio media playlist so its segments point at /api/a/<key>/<n>.ts
 // and keeps their upstream URLs and durations for that handler.
-function drc_playlist(body, url, h) {
+function drc_playlist(body, url, h, m) {
 	let key = hash(match(url, /^[^?#]*/)[0]), segs = [], durs = [], dur = 10;
 	let out = map(split(body, '\n'), l => {
 		l = rtrim(l, '\r');
@@ -865,7 +969,8 @@ function drc_playlist(body, url, h) {
 		return `/api/a/${key}/${length(segs) - 1}.ts`;
 	});
 	mkdir(DRC);
-	save(`${DRC}${key}.json`, { segs, durs, h: valid_headers(h) ? h : null });
+	save(`${DRC}${key}.json`, { segs, durs, h: valid_headers(h) ? h : null,
+		m: valid_media(m) ? m : null });
 	return join('\n', out);
 }
 
@@ -906,7 +1011,7 @@ function drc_raw(meta, key, i) {
 	if (s != null)
 		return s;
 	let url = proxy_target(meta.segs[i]);
-	let pipe = url ? popen(fetch_cmd(url, meta.h)) : null;
+	let pipe = url ? popen(fetch_cmd(url, meta.h, null, meta.m)) : null;
 	s = pipe?.read('all');
 	if (!pipe || pipe.close() != 0 || ord(s ?? '', 0) != 0x47)
 		return null;
@@ -999,14 +1104,16 @@ function drc_segment(key, i) {
 	exit(0);
 }
 
-function proxy(name, u, q, h, drc) {
+function proxy(name, u, q, h, drc, m) {
 	let url = proxy_target(u);
 	if (!url)
 		fail(400, 'bad url');
 	if (h != null && !valid_headers(h))
 		fail(400, 'bad headers');
+	if (m != null && !valid_media(m))
+		fail(400, 'bad media');
 	let e = ext(name), err = ERR + clock()[1];
-	let pipe = popen(fetch_cmd(url, h, err));
+	let pipe = popen(fetch_cmd(url, h, err, m));
 	if (!pipe) {
 		unlink(err);
 		fail(502, 'popen failed');
@@ -1018,8 +1125,8 @@ function proxy(name, u, q, h, drc) {
 			fetch_fail(err, 'upstream playlist fetch failed');
 		unlink(err);
 		let text = drc && index(body, '#EXTINF') >= 0 && access(FFMPEG, 'x') ?
-			drc_playlist(body, url, h) :
-			rewrite_playlist(body, url, match(q ?? '', /^[0-9]{1,5}$/) ? +q : null, h, drc);
+			drc_playlist(body, url, h, m) :
+			rewrite_playlist(body, url, match(q ?? '', /^[0-9]{1,5}$/) ? +q : null, h, drc, m);
 		media_head(200, MIME[e]);
 		print(text, '\n');
 		exit(0);
@@ -1117,11 +1224,11 @@ function play(dev, p, keep) {
 	let ks = keep?.subs ? filter(s.subs, t => t.url && t.name == keep.subs)[0] : null;
 	if (ks && p.subs == null)
 		p.subs = 'sub' + ks.id;
-	let h = s.headers ?? '', body = null;
+	let h = s.headers ?? '', m = media_id(s.url), body = null;
 	if (s.variants == null) {
 		// title-api assembles a source's master on first request; a
 		// source the CDN rejects fails here instead of on the TV.
-		body = fetch_text(s.url, h);
+		body = fetch_text(s.url, h, m);
 		s.variants = qualities(body);
 		if (s.variants == null)
 			reply(502, { error: 'source unavailable', source: s.name,
@@ -1137,20 +1244,24 @@ function play(dev, p, keep) {
 		quality = v?.label ?? 'auto';
 		width = v?.width;
 	}
+	// Without start (or reuse) the title resumes where it was left off;
+	// start=0 plays it from the beginning.
+	let start = p.start ?? (p.reuse == '1' ? null : resume_at(id, season, episode));
+	// Tells title-api the quality and the position before the CDN sees
+	// a request.
+	if (m)
+		media_headers(m, quality_digits(quality), start != null ? +start : null, true);
 	// Probed once per source, on the variant this play picks.
 	if (body != null) {
-		s.fmp4 = is_fmp4(s.url, body, h, width);
-		s.drc = PROXY && !s.fmp4 && drc_supported(s.url, body, h);
+		s.fmp4 = is_fmp4(s.url, body, h, width, m);
+		s.drc = PROXY && !s.fmp4 && drc_supported(s.url, body, h, m);
 	}
 	let drc = p.drc == '1' && !!s.drc;
-	let url = PROXY ? purl(s.url, public_base(), null, h) +
+	let url = PROXY ? purl(s.url, public_base(), null, h, m) +
 		(width ? `&q=${width}` : '') + (drc ? '&drc=1' : '') : s.url;
 	// Subtitles are separate WebVTT files, not part of the HLS manifest,
 	// so they are side-loaded; the receiver names them "sub<id>".
 	let args = ['play', url], labels = {};
-	// Without start (or reuse) the title resumes where it was left off;
-	// start=0 plays it from the beginning.
-	let start = p.start ?? (p.reuse == '1' ? null : resume_at(id, season, episode));
 	if (season != null)
 		next_episode(id, season, episode);
 	if (+(start ?? 0) > 0)
@@ -1162,7 +1273,7 @@ function play(dev, p, keep) {
 	// links that look the real URL up in a file written beforehand.
 	let picked = pick_subs(s.subs);
 	writefile(SUBS + state_key(dev), sprintf('%J', {
-		urls: map(picked, t => t.url), headers: h,
+		urls: map(picked, t => t.url), headers: h, media: m,
 	}));
 	for (let i, t in picked) {
 		push(args, '-s', PROXY ? `${public_base()}/api/sub/${state_key(dev)}/${i}.vtt` : t.url,
@@ -1177,7 +1288,7 @@ function play(dev, p, keep) {
 	// phone went away) while castctl waits for playback, and the TV then
 	// plays this stream all the same. A failed play puts the last one back.
 	let f = state_file(dev), now = {
-		id, stream: n, source: s.name, url, host: host_of(dev),
+		id, stream: n, source: s.name, url, host: host_of(dev), media: m,
 		title: p.title ?? null, season,
 		episode, labels, quality, qualities: map(quals, v => v.label),
 		drc, drc_ok: !!s.drc,
@@ -1196,6 +1307,9 @@ function play(dev, p, keep) {
 	undo = put_back;
 	let st = castctl(dev, ...args);
 	undo = null;
+	// The socket of what this replaces says it ended.
+	if (last?.media != m)
+		media_end(last?.media);
 	// castctl found the TV at a new address from DHCP: the state moves to
 	// its key, and the old key gets back what it had.
 	if (host_of(dev) != now.host) {
@@ -1359,9 +1473,12 @@ const routes = {
 		if (!exists(COMMANDS, c))
 			fail(400, 'unknown command');
 		let dev = device(p);
-		// Stopped from the page, the episode has not ended (see ended).
-		if (c == 'stop' || c == 'quit')
+		// Stopped from the page, the episode has not ended (see ended),
+		// and the playback has.
+		if (c == 'stop' || c == 'quit') {
 			unlink(SEEN + state_key(dev));
+			media_end(load(state_file(dev))?.media);
+		}
 		if (kind == null)
 			return with_now(castctl(dev, c), dev);
 		if (kind == 'num' && !match(arg, /^[0-9]+(\.[0-9]+)?$/))
@@ -1393,7 +1510,7 @@ if (pm) {
 	if (getenv('REQUEST_METHOD') != 'GET')
 		fail(405, 'method not allowed');
 	let qs = parse_form(getenv('QUERY_STRING'), {});
-	proxy(pm[1], qs.u, qs.q, qs.h, qs.drc == '1');
+	proxy(pm[1], qs.u, qs.q, qs.h, qs.drc == '1', qs.m);
 }
 // Leveled audio segments (see drc_playlist).
 let am = match(path, /^\/a\/([0-9a-f]{8})\/([0-9]{1,6})\.ts$/);
@@ -1409,7 +1526,7 @@ if (sm) {
 	let url = subs?.urls?.[+sm[2]];
 	if (!url)
 		fail(404, 'no such subtitle');
-	proxy('sub.vtt', url, null, subs.headers || null);
+	proxy('sub.vtt', url, null, subs.headers || null, false, subs.media);
 }
 
 let p = params();
