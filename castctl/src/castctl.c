@@ -1228,15 +1228,20 @@ static void text_style(char *out, size_t cap, const char *spec)
 			die("unknown subtitle style \"%s\"", kv);
 		}
 		/* A window color only shows with a window behind the text. */
-		if (!strcmp(kv, "window"))
+		if (!strcmp(kv, "window")) {
 			n += snprintf(out + n, cap - n, "%s\"windowType\":\"NORMAL\"",
 				      n > 1 ? "," : "");
+			if (n >= cap)
+				die("subtitle style too long");
+		}
 		n += snprintf(out + n, cap - n,
 			      val == num ? "%s\"%s\":%s" : "%s\"%s\":\"%s\"",
 			      n > 1 ? "," : "", field, val ? val : v);
 		if (n >= cap)
 			die("subtitle style too long");
 	}
+	if (n + 1 >= cap)
+		die("subtitle style too long");
 	snprintf(out + n, cap - n, "}");
 }
 
@@ -1440,9 +1445,14 @@ static void cmd_select_track(struct app *a, struct media *md, const char *type,
 		if (!same_type)
 			n += snprintf(body + n, sizeof(body) - n, "%ld,",
 				      md->active[i]);
+		if (n >= sizeof(body))
+			die("too many active tracks");
 	}
 	if (t)
 		n += snprintf(body + n, sizeof(body) - n, "%ld,", t->id);
+	/* Room for the closing bracket too. */
+	if (n + 1 >= sizeof(body))
+		die("too many active tracks");
 	if (body[n - 1] == ',')
 		n--;
 	snprintf(body + n, sizeof(body) - n, "]");

@@ -292,8 +292,20 @@ function pick_subs(subs) {
 }
 
 // castctl subtitle style: "size=1.3,color=#FFFF00,bg=#00000099,edge=outline".
-const valid_style = s => length(s) <= 200 &&
-	match(s, /^[a-z]+=[#.0-9A-Za-z]+(,[a-z]+=[#.0-9A-Za-z]+)*$/);
+// Each key once and a short string: castctl builds it into a small buffer.
+function valid_style(s) {
+	if (length(s) > 100 ||
+	    !match(s, /^[a-z]+=[#.0-9A-Za-z]+(,[a-z]+=[#.0-9A-Za-z]+)*$/))
+		return false;
+	let seen = {};
+	for (let kv in split(s, ',')) {
+		let k = split(kv, '=')[0];
+		if (seen[k])
+			return false;
+		seen[k] = true;
+	}
+	return true;
+}
 
 function title_id(p) {
 	if (!match(p.id ?? '', /^[0-9A-Za-z]{1,64}$/))
