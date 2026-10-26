@@ -460,10 +460,10 @@ function streams(id, season, episode) {
 
 // The streams of a title, remembered per TV for 10 minutes: the UI lists the
 // sources before playing and may retry with another, all from one provider
-// request.
-function title_streams(dev, id, season, episode) {
+// request. force asks the provider again.
+function title_streams(dev, id, season, episode, force) {
 	let f = LIST + state_key(dev), c = load(f);
-	if (c?.streams && c.id == id && c.season == season &&
+	if (!force && c?.streams && c.id == id && c.season == season &&
 	    c.episode == episode && time() - c.fetched < 600)
 		return c;
 	c = { id, season, episode, streams: streams(id, season, episode), fetched: time() };
@@ -1285,6 +1285,30 @@ function play(dev, p, keep) {
 	let s = list[n];
 	if (!s || !s.url)
 		fail(404, 'stream not found');
+	let h = s.headers ?? '', m = media_id(s.url), body = null;
+	if (s.variants == null) {
+		// title-api assembles a source's master on first request; a
+		// source the CDN rejects fails here instead of on the TV.
+		body = fetch_text(s.url, h, m);
+		// title-api forgets its masters when it restarts, so one of
+		// the streams of an earlier play may be gone: the provider is
+		// asked for them again.
+		if (qualities(body) == null && m && list == last?.streams) {
+			let c = title_streams(dev, id, season, episode, true);
+			list = c.streams;
+			fetched = c.fetched;
+			s = filter(list, x => x.name == s.name)[0];
+			if (!s?.url)
+				fail(404, 'stream not found');
+			h = s.headers ?? '';
+			m = media_id(s.url);
+			body = fetch_text(s.url, h, m);
+		}
+		s.variants = qualities(body);
+		if (s.variants == null)
+			reply(502, { error: 'source unavailable', source: s.name,
+				sources: map(list, x => x.name) });
+	}
 	// The next episode started by the router keeps the dub and the
 	// subtitles of the last one, found by name: track ids may differ.
 	if (keep?.audio && p.audio == null)
@@ -1292,16 +1316,6 @@ function play(dev, p, keep) {
 	let ks = keep?.subs ? filter(s.subs, t => t.url && t.name == keep.subs)[0] : null;
 	if (ks && p.subs == null)
 		p.subs = 'sub' + ks.id;
-	let h = s.headers ?? '', m = media_id(s.url), body = null;
-	if (s.variants == null) {
-		// title-api assembles a source's master on first request; a
-		// source the CDN rejects fails here instead of on the TV.
-		body = fetch_text(s.url, h, m);
-		s.variants = qualities(body);
-		if (s.variants == null)
-			reply(502, { error: 'source unavailable', source: s.name,
-				sources: map(list, x => x.name) });
-	}
 	let quals = s.variants;
 	// The best quality unless asked otherwise; a missing one falls back
 	// to the best below it.
