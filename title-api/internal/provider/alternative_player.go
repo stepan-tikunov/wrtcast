@@ -25,6 +25,10 @@ var (
 	playerTokenPattern       = regexp.MustCompile(`(?s)const\s+userParam\s*=.*?\btoken\s*:\s*'([^']+)'`)
 	playerFilesPattern       = regexp.MustCompile(`(?s)const\s+fileList\s*=\s*JSON\.parse\('((?:\\.|[^'])*)'\)`)
 	playerFingerprintPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	playerUserParamPattern   = regexp.MustCompile(`(?s)const\s+userParam\s*=\s*\{(.*?)\};`)
+	playerMoviePattern       = regexp.MustCompile(`(?s)const\s+movie\s*=\s*\{(.*?)\};`)
+	playerDomainPattern      = regexp.MustCompile(`\bdomain\s*:\s*'([^']*)'`)
+	playerTypePattern        = regexp.MustCompile(`\btype\s*:\s*'([^']*)'`)
 )
 
 // alternativeGuard is a constant of the player bundle. Its HLS loader sends
@@ -57,7 +61,16 @@ func (catalog alternativeCatalog) episodes() alternativeEpisodes {
 
 type alternativeFile struct {
 	ID          int64  `json:"id"`
+	IDFile      int64  `json:"id_file"`
 	Translation string `json:"translation"`
+}
+
+// statID is the id the player registers a view of the file under.
+func (file alternativeFile) statID() int64 {
+	if file.IDFile > 0 {
+		return file.IDFile
+	}
+	return file.ID
 }
 
 type alternativePlayback struct {
@@ -113,12 +126,21 @@ type alternativePlayer struct {
 	fingerprint string
 	token       string
 	catalog     alternativeCatalog
+	// What the player's telemetry (see viewSession) needs of the page:
+	// userParam.domain, %-encoded as the page has it, whether movie.type
+	// is a trailer, and when the page was asked for (performance.now()
+	// counts from there) and had arrived (the player starts then).
+	domain                   string
+	trailer                  bool
+	navigationStart, started time.Time
 
 	// challenge signs the next playback request. It starts as the page's
 	// viewporti nonce, which is single-use, and each accepted request
-	// answers with the next one in its Borth header.
-	mu        sync.Mutex
-	challenge string
+	// answers with the next one in its Borth header. The last accepted
+	// request went out and was answered at playbackSent, playbackAnswered.
+	mu                             sync.Mutex
+	challenge                      string
+	playbackSent, playbackAnswered time.Time
 }
 
 // cdnHeaders are what the player's HLS loader sends with every request to
@@ -222,6 +244,7 @@ func (c *Client) loadAlternativePlayer(ctx context.Context, rawPlayerURL string)
 	}
 	request.Header.Set("User-Agent", c.userAgent)
 	request.Header.Set("Referer", c.providerURL().String()+"/")
+	navigationStart := time.Now()
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("fetch player: %w", err)
@@ -249,8 +272,12 @@ func (c *Client) loadAlternativePlayer(ctx context.Context, rawPlayerURL string)
 		}
 		return nil, fmt.Errorf("decode player catalog %q: %w", preview, err)
 	}
+	userParam := []byte(firstSubmatch(playerUserParamPattern, body))
+	movie := []byte(firstSubmatch(playerMoviePattern, body))
 	return &alternativePlayer{
 		client: client, playerURL: playerURL, fingerprint: fingerprint, token: token, catalog: catalog,
+		domain: firstSubmatch(playerDomainPattern, userParam), trailer: firstSubmatch(playerTypePattern, movie) == "trailer",
+		navigationStart: navigationStart, started: time.Now(),
 		challenge: viewport,
 	}, nil
 }
@@ -269,7 +296,7 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 	if err != nil {
 		return nil, err
 	}
-	streams := c.alternativePlaybackStreams(player, file.ID, playback)
+	streams := c.alternativePlaybackStreams(player, file, playback)
 	if len(streams) == 0 {
 		return nil, fmt.Errorf("none of %d sources has a quality", len(playback.HLSSource))
 	}
@@ -297,6 +324,7 @@ func (c *Client) requestAlternativePlayback(ctx context.Context, player *alterna
 	request.Header.Set("Origin", playerURL.Scheme+"://"+playerURL.Host)
 	request.Header.Set("Referer", playerURL.String())
 	request.Header.Set("Borth", player.fingerprint+"|"+playerChallenge(player.challenge))
+	sent := time.Now()
 	response, err := player.client.Do(request)
 	if err != nil {
 		return alternativePlayback{}, fmt.Errorf("request playback: %w", err)
@@ -305,6 +333,7 @@ func (c *Client) requestAlternativePlayback(ctx context.Context, player *alterna
 	if err != nil {
 		return alternativePlayback{}, fmt.Errorf("request playback: %w", err)
 	}
+	player.playbackSent, player.playbackAnswered = sent, time.Now()
 	if next := response.Header.Get("Borth"); next != "" {
 		player.challenge = next
 	}
@@ -414,7 +443,7 @@ func (catalog alternativeCatalog) selectedFile(season int32, episode string) (al
 // alternativePlaybackStreams lists every source without touching the CDN:
 // each master is assembled only when a player first asks for it, so starting
 // a title costs requests for the chosen source alone.
-func (c *Client) alternativePlaybackStreams(player *alternativePlayer, fileID int64, playback alternativePlayback) []MovieStream {
+func (c *Client) alternativePlaybackStreams(player *alternativePlayer, file alternativeFile, playback alternativePlayback) []MovieStream {
 	subtitles := make([]SubtitleTrack, 0, len(playback.Tracks))
 	for index, track := range playback.Tracks {
 		if track.Source == "" {
@@ -424,6 +453,9 @@ func (c *Client) alternativePlaybackStreams(player *alternativePlayer, fileID in
 		source := track.Source + "?t=" + alternativeGuard + "&b=" + player.fingerprint
 		subtitles = append(subtitles, SubtitleTrack{ID: strconv.Itoa(index + 1), Name: track.Label, Language: track.Language, PlaylistURL: source})
 	}
+	// The sources are the dubs of one file of one page, which the player
+	// switches between: one view for all of them.
+	view := newViewSession(c, player, file.statID())
 	streams := make([]MovieStream, 0, len(playback.HLSSource))
 	for index, source := range playback.HLSSource {
 		if len(source.Quality) == 0 {
@@ -436,8 +468,8 @@ func (c *Client) alternativePlaybackStreams(player *alternativePlayer, fileID in
 			trackID = strconv.Itoa(index + 1)
 		}
 		id := c.masters.putSource(&alternativeSource{
-			client: c, fileID: fileID, label: source.Label, trackID: trackID,
-			player: player, qualities: source.Quality, pnr: playback.Pnr, pnk: playback.Pnk,
+			client: c, fileID: file.ID, statID: file.statID(), label: source.Label, trackID: trackID,
+			player: player, qualities: source.Quality, pnr: playback.Pnr, pnk: playback.Pnk, view: view,
 		})
 		streams = append(streams, MovieStream{
 			Name:              label,
@@ -453,9 +485,11 @@ func (c *Client) alternativePlaybackStreams(player *alternativePlayer, fileID in
 // alternativeSource is one source (a dub) of a file of the alternative
 // player. Its master is assembled on first request, and when the playback
 // reply named a socket (pnr, pnk) the source gets a playbackSession then.
+// Its view reports the playback to the player's site.
 type alternativeSource struct {
 	client  *Client
 	fileID  int64
+	statID  int64
 	label   string
 	trackID string
 
@@ -464,8 +498,10 @@ type alternativeSource struct {
 	mu        sync.Mutex
 	player    *alternativePlayer
 	qualities map[string]string
+	variants  map[string]variantInfo // of the resolved master, by quality
 	pnr, pnk  string
 	session   *playbackSession
+	view      *viewSession
 }
 
 // cdnHeaders are the player's, with the edge_hash once the socket has one.
@@ -480,22 +516,31 @@ func (source *alternativeSource) cdnHeaders() []ProxyHeader {
 }
 
 // headers answers a headers request of the router: those of the socket,
-// which the request keeps open, or the player's own without one.
+// which the request keeps open, or the player's own without one. The
+// request also keeps the view going and tells it what the router plays;
+// while the view runs, the router asks again soon.
 func (source *alternativeSource) headers(report PlaybackReport) MediaHeaders {
 	source.mu.Lock()
-	player, session := source.player, source.session
+	player, session, view := source.player, source.session, source.view
 	source.mu.Unlock()
+	change, active := view.touch(time.Now(), source, report)
+	headers := MediaHeaders{Headers: player.cdnHeaders(), TTL: mediaHeadersTTL}
 	if session != nil {
-		return session.touch(report)
+		headers = session.touch(report, change)
 	}
-	return MediaHeaders{Headers: player.cdnHeaders(), TTL: mediaHeadersTTL}
+	if active && headers.TTL > activeHeadersTTL {
+		headers.TTL = activeHeadersTTL
+	}
+	return headers
 }
 
-// end closes the socket, if any, saying the playback ended.
+// end ends the view and closes the socket, if any, saying the playback
+// ended.
 func (source *alternativeSource) end() {
 	source.mu.Lock()
-	session := source.session
+	session, view := source.session, source.view
 	source.mu.Unlock()
+	view.end(source)
 	if session != nil {
 		session.end()
 	}
@@ -530,6 +575,12 @@ func (source *alternativeSource) resolve(ctx context.Context) ([]byte, error) {
 				}
 				player = fresh
 				playback, err = c.requestAlternativePlayback(ctx, player, source.fileID)
+				if err == nil {
+					// A page of its own, with a player of its own.
+					source.mu.Lock()
+					source.view = newViewSession(c, player, source.statID)
+					source.mu.Unlock()
+				}
 			}
 			if vd, blocked := cdnBlocked(err); blocked {
 				return nil, fmt.Errorf("%w (X-VD: %s)", ErrCDNBlocked, vd)
@@ -546,8 +597,11 @@ func (source *alternativeSource) resolve(ctx context.Context) ([]byte, error) {
 			source.player, source.qualities, source.pnr, source.pnk = player, qualities, playback.Pnr, playback.Pnk
 			source.mu.Unlock()
 		}
-		master, err := c.syntheticMaster(ctx, player, source.cdnHeaders(), qualities)
+		master, variants, err := c.syntheticMaster(ctx, player, source.cdnHeaders(), qualities)
 		if err == nil {
+			source.mu.Lock()
+			source.variants = variants
+			source.mu.Unlock()
 			source.startSession()
 			return master, nil
 		}
@@ -568,19 +622,51 @@ func (source *alternativeSource) startSession() {
 	source.mu.Lock()
 	if source.session == nil && source.pnk != "" &&
 		(strings.HasPrefix(source.pnr, "wss://") || strings.HasPrefix(source.pnr, "ws://")) {
-		source.session = newPlaybackSession(source.client, source.player, source.pnr, source.pnk, source.trackID, source.qualities)
+		source.session = newPlaybackSession(source.client, source.player, source.view, source.pnr, source.pnk, source.trackID, source.qualities)
 	}
 	session := source.session
 	source.mu.Unlock()
 	if session != nil {
-		session.touch(PlaybackReport{})
+		session.touch(PlaybackReport{}, source.view.current())
 	}
+}
+
+// variantInfo is what the player's telemetry tells of a quality: the
+// attributes of its variant and when its master was asked for and read.
+type variantInfo struct {
+	bandwidth, averageBandwidth int64
+	frameRate                   float64
+	width, height               int
+	requested, loaded           time.Time
+}
+
+var (
+	bandwidthAttribute        = regexp.MustCompile(`(?:^|,)BANDWIDTH=([0-9]+)`)
+	averageBandwidthAttribute = regexp.MustCompile(`(?:^|,)AVERAGE-BANDWIDTH=([0-9]+)`)
+	frameRateAttribute        = regexp.MustCompile(`(?:^|,)FRAME-RATE=([0-9.]+)`)
+	resolutionAttribute       = regexp.MustCompile(`(?:^|,)RESOLUTION=([0-9]+)x([0-9]+)`)
+)
+
+func parseVariantInfo(attributes string) variantInfo {
+	var info variantInfo
+	number := func(pattern *regexp.Regexp, group int) string {
+		if match := pattern.FindStringSubmatch(attributes); len(match) > group {
+			return match[group]
+		}
+		return ""
+	}
+	info.bandwidth, _ = strconv.ParseInt(number(bandwidthAttribute, 1), 10, 64)
+	info.averageBandwidth, _ = strconv.ParseInt(number(averageBandwidthAttribute, 1), 10, 64)
+	info.frameRate, _ = strconv.ParseFloat(number(frameRateAttribute, 1), 64)
+	info.width, _ = strconv.Atoi(number(resolutionAttribute, 1))
+	info.height, _ = strconv.Atoi(number(resolutionAttribute, 2))
+	return info
 }
 
 // syntheticMaster resolves the qualities one after another, as the player
 // loads one at a time. A 403 is the CDN refusing the signature or the
 // client, which the remaining links would only repeat.
-func (c *Client) syntheticMaster(ctx context.Context, player *alternativePlayer, headers []ProxyHeader, qualities map[string]string) ([]byte, error) {
+func (c *Client) syntheticMaster(ctx context.Context, player *alternativePlayer, headers []ProxyHeader, qualities map[string]string) ([]byte, map[string]variantInfo, error) {
 	type variant struct {
 		quality                    int
 		link, attributes, mediaURL string
@@ -599,12 +685,14 @@ func (c *Client) syntheticMaster(ctx context.Context, player *alternativePlayer,
 	}
 	sort.Slice(pending, func(i, j int) bool { return pending[i].quality < pending[j].quality })
 	resolved := make([]variant, 0, len(pending))
+	infos := make(map[string]variantInfo, len(pending))
 	lastErr := errors.New("no quality has a link")
 	for _, item := range pending {
+		requested := time.Now()
 		attributes, mediaURL, err := c.resolveAlternativeVariant(ctx, player, headers, item.link)
 		if err != nil {
 			if _, blocked := cdnBlocked(err); blocked || ctx.Err() != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			lastErr = err
 			var refused *alternativeStatusError
@@ -615,9 +703,12 @@ func (c *Client) syntheticMaster(ctx context.Context, player *alternativePlayer,
 		}
 		item.attributes, item.mediaURL = attributes, mediaURL
 		resolved = append(resolved, item)
+		info := parseVariantInfo(attributes)
+		info.requested, info.loaded = requested, time.Now()
+		infos[strconv.Itoa(item.quality)] = info
 	}
 	if len(resolved) == 0 {
-		return nil, lastErr
+		return nil, nil, lastErr
 	}
 	var master strings.Builder
 	master.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n")
@@ -628,7 +719,7 @@ func (c *Client) syntheticMaster(ctx context.Context, player *alternativePlayer,
 		master.WriteString(item.mediaURL)
 		master.WriteByte('\n')
 	}
-	return []byte(master.String()), nil
+	return []byte(master.String()), infos, nil
 }
 
 func (c *Client) resolveAlternativeVariant(ctx context.Context, player *alternativePlayer, headers []ProxyHeader, rawURL string) (string, string, error) {

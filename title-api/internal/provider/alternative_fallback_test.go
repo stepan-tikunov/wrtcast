@@ -103,6 +103,16 @@ type fakeAlternativePlayer struct {
 	challenge   string
 	used        map[string]bool
 	fingerprint string
+	telemetry   []telemetryRecord
+	refuse      int // telemetry answers 403
+}
+
+// telemetryRecord is a telemetry request the player page got.
+type telemetryRecord struct {
+	path   string
+	header http.Header
+	body   string
+	at     time.Time
 }
 
 func newFakeAlternativePlayer(t *testing.T, chain bool, goodFrom int, cdnRefusal string) *fakeAlternativePlayer {
@@ -121,9 +131,18 @@ func (fake *fakeAlternativePlayer) url() string {
 func (fake *fakeAlternativePlayer) servePlayer(response http.ResponseWriter, request *http.Request) {
 	fake.mu.Lock()
 	defer fake.mu.Unlock()
+	if path := request.URL.Path; path == "/stat" || path == "/stats" || path == "/events" {
+		body, _ := io.ReadAll(request.Body)
+		fake.telemetry = append(fake.telemetry, telemetryRecord{path: path, header: request.Header.Clone(), body: string(body), at: time.Now()})
+		if fake.refuse > 0 {
+			response.WriteHeader(fake.refuse)
+		}
+		return
+	}
 	if request.Method != http.MethodPost {
 		fake.pages++
 		fake.challenge = fmt.Sprintf("viewport-nonce-%d", fake.pages)
+		http.SetCookie(response, &http.Cookie{Name: "page", Value: "1", Path: "/"})
 		_, _ = fmt.Fprintf(response, `<meta name="viewporti" content="%s">
 <script>const userParam = { token: 'tok' }; const fileList = JSON.parse('{"type":"movie","active":{"id":7,"translation":"Dub"},"all":{}}');</script>`, fake.challenge)
 		return
@@ -187,6 +206,19 @@ func (fake *fakeAlternativePlayer) serveCDN(response http.ResponseWriter, reques
 		return
 	}
 	_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720\nmedia.m3u8\n"))
+}
+
+// telemetryOf is the telemetry requests to path so far.
+func (fake *fakeAlternativePlayer) telemetryOf(path string) []telemetryRecord {
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	var records []telemetryRecord
+	for _, record := range fake.telemetry {
+		if record.path == path {
+			records = append(records, record)
+		}
+	}
+	return records
 }
 
 func (fake *fakeAlternativePlayer) counts() (pages, playbacks, cdnRequests int) {

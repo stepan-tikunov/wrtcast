@@ -100,7 +100,7 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 
 	playerURL, _ := url.Parse("https://player.example/?token_movie=abc&token=def")
 	player := &alternativePlayer{client: server.Client(), playerURL: playerURL, fingerprint: fingerprint}
-	streams := client.alternativePlaybackStreams(player, 7, playback)
+	streams := client.alternativePlaybackStreams(player, alternativeFile{ID: 7}, playback)
 	if requests != 0 {
 		t.Fatalf("listing sources made %d CDN requests", requests)
 	}
@@ -188,5 +188,43 @@ func TestPlayerFingerprintIsStable(t *testing.T) {
 	}
 	if again, _ := fingerprints(newClient(store)); again != first || store.saves != 1 {
 		t.Fatalf("restarted client fingerprint = %q, want %q (%d saves)", again, first, store.saves)
+	}
+}
+
+// The page's userParam.domain (kept %-encoded), movie.type and the file's
+// id_file are what the player's telemetry sends.
+func TestAlternativePlayerTelemetryBootstrap(t *testing.T) {
+	t.Parallel()
+	page := `<meta name="viewporti" content="nonce">
+<script>
+	const userParam = {
+		token: 'ec4acf58bc9bf62f8be18cad95484c',
+		domain: 'https%3A%2F%2Fgo.example.pro%2F',
+		device: 0,
+		hidden: JSON.parse('[]'),
+	};
+	const movie = {
+		id: '997c32850c0ac731d1a77bcd232556',
+		type: 'trailer',
+	};
+	const fileList = JSON.parse('{"type":"movie","active":{"id":1547557,"id_file":2001,"translation":"SDI Media"},"all":{}}');
+</script>`
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		_, _ = response.Write([]byte(page))
+	}))
+	defer server.Close()
+	client, err := NewClient(Config{BaseURL: "https://example.com", MediaBaseURL: "https://api.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := time.Now()
+	player, err := client.loadAlternativePlayer(context.Background(), server.URL+"/?token_movie=abc&token=def")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if player.token != "ec4acf58bc9bf62f8be18cad95484c" || player.domain != "https%3A%2F%2Fgo.example.pro%2F" || !player.trailer ||
+		player.catalog.Active.statID() != 2001 || (alternativeFile{ID: 7}).statID() != 7 ||
+		player.navigationStart.Before(before) || player.started.Before(player.navigationStart) {
+		t.Fatalf("player = %+v", player)
 	}
 }

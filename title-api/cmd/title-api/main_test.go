@@ -169,7 +169,10 @@ func TestMediaHeadersHandler(t *testing.T) {
 		status    int
 	}{
 		{"known", "?q=720&t=12.5", http.StatusOK}, {"known", "", http.StatusOK},
+		{"known", "?q=1080&t=30&p=1&d=2640.04&b=123456789&e=8000000", http.StatusOK},
 		{"known", "?q=720p", http.StatusBadRequest}, {"known", "?t=-1", http.StatusBadRequest},
+		{"known", "?p=yes", http.StatusBadRequest}, {"known", "?b=-5", http.StatusBadRequest},
+		{"known", "?d=1e3", http.StatusBadRequest}, {"known", "?e=1.5", http.StatusBadRequest},
 		{"missing", "", http.StatusNotFound}, {"blocked", "", http.StatusForbidden},
 	} {
 		response := httptest.NewRecorder()
@@ -182,9 +185,13 @@ func TestMediaHeadersHandler(t *testing.T) {
 			t.Errorf("%s%s: %s %q", test.id, test.query, response.Header().Get("Content-Type"), response.Body.String())
 		}
 	}
-	if len(source.reports) != 2 ||
+	if len(source.reports) != 3 ||
 		source.reports[0] != (provider.PlaybackReport{Resolution: "720", Position: 12.5, HasPosition: true}) ||
-		source.reports[1] != (provider.PlaybackReport{}) {
+		source.reports[1] != (provider.PlaybackReport{}) ||
+		source.reports[2] != (provider.PlaybackReport{
+			Resolution: "1080", Position: 30, HasPosition: true, Paused: true, HasPaused: true,
+			Duration: 2640.04, Bytes: 123456789, HasBytes: true, Bandwidth: 8000000,
+		}) {
 		t.Fatalf("reports = %+v", source.reports)
 	}
 }

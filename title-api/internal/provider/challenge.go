@@ -61,13 +61,14 @@ type Client struct {
 
 	// Playback sockets of the alternative player (see playbackSession),
 	// until Close.
-	sessionTiming  sessionTiming
-	wsTransport    http.RoundTripper
-	sessionsCtx    context.Context
-	stopSessions   context.CancelFunc
-	sessionsMu     sync.Mutex
-	sessionsClosed bool
-	sessions       sync.WaitGroup
+	sessionTiming   sessionTiming
+	telemetryTiming telemetryTiming
+	wsTransport     http.RoundTripper
+	sessionsCtx     context.Context
+	stopSessions    context.CancelFunc
+	sessionsMu      sync.Mutex
+	sessionsClosed  bool
+	sessions        sync.WaitGroup
 
 	mu             sync.RWMutex
 	session        *session
@@ -113,6 +114,7 @@ func NewClient(config Config) (*Client, error) {
 		urlStore:         config.URLStore,
 		fingerprintStore: config.FingerprintStore,
 		sessionTiming:    defaultSessionTiming,
+		telemetryTiming:  defaultTelemetryTiming,
 		wsTransport:      newWSTransport(),
 	}
 	client.sessionsCtx, client.stopSessions = context.WithCancel(context.Background())

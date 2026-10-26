@@ -116,7 +116,8 @@ func TestPlaybackSessionReportsPlayback(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if headers.TTL != mediaHeadersTTL {
+	// The view runs, so the router comes back soon.
+	if headers.TTL != activeHeadersTTL {
 		t.Fatalf("TTL with an edge_hash = %v", headers.TTL)
 	}
 	start, _ = nextMessage(t, peer, "playback_start")
@@ -139,11 +140,36 @@ func TestPlaybackSessionReportsPlayback(t *testing.T) {
 	if start, _ = nextMessage(t, peer, "playback_start"); start["resolution"] != "480" {
 		t.Fatalf("playback_start on reconnect = %v", start)
 	}
-	// The heartbeat goes on, with no resumed.
-	nextMessage(t, peer, "playing")
+	// The site's /stats heard of both, as from the player's beacon.
+	stats := fake.telemetryOf("/stats")
+	if len(stats) != 2 ||
+		!regexp.MustCompile(`^token=tok&domain=&ws=1&wsf=1&status=error&reconnects=0&tokens_received=1&msgs_sent=[0-9]+&duration=0&last_token_age=0&close_code=1001$`).MatchString(stats[0].body) ||
+		!regexp.MustCompile(`^token=tok&domain=&ws=1&wsf=1&status=reconnected&reconnects=1&tokens_received=1&msgs_sent=[0-9]+&duration=0&last_token_age=0$`).MatchString(stats[1].body) ||
+		stats[0].header.Get("Content-Type") != "application/x-www-form-urlencoded" || stats[0].header.Get("Origin") != fake.player.URL {
+		t.Fatalf("/stats got %+v", stats)
+	}
 	if headers, _ = client.MediaHeaders(ctx, id, report); controlOf(headers.Headers) != testEdgeHash {
 		t.Fatalf("reconnect dropped the edge_hash: %+v", headers)
 	}
+	// As the player's, the heartbeat went with the connection: neither
+	// resumed nor playing until the router's playback pauses and resumes.
+	time.Sleep(3 * testSessionTiming.heartbeat)
+	if _, err := client.MediaHeaders(ctx, id, PlaybackReport{Paused: true, HasPaused: true}); err != nil {
+		t.Fatal(err)
+	}
+	if message, _ := peer.readMessage(); message["type"] != "paused" {
+		t.Fatalf("after a reconnect and a pause the client sent %v", message)
+	}
+	time.Sleep(2 * testSessionTiming.heartbeat)
+	if _, err := client.MediaHeaders(ctx, id, PlaybackReport{HasPaused: true}); err != nil {
+		t.Fatal(err)
+	}
+	// The position stood still while paused.
+	resumed, _ := peer.readMessage()
+	if position := resumed["current_time"].(float64); resumed["type"] != "resumed" || position < 100 || position > 101 {
+		t.Fatalf("resume = %v", resumed)
+	}
+	nextMessage(t, peer, "playing")
 
 	// The playback ends.
 	ended := make(chan struct{})
@@ -271,7 +297,7 @@ func TestMediaHeadersWithoutSocket(t *testing.T) {
 		t.Fatalf("unknown media: %v", err)
 	}
 	headers, err := client.MediaHeaders(ctx, id, PlaybackReport{Resolution: "720"})
-	if err != nil || headers.TTL != mediaHeadersTTL || len(headers.Headers) != 4 ||
+	if err != nil || headers.TTL != activeHeadersTTL || len(headers.Headers) != 4 ||
 		controlOf(headers.Headers) != fake.fingerprint {
 		t.Fatalf("headers = %+v, %v", headers, err)
 	}

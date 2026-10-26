@@ -3,7 +3,9 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
+	"math"
 	"net/http"
 	"regexp"
 	"sort"
@@ -15,11 +17,15 @@ import (
 
 // The alternative player reports a playback over a WebSocket when its
 // playback reply names one (pnr, pnk): playback_start once the stream is
-// ready and on every reconnect, resumed on play, playing every 30 seconds.
-// The server answers with config_update and an edge_hash, which from then
-// on replaces the device fingerprint in Accepts-Controls of CDN requests.
-// title-api holds that socket while the router plays the source and hands
-// the router the headers of the moment (MediaHeaders).
+// ready and on every reconnect, resumed on play and playing every 30
+// seconds from then until a pause (paused) or a lost connection, seeked
+// after a seek. The server answers with config_update and an edge_hash,
+// which from then on replaces the device fingerprint in Accepts-Controls of
+// CDN requests. A connection that drops, comes back or can't be had any
+// more is told to the site's /stats. title-api holds that socket while the
+// router plays the source and hands the router the headers of the moment
+// (MediaHeaders). The position and the pauses are the view's (see
+// viewSession), so the socket and the telemetry tell the same.
 
 const (
 	// How long the router may keep the headers of a media.
@@ -53,11 +59,19 @@ var defaultSessionTiming = sessionTiming{
 
 // PlaybackReport is what the router knows of a playback when it asks for
 // the headers of its media: the quality it plays ("720", empty when not
-// known) and the position, when known.
+// known), the position, whether it is paused, the duration the TV reports
+// once it plays, the bytes of the media's segments loaded so far and the
+// bandwidth they came at (bits/s), each when known.
 type PlaybackReport struct {
 	Resolution  string
 	Position    float64
 	HasPosition bool
+	Paused      bool
+	HasPaused   bool
+	Duration    float64
+	Bytes       int64
+	HasBytes    bool
+	Bandwidth   int64
 }
 
 // MediaHeaders are the headers CDN requests of a media need now, and how
@@ -73,28 +87,34 @@ type MediaHeaders struct {
 type playbackSession struct {
 	client    *Client
 	player    *alternativePlayer
+	view      *viewSession
 	pnr, pnk  string
 	trackID   string
 	qualities map[string]string
 
 	mu         sync.Mutex
 	resolution string
-	position   float64
-	positionAt time.Time // when position was reported; zero without a report
-	started    time.Time
 	edgeHash   string
 	edgeTTL    time.Duration
 	leaseUntil time.Time
 	running    bool
 	ending     bool // end() asked for ended and a close
 	restart    bool // the resolution changed: playback_start is due
-	kick       chan struct{}
-	done       chan struct{} // of the last run
+	paused     bool // the router's playback is paused
+	announced  bool // resumed was sent for the playing of now
+	seekDue    bool // seeked is due
+	// The run's numbers for /stats: reconnect attempts in a row since the
+	// last config_update, reconnects, config_updates and messages, when
+	// the connection opened and the last edge_hash came.
+	attempts, reconnects, tokens, sent int
+	openedAt, tokenAt                  time.Time
+	kick                               chan struct{}
+	done                               chan struct{} // of the last run
 }
 
-func newPlaybackSession(client *Client, player *alternativePlayer, pnr, pnk, trackID string, qualities map[string]string) *playbackSession {
+func newPlaybackSession(client *Client, player *alternativePlayer, view *viewSession, pnr, pnk, trackID string, qualities map[string]string) *playbackSession {
 	return &playbackSession{
-		client: client, player: player, pnr: pnr, pnk: pnk, trackID: trackID, qualities: qualities,
+		client: client, player: player, view: view, pnr: pnr, pnk: pnk, trackID: trackID, qualities: qualities,
 		resolution: pickResolution(qualities, ""),
 		kick:       make(chan struct{}, 1),
 	}
@@ -134,14 +154,17 @@ func (s *playbackSession) signal() {
 }
 
 // touch extends the lease, opening the socket if it is closed, takes in
-// the router's report and answers with the headers of the moment.
-func (s *playbackSession) touch(report PlaybackReport) MediaHeaders {
+// the router's report and what the view made of it (a pause, a resume, a
+// seek), and answers with the headers of the moment.
+func (s *playbackSession) touch(report PlaybackReport, change viewChange) MediaHeaders {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
 	s.leaseUntil = now.Add(s.client.sessionTiming.lease)
-	if report.HasPosition {
-		s.position, s.positionAt = report.Position, now
+	if change.paused != s.paused || change.seeked {
+		s.paused = change.paused
+		s.seekDue = s.seekDue || change.seeked
+		s.signal()
 	}
 	if report.Resolution != "" {
 		if resolution := pickResolution(s.qualities, report.Resolution); resolution != s.resolution {
@@ -200,8 +223,9 @@ func (s *playbackSession) startLocked() {
 		return
 	}
 	client.sessions.Add(1)
-	s.running, s.ending, s.restart = true, false, false
-	s.started = time.Now()
+	s.running, s.ending, s.restart, s.announced, s.seekDue = true, false, false, false, false
+	s.attempts, s.reconnects, s.tokens, s.sent = 0, 0, 0, 0
+	s.openedAt, s.tokenAt = time.Time{}, time.Time{}
 	previous := s.done
 	s.done = make(chan struct{})
 	go s.run(client.sessionsCtx, previous, s.done)
@@ -240,9 +264,11 @@ func (s *playbackSession) stopLocked() {
 // sessionRun is the state of one run, across its reconnects.
 type sessionRun struct {
 	*playbackSession
-	ctx   context.Context
-	lease *time.Timer
-	beat  *time.Ticker // from resumed on
+	ctx    context.Context
+	lease  *time.Timer
+	beat   *time.Ticker // from resumed to a pause or a lost connection
+	opened bool         // a connection of the run opened before
+	failed bool         // a /stats request failed, which is logged once
 }
 
 func (s *playbackSession) run(ctx context.Context, previous, done chan struct{}) {
@@ -255,37 +281,88 @@ func (s *playbackSession) run(ctx context.Context, previous, done chan struct{})
 	timing := s.client.sessionTiming
 	r := &sessionRun{playbackSession: s, ctx: ctx, lease: time.NewTimer(timing.lease)}
 	defer r.lease.Stop()
-	defer func() {
-		if r.beat != nil {
-			r.beat.Stop()
-		}
-	}()
-	attempts := 0
+	defer r.stopBeat()
 	for {
 		if _, _, over := r.over(ctx, r.lease); over {
 			return
 		}
 		conn, err := s.connect(ctx)
 		if err == nil {
-			attempts = 0
+			s.mu.Lock()
+			s.openedAt = time.Now()
+			reconnect := r.opened
+			if reconnect {
+				s.reconnects++
+			}
+			s.mu.Unlock()
+			r.opened = true
+			if reconnect {
+				r.stats("reconnected")
+			}
 			if !r.serve(conn) {
 				return
 			}
 		} else if ctx.Err() == nil {
 			log.Printf("playback socket %s: %v", s.pnr, err)
 		}
+		// As the player's: the attempts count from the last config_update,
+		// not from the last connection, which the server may close at once.
+		s.mu.Lock()
+		attempts := s.attempts
+		if attempts < timing.attempts {
+			s.attempts++
+		}
+		s.mu.Unlock()
 		if attempts >= timing.attempts {
 			log.Printf("playback socket %s: gave up after %d attempts", s.pnr, attempts)
+			r.stats("reconnect_failed", [2]string{"error", "max_attempts_30"})
 			s.mu.Lock()
 			s.stopLocked()
 			s.mu.Unlock()
 			return
 		}
 		delay := min(timing.backoffBase<<attempts, timing.backoffMax)
-		attempts++
 		if !r.wait(delay) {
 			return
 		}
+	}
+}
+
+func (r *sessionRun) stopBeat() {
+	if r.beat != nil {
+		r.beat.Stop()
+		r.beat = nil
+	}
+}
+
+// stats tells the site's /stats what became of the socket, as the
+// player's beacon does: the page's token and domain, the run's numbers
+// and the extra fields.
+func (r *sessionRun) stats(status string, extra ...[2]string) {
+	now := time.Now()
+	seconds := func(since time.Time) string {
+		if since.IsZero() {
+			return "0"
+		}
+		return strconv.FormatInt(max(0, int64(math.Floor(now.Sub(since).Seconds()+0.5))), 10)
+	}
+	r.mu.Lock()
+	fields := [][2]string{
+		{"token", r.player.token}, {"domain", r.player.domain}, {"ws", "1"}, {"wsf", "1"},
+		{"status", status}, {"reconnects", strconv.Itoa(r.reconnects)},
+		{"tokens_received", strconv.Itoa(r.tokens)}, {"msgs_sent", strconv.Itoa(r.sent)},
+		{"duration", seconds(r.openedAt)}, {"last_token_age", seconds(r.tokenAt)},
+	}
+	r.mu.Unlock()
+	request := telemetryRequest{
+		path: "/stats", contentType: "application/x-www-form-urlencoded",
+		body: searchParams(append(fields, extra...)),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), r.client.telemetryTiming.request)
+	defer cancel()
+	if err := r.player.post(ctx, r.client.userAgent, request); err != nil && !r.failed {
+		r.failed = true
+		log.Printf("playback socket %s: /stats: %v", r.pnr, err)
 	}
 }
 
@@ -345,26 +422,37 @@ func (r *sessionRun) serve(conn *wsConn) bool {
 		}
 	}()
 	r.mu.Lock()
-	r.restart = false
+	r.restart, r.seekDue = false, false
 	r.mu.Unlock()
 	err := r.send(conn, "playback_start")
-	if err == nil && r.beat == nil {
-		if err = r.send(conn, "resumed"); err == nil {
-			r.beat = time.NewTicker(r.client.sessionTiming.heartbeat)
-		}
-	}
-	var beat <-chan time.Time
-	if r.beat != nil {
-		beat = r.beat.C
+	if err == nil {
+		err = r.follow(conn)
 	}
 	for err == nil {
+		var beat <-chan time.Time
+		if r.beat != nil {
+			beat = r.beat.C
+		}
 		select {
 		case <-beat:
 			err = r.send(conn, "playing")
 			continue
 		case err = <-lost:
+			// The player's heartbeat goes with the connection, and the
+			// next play event starts it again.
 			log.Printf("playback socket %s: %v", r.pnr, err)
 			conn.Close()
+			r.stopBeat()
+			code := 1006
+			var closed *wsCloseError
+			if errors.As(err, &closed) {
+				code = closed.code
+			}
+			status := "error"
+			if code == wsCloseNormal {
+				status = "closed"
+			}
+			r.stats(status, [2]string{"close_code", strconv.Itoa(code)})
 			return true
 		case <-r.ctx.Done():
 		case <-r.kick:
@@ -391,11 +479,41 @@ func (r *sessionRun) serve(conn *wsConn) bool {
 		if restart {
 			err = r.send(conn, "playback_start")
 		}
+		if err == nil {
+			err = r.follow(conn)
+		}
 	}
 	// A failed write: the connection is gone.
 	conn.Close()
 	<-lost
+	r.stopBeat()
+	r.stats("error", [2]string{"close_code", "1006"})
 	return true
+}
+
+// follow tells the server of a pause, a resume or a seek of the router's
+// playback: paused stops the heartbeat, resumed starts it again (as on
+// the first play), seeked follows a seek.
+func (r *sessionRun) follow(conn *wsConn) error {
+	r.mu.Lock()
+	paused, announced, seek := r.paused, r.announced, r.seekDue
+	r.seekDue = false
+	r.announced = !paused
+	r.mu.Unlock()
+	var err error
+	switch {
+	case paused && announced:
+		r.stopBeat()
+		err = r.send(conn, "paused")
+	case !paused && !announced:
+		if err = r.send(conn, "resumed"); err == nil {
+			r.beat = time.NewTicker(r.client.sessionTiming.heartbeat)
+		}
+	}
+	if err == nil && seek {
+		err = r.send(conn, "seeked")
+	}
+	return err
 }
 
 type sessionMessage struct {
@@ -410,13 +528,9 @@ type sessionMessage struct {
 
 func (r *sessionRun) send(conn *wsConn, kind string) error {
 	now := time.Now()
+	// The view's position: the router's, run on in between.
+	position := r.view.position(now)
 	r.mu.Lock()
-	// The router reports the position about once a minute; in between it
-	// runs on.
-	position := now.Sub(r.started).Seconds()
-	if !r.positionAt.IsZero() {
-		position = r.position + now.Sub(r.positionAt).Seconds()
-	}
 	message := sessionMessage{
 		Type: kind, CurrentTime: int64(max(position, 0)), Resolution: r.resolution,
 		TrackID: r.trackID, Speed: 1, Subtitle: -1, TS: now.UnixMilli(),
@@ -426,7 +540,12 @@ func (r *sessionRun) send(conn *wsConn, kind string) error {
 	if err != nil {
 		return err
 	}
-	return conn.writeText(text)
+	if err = conn.writeText(text); err == nil {
+		r.mu.Lock()
+		r.sent++
+		r.mu.Unlock()
+	}
+	return err
 }
 
 // receive keeps the edge_hash of a config_update; the player ignores the
@@ -445,6 +564,8 @@ func (s *playbackSession) receive(message []byte) {
 	defer s.mu.Unlock()
 	s.edgeHash = update.EdgeHash
 	s.edgeTTL = time.Duration(max(update.TTL, 0)) * time.Second
+	s.attempts, s.tokenAt = 0, time.Now()
+	s.tokens++
 }
 
 // encodeURIComponentJS is JavaScript's encodeURIComponent, which the

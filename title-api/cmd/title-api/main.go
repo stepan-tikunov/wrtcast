@@ -194,6 +194,8 @@ type mediaHeadersSource interface {
 var (
 	resolutionPattern = regexp.MustCompile(`^[0-9]{1,5}$`)
 	positionPattern   = regexp.MustCompile(`^[0-9]{1,7}(\.[0-9]+)?$`)
+	countPattern      = regexp.MustCompile(`^[0-9]{1,15}$`)
+	flagPattern       = regexp.MustCompile(`^[01]$`)
 )
 
 type mediaHeader struct {
@@ -201,10 +203,12 @@ type mediaHeader struct {
 	Value string `json:"value"`
 }
 
-// mediaHeadersHandler serves GET /v1/media/{id}/headers?q=<720>&t=<seconds>:
+// mediaHeadersHandler serves GET
+// /v1/media/{id}/headers?q=<720>&t=<seconds>&p=<1 paused>&d=<seconds>&b=<bytes>&e=<bits/s>:
 // the headers a media proxy sends with the media's CDN requests now, and for
-// how many seconds it may keep them. It keeps the playback socket of the
-// media open and reports the quality and the position played, both
+// how many seconds it may keep them. It keeps the playback socket and the
+// view of the media going and reports the quality, the position, the pause,
+// the duration, the bytes of segments loaded and their bandwidth, all
 // optional.
 func mediaHeadersHandler(source mediaHeadersSource) runtime.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
@@ -214,13 +218,34 @@ func mediaHeadersHandler(source mediaHeadersSource) runtime.HandlerFunc {
 			http.Error(response, "invalid q", http.StatusBadRequest)
 			return
 		}
-		if position := query.Get("t"); position != "" {
-			if !positionPattern.MatchString(position) {
-				http.Error(response, "invalid t", http.StatusBadRequest)
+		for _, field := range []struct {
+			name    string
+			pattern *regexp.Regexp
+			set     func(string)
+		}{
+			{"t", positionPattern, func(value string) {
+				report.Position, _ = strconv.ParseFloat(value, 64)
+				report.HasPosition = true
+			}},
+			{"p", flagPattern, func(value string) {
+				report.Paused, report.HasPaused = value == "1", true
+			}},
+			{"d", positionPattern, func(value string) { report.Duration, _ = strconv.ParseFloat(value, 64) }},
+			{"b", countPattern, func(value string) {
+				report.Bytes, _ = strconv.ParseInt(value, 10, 64)
+				report.HasBytes = true
+			}},
+			{"e", countPattern, func(value string) { report.Bandwidth, _ = strconv.ParseInt(value, 10, 64) }},
+		} {
+			value := query.Get(field.name)
+			if value == "" {
+				continue
+			}
+			if !field.pattern.MatchString(value) {
+				http.Error(response, "invalid "+field.name, http.StatusBadRequest)
 				return
 			}
-			report.Position, _ = strconv.ParseFloat(position, 64)
-			report.HasPosition = true
+			field.set(value)
 		}
 		headers, err := source.MediaHeaders(request.Context(), pathParams["id"], report)
 		if mediaError(response, err) {
