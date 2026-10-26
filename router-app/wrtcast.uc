@@ -186,7 +186,10 @@ function api_try(path) {
 // title-api holds the player's playback socket, whose edge_hash replaces the
 // device fingerprint. So the proxy URLs of a stream that is a title-api
 // master carry its media id (&m=) instead of the headers (&h=), and fetches
-// take the headers from HDR<id>, kept for the ttl title-api gives.
+// take the headers from HDR<id>, kept for the ttl title-api gives. A
+// title-api that names a relay of the media's CDN requests (proxy) gets
+// them instead: it fetches them as the player's page would, so the CDN sees
+// one browser for the whole playback.
 
 // Per-stream upstream headers travel in the proxy URL (&h=, "Name: value"
 // lines) and are inherited by every URL a rewritten playlist points to.
@@ -216,8 +219,10 @@ function quality_digits(l) {
 // playback goes on (for the alternative player's telemetry too), with q,
 // the quality's digits, t, the position (else the TV's last one, run on
 // while playing), p, the pause, and d, the duration, as the TV last told
-// (see watch_end), b, the bytes of the media's segments streamed so far,
-// and e, the bandwidth of the last few (see count_bytes), when known. One
+// (see watch_end), w, whether it waits for data (BUFFERING), b, the bytes
+// of the media's segments streamed so far, and e, the bandwidth of the
+// last few (see count_bytes), when known. The relay title-api names, if
+// any, is kept with the headers (see fetch_cmd). One
 // request refreshes them while the others go on with what there is for a
 // few seconds (a few may still refresh at once); a failed refresh keeps
 // the stale ones too.
@@ -253,7 +258,7 @@ function media_headers(m, q, t, force) {
 	if (type(t) in ['int', 'double'] && t >= 0)
 		push(qs, sprintf('t=%d', t));
 	if (pos)
-		push(qs, `p=${pos.paused ? 1 : 0}`);
+		push(qs, `p=${pos.paused ? 1 : 0}`, `w=${pos.buffering ? 1 : 0}`);
 	if (+(pos?.dur ?? 0) > 0)
 		push(qs, sprintf('d=%.2f', pos.dur));
 	if (n)
@@ -264,7 +269,8 @@ function media_headers(m, q, t, force) {
 	let hl = map(filter(r?.headers ?? [], x => type(x?.name) == 'string' &&
 		type(x?.value) == 'string'), x => `${x.name}: ${x.value}`);
 	if (type(r?.headers) == 'array' && (!length(hl) || valid_headers(join('\n', hl)))) {
-		c = { headers: hl, fetched: time(), ttl: +r.ttl > 0 ? +r.ttl : 60 };
+		c = { headers: hl, fetched: time(), ttl: +r.ttl > 0 ? +r.ttl : 60,
+			proxy: match(r.proxy ?? '', /^\/v1\/media\/[0-9a-f]{32}\/cdn$/) ? r.proxy : null };
 		save(f, c);
 	}
 	return c?.headers;
@@ -603,7 +609,8 @@ function watch_end(now, st) {
 		// media_headers), with no castctl call of its own.
 		if (valid_media(now.media))
 			save(POS + now.media, {
-				pos: +(m.time ?? 0), dur: +(m.duration ?? 0), paused: m.state == 'PAUSED', at: time(),
+				pos: +(m.time ?? 0), dur: +(m.duration ?? 0), paused: m.state == 'PAUSED',
+				buffering: m.state == 'BUFFERING', at: time(),
 			});
 		return;
 	}
@@ -680,15 +687,17 @@ function tick() {
 // With err, stderr goes to that file and keeps the "HTTP error N" line of
 // a refused fetch, which -q leaves out. With m, the headers of that
 // title-api media (see media_headers) replace the same-named ones of h,
-// which stand in for them only while there are none; the master from
-// title-api itself needs none.
+// which stand in for them only while there are none, or, once title-api
+// names its relay, the request goes to that, without headers of ours;
+// title-api's own URLs (the master, its quality playlists) need none.
 function fetch_cmd(url, h, err, m) {
-	let cmd = `uclient-fetch ${err ? '' : '-q '}-T 20 -U ${shq(USER_AGENT)}`;
-	for (let x in (type(HEADERS) == 'array' ? HEADERS : [HEADERS]))
-		cmd += ' --header=' + shq(x);
+	let out = u => `-O - ${shq(u)} 2>${err ? shq(err) : '/dev/null'}`;
+	let cmd = `uclient-fetch ${err ? '' : '-q '}-T 20`;
 	let lines = valid_headers(h) ? split(h, '\n') : [];
-	if (valid_media(m) && !media_id(url)) {
-		let dyn = media_headers(m);
+	if (valid_media(m) && substr(url, 0, length(API) + 1) != API + '/') {
+		let dyn = media_headers(m), relay = load(HDR + m)?.proxy;
+		if (relay)
+			return `${cmd} ${out(API + relay + '?u=' + urlenc(url))}`;
 		if (dyn == null && !length(lines)) {
 			if (err)
 				unlink(err);
@@ -699,9 +708,12 @@ function fetch_cmd(url, h, err, m) {
 			own[name(l)] = true;
 		lines = [...filter(lines, l => !own[name(l)]), ...(dyn ?? [])];
 	}
+	cmd += ` -U ${shq(USER_AGENT)}`;
+	for (let x in (type(HEADERS) == 'array' ? HEADERS : [HEADERS]))
+		cmd += ' --header=' + shq(x);
 	for (let x in lines)
 		cmd += ' --header=' + shq(x);
-	return `${cmd} -O - ${shq(url)} 2>${err ? shq(err) : '/dev/null'}`;
+	return `${cmd} ${out(url)}`;
 }
 
 // Answers a failed proxied fetch: a 403 stays a 403, which receivers don't
