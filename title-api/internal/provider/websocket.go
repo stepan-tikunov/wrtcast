@@ -2,6 +2,8 @@ package provider
 
 import (
 	"bufio"
+	"bytes"
+	"compress/flate"
 	"context"
 	"crypto/rand"
 	"crypto/sha1"
@@ -54,8 +56,34 @@ type wsConn struct {
 	closeSent bool
 
 	// Of the message being read, for continuation frames.
-	message []byte
-	reading bool
+	message    []byte
+	reading    bool
+	compressed bool
+	inflate    *wsInflater // permessage-deflate, when negotiated
+}
+
+// wsInflater decompresses permessage-deflate messages. The server may
+// refer back into earlier messages (context takeover), so each message is
+// inflated with the last 32 KiB of output as its dictionary.
+type wsInflater struct {
+	window []byte
+}
+
+func (inflater *wsInflater) inflate(payload []byte) ([]byte, error) {
+	source := io.MultiReader(bytes.NewReader(payload), bytes.NewReader([]byte{0, 0, 0xff, 0xff, 1, 0, 0, 0xff, 0xff}))
+	reader := flate.NewReaderDict(source, inflater.window)
+	message, err := io.ReadAll(io.LimitReader(reader, wsMaxMessage+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(message) > wsMaxMessage {
+		return nil, errWSProtocol
+	}
+	inflater.window = append(inflater.window, message...)
+	if excess := len(inflater.window) - 32<<10; excess > 0 {
+		inflater.window = append([]byte(nil), inflater.window[excess:]...)
+	}
+	return message, nil
 }
 
 // newWSTransport is an HTTP/1.1-only transport: an upgrade needs the
@@ -192,16 +220,18 @@ func (c *wsConn) Close() error {
 	return c.rwc.Close()
 }
 
-// readFrame reads one frame. Servers don't mask, and no extension was
-// negotiated, so a mask or a reserved bit is a protocol error.
-func (c *wsConn) readFrame() (fin bool, opcode byte, payload []byte, err error) {
+// readFrame reads one frame. Servers don't mask, and only RSV1 has a
+// meaning (a compressed message), so a mask or another reserved bit is a
+// protocol error.
+func (c *wsConn) readFrame() (fin, rsv1 bool, opcode byte, payload []byte, err error) {
 	var head [2]byte
 	if _, err = io.ReadFull(c.br, head[:]); err != nil {
 		return
 	}
-	fin, opcode = head[0]&0x80 != 0, head[0]&0x0F
-	if head[0]&0x70 != 0 || head[1]&0x80 != 0 {
-		return false, 0, nil, errWSProtocol
+	fin, rsv1, opcode = head[0]&0x80 != 0, head[0]&0x40 != 0, head[0]&0x0F
+	// RSV1 marks a compressed message, when permessage-deflate is on.
+	if head[0]&0x30 != 0 || rsv1 && (c.inflate == nil || opcode >= wsClose || opcode == wsContinuation) || head[1]&0x80 != 0 {
+		return false, false, 0, nil, errWSProtocol
 	}
 	length := uint64(head[1] & 0x7F)
 	switch length {
@@ -219,7 +249,7 @@ func (c *wsConn) readFrame() (fin bool, opcode byte, payload []byte, err error) 
 		length = binary.BigEndian.Uint64(extended[:])
 	}
 	if opcode >= wsClose && (!fin || length > 125) || length > wsMaxMessage {
-		return false, 0, nil, errWSProtocol
+		return false, false, 0, nil, errWSProtocol
 	}
 	payload = make([]byte, length)
 	_, err = io.ReadFull(c.br, payload)
@@ -231,7 +261,7 @@ func (c *wsConn) readFrame() (fin bool, opcode byte, payload []byte, err error) 
 // answered too and ends the connection with a wsCloseError.
 func (c *wsConn) readMessage() ([]byte, error) {
 	for {
-		fin, opcode, payload, err := c.readFrame()
+		fin, rsv1, opcode, payload, err := c.readFrame()
 		if err != nil {
 			return nil, err
 		}
@@ -255,7 +285,7 @@ func (c *wsConn) readMessage() ([]byte, error) {
 			if c.reading {
 				return nil, errWSProtocol
 			}
-			c.message, c.reading = payload, true
+			c.message, c.reading, c.compressed = payload, true, rsv1
 		case wsContinuation:
 			if !c.reading || len(c.message)+len(payload) > wsMaxMessage {
 				return nil, errWSProtocol
@@ -265,8 +295,11 @@ func (c *wsConn) readMessage() ([]byte, error) {
 			return nil, errWSProtocol
 		}
 		if fin {
-			message := c.message
-			c.message, c.reading = nil, false
+			message, compressed := c.message, c.compressed
+			c.message, c.reading, c.compressed = nil, false, false
+			if compressed {
+				return c.inflate.inflate(message)
+			}
 			return message, nil
 		}
 	}
