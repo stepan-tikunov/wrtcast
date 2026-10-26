@@ -100,11 +100,13 @@ type fakeAlternativePlayer struct {
 	pages       int
 	playbacks   int
 	cdnRequests int
+	preflights  int
 	challenge   string
 	used        map[string]bool
 	fingerprint string
 	telemetry   []telemetryRecord
-	refuse      int // telemetry answers 403
+	refuse      int    // telemetry answers 403
+	segments    string // X-VD of a 403 for every segment, if set
 }
 
 // telemetryRecord is a telemetry request the player page got.
@@ -131,7 +133,7 @@ func (fake *fakeAlternativePlayer) url() string {
 func (fake *fakeAlternativePlayer) servePlayer(response http.ResponseWriter, request *http.Request) {
 	fake.mu.Lock()
 	defer fake.mu.Unlock()
-	if path := request.URL.Path; path == "/stat" || path == "/stats" || path == "/events" {
+	if path := request.URL.Path; path == "/stat" || path == "/stats" || path == "/events" || path == "/errors" {
 		body, _ := io.ReadAll(request.Body)
 		fake.telemetry = append(fake.telemetry, telemetryRecord{path: path, header: request.Header.Clone(), body: string(body), at: time.Now()})
 		if fake.refuse > 0 {
@@ -140,9 +142,15 @@ func (fake *fakeAlternativePlayer) servePlayer(response http.ResponseWriter, req
 		return
 	}
 	if request.Method != http.MethodPost {
+		if request.URL.Path != "/" {
+			return
+		}
 		fake.pages++
 		fake.challenge = fmt.Sprintf("viewport-nonce-%d", fake.pages)
-		http.SetCookie(response, &http.Cookie{Name: "page", Value: "1", Path: "/"})
+		// The player's iframe is cross-site to the provider's page: only a
+		// SameSite=None cookie is kept, as in Chrome.
+		http.SetCookie(response, &http.Cookie{Name: "page", Value: "1", Path: "/", SameSite: http.SameSiteNoneMode, Secure: true})
+		http.SetCookie(response, &http.Cookie{Name: "lax", Value: "1", Path: "/"})
 		_, _ = fmt.Fprintf(response, `<meta name="viewporti" content="%s">
 <script>const userParam = { token: 'tok' }; const fileList = JSON.parse('{"type":"movie","active":{"id":7,"translation":"Dub"},"all":{}}');</script>`, fake.challenge)
 		return
@@ -189,6 +197,19 @@ func (fake *fakeAlternativePlayer) servePlayer(response http.ResponseWriter, req
 func (fake *fakeAlternativePlayer) serveCDN(response http.ResponseWriter, request *http.Request) {
 	fake.mu.Lock()
 	defer fake.mu.Unlock()
+	// The CORS preflight Chrome sends first, for hls.js's own headers.
+	if request.Method == http.MethodOptions {
+		fake.preflights++
+		if got := request.Header.Get("Access-Control-Request-Headers"); got != "accepts-controls,authorizations" ||
+			request.Header.Get("Origin") != fake.player.URL || request.Header.Get("Cookie") != "" {
+			fake.t.Errorf("CDN preflight %v", request.Header)
+		}
+		response.Header().Set("Access-Control-Allow-Origin", "*")
+		response.Header().Set("Access-Control-Allow-Headers", "accepts-controls, authorizations")
+		response.Header().Set("Access-Control-Max-Age", "600")
+		response.WriteHeader(http.StatusNoContent)
+		return
+	}
 	fake.cdnRequests++
 	for name, want := range map[string]string{
 		"Accepts-Controls": fake.fingerprint,
@@ -200,9 +221,22 @@ func (fake *fakeAlternativePlayer) serveCDN(response http.ResponseWriter, reques
 			fake.t.Errorf("CDN request %s = %q, want %q", name, got, want)
 		}
 	}
-	if sig, _ := strconv.Atoi(request.URL.Query().Get("sig")); sig < fake.goodFrom {
+	if sig, _ := strconv.Atoi(request.URL.Query().Get("sig")); request.URL.Query().Has("sig") && sig < fake.goodFrom {
 		response.Header().Set("X-VD", fake.cdnRefusal)
 		response.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if strings.HasSuffix(request.URL.Path, "/media.m3u8") {
+		_, _ = response.Write([]byte("#EXTM3U\n#EXTINF:10,\nseg-0.ts\n#EXTINF:10,\nseg-1.ts\n#EXT-X-ENDLIST\n"))
+		return
+	}
+	if strings.HasSuffix(request.URL.Path, ".ts") {
+		if fake.segments != "" {
+			response.Header().Set("X-VD", fake.segments)
+			response.WriteHeader(http.StatusForbidden)
+			return
+		}
+		_, _ = response.Write(make([]byte, 50000))
 		return
 	}
 	_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720\nmedia.m3u8\n"))
@@ -263,10 +297,12 @@ func TestAlternativePlayerRetriesRejectedLinks(t *testing.T) {
 			id := alternativeMasterID(t, client, fake)
 			master, err := client.MasterPlaylist(context.Background(), id)
 			pages, playbacks, cdnRequests := fake.counts()
-			// The first link's 403 stops the first attempt; both links
-			// of the second attempt resolve.
-			if err != nil || !strings.Contains(string(master), "media.m3u8") ||
-				pages != test.pages || playbacks != 2 || cdnRequests != 3 {
+			// The first attempt's master, of the 480 the page starts
+			// with, is refused; the second attempt's loads, and the
+			// master lists both qualities.
+			if err != nil || !strings.Contains(string(master), "/quality/480/playlist.m3u8") ||
+				!strings.Contains(string(master), "/quality/720/playlist.m3u8") ||
+				pages != test.pages || playbacks != 2 || cdnRequests != 2 {
 				t.Fatalf("master = %q, err = %v after %d pages, %d playback and %d CDN requests",
 					master, err, pages, playbacks, cdnRequests)
 			}

@@ -59,11 +59,15 @@ type Client struct {
 	fingerprintMu    sync.Mutex
 	fingerprint      string
 
-	// Playback sockets of the alternative player (see playbackSession),
-	// until Close.
+	// The Chrome the alternative player sees (see browser), the quality
+	// its pages start with (the last one played, as the page stores it),
+	// and its playback sockets (see playbackSession), until Close.
+	browser         *browser
+	pageTiming      pageTiming
+	qualityMu       sync.Mutex
+	quality         string
 	sessionTiming   sessionTiming
 	telemetryTiming telemetryTiming
-	wsTransport     http.RoundTripper
 	sessionsCtx     context.Context
 	stopSessions    context.CancelFunc
 	sessionsMu      sync.Mutex
@@ -113,13 +117,28 @@ func NewClient(config Config) (*Client, error) {
 		masters:          newMasterStore(6*time.Hour, 4096),
 		urlStore:         config.URLStore,
 		fingerprintStore: config.FingerprintStore,
+		browser:          newBrowser(false),
+		pageTiming:       defaultPageTiming,
 		sessionTiming:    defaultSessionTiming,
 		telemetryTiming:  defaultTelemetryTiming,
-		wsTransport:      newWSTransport(),
 	}
 	client.sessionsCtx, client.stopSessions = context.WithCancel(context.Background())
 	client.baseURL.Store(baseURL)
 	return client, nil
+}
+
+// preferQuality remembers the quality played, which the next page starts
+// with, as the player keeps it in the page's storage.
+func (c *Client) preferQuality(quality string) {
+	c.qualityMu.Lock()
+	c.quality = quality
+	c.qualityMu.Unlock()
+}
+
+func (c *Client) preferredQuality() string {
+	c.qualityMu.Lock()
+	defer c.qualityMu.Unlock()
+	return c.quality
 }
 
 // Close closes the playback sockets, each with a close frame, and waits

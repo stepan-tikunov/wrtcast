@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -70,16 +71,36 @@ func TestPlayerChallenge(t *testing.T) {
 func TestAlternativePlaybackStreams(t *testing.T) {
 	t.Parallel()
 	const fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	requests := 0
+	requests, preflights := 0, 0
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodOptions {
+			preflights++
+			if request.Header.Get("Access-Control-Request-Headers") != "accepts-controls,authorizations" ||
+				request.Header.Get("Origin") != "https://player.example" {
+				t.Errorf("CDN preflight headers: %v", request.Header)
+			}
+			response.Header().Set("Access-Control-Allow-Origin", "*")
+			response.Header().Set("Access-Control-Allow-Headers", "Accepts-Controls, Authorizations")
+			response.WriteHeader(http.StatusNoContent)
+			return
+		}
 		requests++
 		if request.Header.Get("Accepts-Controls") != fingerprint ||
 			request.Header.Get("Authorizations") != "Bearer "+alternativeGuard ||
 			request.Header.Get("Origin") != "https://player.example" ||
-			request.Header.Get("Referer") != "https://player.example/?token_movie=abc&token=def" {
+			request.Header.Get("Referer") != "https://player.example/?token_movie=abc&token=def" ||
+			request.Header.Get("Sec-Fetch-Mode") != "cors" || request.Header.Get("Sec-Fetch-Site") != "cross-site" ||
+			request.Header.Get("Cookie") != "" || request.UserAgent() != chromeUserAgent {
 			t.Errorf("CDN request headers: %v", request.Header)
 		}
-		_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720\nmedia.m3u8\n"))
+		switch request.URL.Path {
+		case "/720/master.m3u8":
+			_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720,CODECS=\"avc1.64001f,mp4a.40.2\"\nmedia.m3u8\n"))
+		case "/720/media.m3u8":
+			_, _ = response.Write([]byte("#EXTM3U\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:6,\nseg-1.m4s\n#EXTINF:4,\nhttps://edge.example/seg-2.m4s\n#EXT-X-ENDLIST\n"))
+		default:
+			t.Errorf("CDN request for %s", request.URL)
+		}
 	}))
 	defer server.Close()
 	client, err := NewClient(Config{BaseURL: "https://example.com", MediaBaseURL: "https://api.example.com"})
@@ -99,7 +120,7 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 	}{Kind: "captions", Label: "Russian", Source: "https://cdn.example/sub.vtt?lang=ru", Language: "rus", Default: true})
 
 	playerURL, _ := url.Parse("https://player.example/?token_movie=abc&token=def")
-	player := &alternativePlayer{client: server.Client(), playerURL: playerURL, fingerprint: fingerprint}
+	player := &alternativePlayer{browser: client.browser, playerURL: playerURL, fingerprint: fingerprint}
 	streams := client.alternativePlaybackStreams(player, alternativeFile{ID: 7}, playback)
 	if requests != 0 {
 		t.Fatalf("listing sources made %d CDN requests", requests)
@@ -132,8 +153,34 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 	}
 	id := strings.Split(strings.TrimSuffix(streams[0].MasterPlaylistURL, "/master.m3u8"), "/")
 	master, err := client.MasterPlaylist(context.Background(), id[len(id)-1])
-	if err != nil || requests != 1 || !strings.Contains(string(master), server.URL+"/720/media.m3u8") {
-		t.Fatalf("unexpected synthetic master: %q", master)
+	if err != nil || requests != 1 || preflights != 1 ||
+		!strings.Contains(string(master), "https://api.example.com/v1/media/"+id[len(id)-1]+"/quality/720/playlist.m3u8") {
+		t.Fatalf("unexpected synthetic master after %d requests: %q", requests, master)
+	}
+	// The quality's media playlist, its URIs absolute; again within a few
+	// seconds without asking the CDN.
+	for range 2 {
+		playlist, err := client.QualityPlaylist(context.Background(), id[len(id)-1], "720")
+		if err != nil || requests != 2 || preflights != 2 ||
+			!strings.Contains(string(playlist), `#EXT-X-MAP:URI="`+server.URL+`/720/init.mp4"`) ||
+			!strings.Contains(string(playlist), "\n"+server.URL+"/720/seg-1.m4s\n") {
+			t.Fatalf("playlist after %d requests: %q, %v", requests, playlist, err)
+		}
+	}
+	// Only the media's hosts go through the relay.
+	if _, err := client.FetchMedia(context.Background(), id[len(id)-1], "https://elsewhere.example/seg.m4s"); !errors.Is(err, ErrMediaURL) {
+		t.Fatalf("relay of a foreign host: %v", err)
+	}
+}
+
+// The synthetic master lists every quality: the one loaded with its own
+// attributes, the others scaled from it.
+func TestScaleAttributes(t *testing.T) {
+	t.Parallel()
+	got := scaleAttributes(`BANDWIDTH=1000000,AVERAGE-BANDWIDTH=800000,RESOLUTION=854x480,CODECS="avc1.64001f,mp4a.40.2",FRAME-RATE=25.000`, 1.5)
+	want := `BANDWIDTH=2250000,AVERAGE-BANDWIDTH=1800000,RESOLUTION=1282x720,CODECS="avc1.64001f,mp4a.40.2",FRAME-RATE=25.000`
+	if got != want {
+		t.Fatalf("scaleAttributes = %q, want %q", got, want)
 	}
 }
 
@@ -181,9 +228,11 @@ func TestPlayerFingerprintIsStable(t *testing.T) {
 		t.Fatalf("fingerprints without a store = %q, %q", first, second)
 	}
 
-	store := &memoryFingerprintStore{value: "not a fingerprint"}
+	// One of another identity (the Chromecast's, before) is another
+	// device's.
+	store := &memoryFingerprintStore{value: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
 	first, second = fingerprints(newClient(store))
-	if !playerFingerprintPattern.MatchString(first) || first != second || store.value != first || store.saves != 1 {
+	if !playerFingerprintPattern.MatchString(first) || first != second || store.value != playerIdentity()+":"+first || store.saves != 1 {
 		t.Fatalf("fingerprints = %q, %q; stored %q after %d saves", first, second, store.value, store.saves)
 	}
 	if again, _ := fingerprints(newClient(store)); again != first || store.saves != 1 {

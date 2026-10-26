@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -104,6 +105,8 @@ func run() error {
 		{http.MethodGet, "/v1/posters", posterHandler(client)},
 		{http.MethodGet, "/v1/media/{id}/master.m3u8", masterPlaylistHandler(client)},
 		{http.MethodGet, "/v1/media/{id}/headers", mediaHeadersHandler(client)},
+		{http.MethodGet, "/v1/media/{id}/quality/{quality}/playlist.m3u8", qualityPlaylistHandler(client)},
+		{http.MethodGet, "/v1/media/{id}/cdn", mediaRelayHandler(client)},
 		{http.MethodDelete, "/v1/media/{id}/session", mediaSessionHandler(client)},
 		// The same for clients that can only GET and POST, like the router's
 		// uclient-fetch.
@@ -170,20 +173,98 @@ func masterPlaylistHandler(source masterPlaylistSource) runtime.HandlerFunc {
 	}
 }
 
-// mediaError answers a failed master or headers request.
+// mediaError answers a failed media request: the CDN's refusal with its
+// status and X-VD, as the router passes those on.
 func mediaError(response http.ResponseWriter, err error) bool {
+	status, vd := provider.MediaStatus(err)
 	switch {
 	case err == nil:
 		return false
 	case errors.Is(err, provider.ErrMasterNotFound):
 		http.Error(response, err.Error(), http.StatusNotFound)
+	case errors.Is(err, provider.ErrMediaURL):
+		http.Error(response, err.Error(), http.StatusBadRequest)
 	// A 403 reaches the receiver as one, and it does not retry that.
 	case errors.Is(err, provider.ErrCDNBlocked):
 		http.Error(response, err.Error(), http.StatusForbidden)
+	case status >= 400 && status < 600:
+		if vd != "" {
+			response.Header().Set("X-VD", vd)
+		}
+		http.Error(response, err.Error(), status)
 	default:
 		http.Error(response, err.Error(), http.StatusBadGateway)
 	}
 	return true
+}
+
+type qualityPlaylistSource interface {
+	QualityPlaylist(ctx context.Context, id, quality string) ([]byte, error)
+}
+
+// qualityPlaylistHandler serves GET
+// /v1/media/{id}/quality/{quality}/playlist.m3u8: the media playlist of a
+// quality of a synthetic master, its URIs absolute.
+func qualityPlaylistHandler(source qualityPlaylistSource) runtime.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
+		if !resolutionPattern.MatchString(pathParams["quality"]) {
+			http.Error(response, "invalid quality", http.StatusBadRequest)
+			return
+		}
+		body, err := source.QualityPlaylist(request.Context(), pathParams["id"], pathParams["quality"])
+		if mediaError(response, err) {
+			return
+		}
+		response.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+		response.Header().Set("Cache-Control", "no-store")
+		_, _ = response.Write(body)
+	}
+}
+
+type mediaRelaySource interface {
+	FetchMedia(ctx context.Context, id, rawURL string) (*http.Response, error)
+}
+
+// mediaRelayHandler serves GET /v1/media/{id}/cdn?u=<CDN URL>: the URL
+// fetched for the router as the media's player page fetches it, the
+// status, the type and X-VD passed on, the body streamed as it comes.
+func mediaRelayHandler(source mediaRelaySource) runtime.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
+		upstream, err := source.FetchMedia(request.Context(), pathParams["id"], request.URL.Query().Get("u"))
+		if mediaError(response, err) {
+			return
+		}
+		defer upstream.Body.Close()
+		for _, name := range []string{"Content-Type", "X-VD", "Last-Modified", "ETag"} {
+			if value := upstream.Header.Get(name); value != "" {
+				response.Header().Set(name, value)
+			}
+		}
+		if upstream.ContentLength >= 0 && upstream.Header.Get("Content-Encoding") == "" {
+			response.Header().Set("Content-Length", strconv.FormatInt(upstream.ContentLength, 10))
+		}
+		response.Header().Set("Cache-Control", "no-store")
+		response.WriteHeader(upstream.StatusCode)
+		flusher, _ := response.(http.Flusher)
+		buffer := make([]byte, 64<<10)
+		for {
+			n, err := upstream.Body.Read(buffer)
+			if n > 0 {
+				if _, writeErr := response.Write(buffer[:n]); writeErr != nil {
+					return
+				}
+				if flusher != nil {
+					flusher.Flush()
+				}
+			}
+			if err != nil {
+				if err != io.EOF {
+					log.Printf("media relay %s: %v", pathParams["id"], err)
+				}
+				return
+			}
+		}
+	}
 }
 
 type mediaHeadersSource interface {
@@ -204,12 +285,14 @@ type mediaHeader struct {
 }
 
 // mediaHeadersHandler serves GET
-// /v1/media/{id}/headers?q=<720>&t=<seconds>&p=<1 paused>&d=<seconds>&b=<bytes>&e=<bits/s>:
+// /v1/media/{id}/headers?q=<720>&t=<seconds>&p=<1 paused>&w=<1 buffering>&d=<seconds>&b=<bytes>&e=<bits/s>:
 // the headers a media proxy sends with the media's CDN requests now, and for
-// how many seconds it may keep them. It keeps the playback socket and the
-// view of the media going and reports the quality, the position, the pause,
-// the duration, the bytes of segments loaded and their bandwidth, all
-// optional.
+// how many seconds it may keep them, and, for the alternative player, the
+// path of title-api's relay of them (proxy), which a router that knows it
+// goes through instead. It keeps the playback socket and the view of the
+// media going and reports the quality, the position, the pause, whether the
+// receiver waits for data, the duration, the bytes of segments loaded and
+// their bandwidth, all optional.
 func mediaHeadersHandler(source mediaHeadersSource) runtime.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
 		query := request.URL.Query()
@@ -229,6 +312,9 @@ func mediaHeadersHandler(source mediaHeadersSource) runtime.HandlerFunc {
 			}},
 			{"p", flagPattern, func(value string) {
 				report.Paused, report.HasPaused = value == "1", true
+			}},
+			{"w", flagPattern, func(value string) {
+				report.Buffering, report.HasBuffering = value == "1", true
 			}},
 			{"d", positionPattern, func(value string) { report.Duration, _ = strconv.ParseFloat(value, 64) }},
 			{"b", countPattern, func(value string) {
@@ -254,7 +340,8 @@ func mediaHeadersHandler(source mediaHeadersSource) runtime.HandlerFunc {
 		body := struct {
 			Headers []mediaHeader `json:"headers"`
 			TTL     int64         `json:"ttl"`
-		}{Headers: make([]mediaHeader, 0, len(headers.Headers)), TTL: int64(headers.TTL / time.Second)}
+			Proxy   string        `json:"proxy,omitempty"`
+		}{Headers: make([]mediaHeader, 0, len(headers.Headers)), TTL: int64(headers.TTL / time.Second), Proxy: headers.Proxy}
 		for _, header := range headers.Headers {
 			body.Headers = append(body.Headers, mediaHeader{Name: header.Name, Value: header.Value})
 		}

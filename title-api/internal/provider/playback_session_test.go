@@ -35,7 +35,7 @@ func newSessionFixture(t *testing.T, timing sessionTiming, accept func(*http.Req
 		query := request.URL.Query()
 		if request.URL.Path != "/ws/" || query.Get("sid") != "pn+k/1=" ||
 			!regexp.MustCompile(`^sid=pn%2Bk%2F1%3D&v=2\.1&t=[0-9]{13}$`).MatchString(request.URL.RawQuery) ||
-			request.Header.Get("Origin") != origin || request.UserAgent() != defaultUserAgent {
+			request.Header.Get("Origin") != origin || request.UserAgent() != chromeUserAgent {
 			t.Errorf("socket request %s with %v", request.URL, request.Header)
 		}
 		if accept != nil {
@@ -88,7 +88,7 @@ func TestPlaybackSessionReportsPlayback(t *testing.T) {
 
 	// The first headers request resolves the master, which opens the socket.
 	headers, err := client.MediaHeaders(ctx, id, PlaybackReport{})
-	if _, _, cdnRequests := fake.counts(); err != nil || cdnRequests != 2 ||
+	if _, _, cdnRequests := fake.counts(); err != nil || cdnRequests != 1 ||
 		controlOf(headers.Headers) != fake.fingerprint || headers.TTL != pendingHeadersTTL || len(headers.Headers) != 4 {
 		t.Fatalf("headers = %+v, %v after %d CDN requests", headers, err, cdnRequests)
 	}
@@ -257,8 +257,10 @@ func TestPlaybackSessionGivesUp(t *testing.T) {
 		attempts.Add(1)
 		return http.StatusForbidden
 	})
+	// The master waits for the socket, which gives up meanwhile; no edge_hash
+	// is pending then, and the next request does not try again.
 	headers, err := client.MediaHeaders(context.Background(), id, PlaybackReport{})
-	if err != nil || headers.TTL != pendingHeadersTTL {
+	if err != nil || headers.TTL != activeHeadersTTL {
 		t.Fatalf("headers = %+v, %v", headers, err)
 	}
 	entry, _ := client.masters.entry(id)

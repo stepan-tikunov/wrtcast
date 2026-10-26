@@ -62,7 +62,7 @@ func (v *viewSession) takeOutbox() []telemetryRequest {
 // events.
 func eventsOf(t *testing.T, request telemetryRequest) (string, []map[string]any) {
 	t.Helper()
-	if request.path != "/events" || request.xhr || request.contentType != "application/x-www-form-urlencoded;charset=UTF-8" {
+	if request.path != "/events" || request.kind != fetchFetch || request.contentType != "application/x-www-form-urlencoded;charset=UTF-8" {
 		t.Fatalf("not an /events fetch: %+v", request)
 	}
 	form, err := url.ParseQuery(request.body)
@@ -133,9 +133,9 @@ func wantStat(t *testing.T, request telemetryRequest, percent string) {
 		"&url=https%3A%2F%2Fplayer.example%2F%3Ftoken_movie%3Dabc%26token%3Dtok&type=mgpo&ab=false" + percent +
 		"&info%5Bwasm%5D=true&info%5Bsw%5D=false" +
 		"&info%5Bresolution%5D%5BscreenWidth%5D=1920&info%5Bresolution%5D%5BscreenHeight%5D=1080" +
-		"&info%5Bresolution%5D%5BwindowWidth%5D=1920&info%5Bresolution%5D%5BwindowHeight%5D=1080" +
-		"&info%5Bresolution%5D%5BdevicePixelRatio%5D=1&info%5BwebSocket%5D=true&info%5Bplatform%5D=Linux+armv7l"
-	if request.path != "/stat" || !request.xhr || request.contentType != "application/x-www-form-urlencoded; charset=UTF-8" ||
+		"&info%5Bresolution%5D%5BwindowWidth%5D=854&info%5Bresolution%5D%5BwindowHeight%5D=480" +
+		"&info%5Bresolution%5D%5BdevicePixelRatio%5D=1&info%5BwebSocket%5D=true&info%5Bplatform%5D=Win32"
+	if request.path != "/stat" || request.kind != fetchXHR || request.contentType != "application/x-www-form-urlencoded; charset=UTF-8" ||
 		request.body != want {
 		t.Errorf("stat = %+v\nwant body %s", request, want)
 	}
@@ -212,7 +212,7 @@ func TestViewTelemetry(t *testing.T) {
 		common("0", "null", "0", true) + `"event_type":"ad_block_end","adDurationMs":600,"adDurationCumulativeMs":600,"at":1800000051100,"since":51100},`,
 		common("0", "null", "0", false) + `"event_type":"view_start","fileChangeType":"initial","autoplay":false,"resumeFrom":0,` +
 			`"startupQuality":720,"startupAudio":"(Russian) Dub","startupBitrate":2000000,"startupFrameRate":25,` +
-			`"renderWidth":1920,"renderHeight":1080,"at":1800000051100,"since":51100},`,
+			`"renderWidth":854,"renderHeight":480,"at":1800000051100,"since":51100},`,
 		common("0", "null", "0", false) + `"event_type":"startup","fileChangeType":"initial","playerStartupMs":50800,` +
 			`"manifestLoadMs":200,"userWaitMs":900,"bandwidthEstimate":500000,"startupBitrate":2000000,"at":1800000051100,"since":51100},`,
 		common("0", "null", "0", false) + `"event_type":"play","at":1800000051100,"since":51100},`,
@@ -265,8 +265,10 @@ func TestViewTelemetry(t *testing.T) {
 		"isUpscaling", "rebufferCountSession", "rebufferTotalMsSession", "bytesLoadedTotal", "bytesLoadedDelta")
 	wantKeys(t, keys[2], "event_type")
 	for index, want := range []map[string]any{
-		{"currentTime": 2.3, "playedSecondsDelta": 2.3, "bytesLoadedTotal": 3e6, "bytesLoadedDelta": 3e6},
-		{"currentTime": 12.3, "playedSecondsDelta": 10.0, "bytesLoadedTotal": 6.69e6, "bytesLoadedDelta": 3.69e6},
+		// hls.js's worker has the fragments' bytes by the time the
+		// bundle counts them.
+		{"currentTime": 2.3, "playedSecondsDelta": 2.3, "bytesLoadedTotal": 0.0, "bytesLoadedDelta": 0.0},
+		{"currentTime": 12.3, "playedSecondsDelta": 10.0, "bytesLoadedTotal": 0.0, "bytesLoadedDelta": 0.0},
 	} {
 		for key, value := range want {
 			if events[index][key] != value {
@@ -275,7 +277,7 @@ func TestViewTelemetry(t *testing.T) {
 		}
 		if events[index]["bandwidthEstimate"] != 12e6 || events[index]["currentBitrate"] != 2e6 ||
 			events[index]["currentFrameRate"] != 25.0 || events[index]["videoWidth"] != 1280.0 ||
-			events[index]["isUpscaling"] != true || events[index]["paused"] != false {
+			events[index]["isUpscaling"] != false || events[index]["paused"] != false {
 			t.Errorf("heartbeat %d = %v", index, events[index])
 		}
 	}
@@ -324,14 +326,15 @@ func TestViewTelemetry(t *testing.T) {
 	}
 	payload, events = eventsOf(t, requests[0])
 	if got := eventTypes(events); !reflect.DeepEqual(got, []string{
-		"quality_switch", "switch_complete", "seek_start", "seek_end", "view_percent", "view_percent", "view_finish",
+		"quality_switch", "switch_complete", "seek_start", "seek_end", "view_percent", "view_percent", "pause", "view_finish",
 	}) {
 		t.Fatalf("last batch %v", got)
 	}
 	keys = objectKeys(t, payload)
 	wantKeys(t, keys[0], "event_type", "qualityBefore", "qualityAfter", "isUpscale", "isDownscale", "bandwidthEstimate")
 	wantKeys(t, keys[1], "event_type", "switchType", "switchToFirstFrameMs", "manifestLoadMs", "segmentLoadMs", "bandwidthEstimate")
-	wantKeys(t, keys[6], "event_type", "watchTimeSec", "completed")
+	wantKeys(t, keys[6], "event_type")
+	wantKeys(t, keys[7], "event_type", "watchTimeSec", "completed")
 	if switched := events[0]; switched["qualityBefore"] != 720.0 || switched["qualityAfter"] != 480.0 ||
 		switched["isUpscale"] != nil || switched["isDownscale"] != true || switched["quality"] != 720.0 {
 		t.Errorf("quality_switch = %v", switched)
@@ -343,13 +346,16 @@ func TestViewTelemetry(t *testing.T) {
 	// Played: 17 s before the pause, then 5 to the first seek, 1 to the
 	// switch, 5 to the next report (which takes 1 back, not counted), 4 to
 	// the second seek and 1 to the end; the seeks don't count.
-	if finish := events[6]; finish["completed"] != true || finish["watchTimeSec"] != 33.0 || events[5]["percent"] != 97.0 {
+	// The media element pauses as it ends.
+	if finish := events[7]; finish["completed"] != true || finish["watchTimeSec"] != 33.0 || events[5]["percent"] != 97.0 ||
+		events[6]["paused"] != true {
 		t.Errorf("view_finish = %v, %v", finish, events[5])
 	}
 }
 
-// A page that goes away before the TV played tells so and sends what is
-// left by beacon, as multipart form data.
+// A page that goes away before the TV played sends what is left by beacon,
+// as multipart form data, when it is hidden, and then tells it never
+// started.
 func TestViewTelemetryPageGoes(t *testing.T) {
 	t.Parallel()
 	view, source, t0 := newTestView(t)
@@ -363,7 +369,7 @@ func TestViewTelemetryPageGoes(t *testing.T) {
 		t.Fatal("the lease ran out and the view went on")
 	}
 	requests := view.takeOutbox()
-	if len(requests) != 1 || requests[0].path != "/events" {
+	if len(requests) != 2 || requests[0].path != "/events" || requests[1].path != "/events" {
 		t.Fatalf("at the lease's end %+v", requests)
 	}
 	mediaType, parameters, err := mime.ParseMediaType(requests[0].contentType)
@@ -380,9 +386,14 @@ func TestViewTelemetryPageGoes(t *testing.T) {
 		t.Errorf("beacon body %q", requests[0].body)
 	}
 	_, events := payloadEvents(t, form.Value["payload"][0])
-	if got := eventTypes(events); !reflect.DeepEqual(got, []string{"ad_block_start", "ad_block_end", "view_start", "startup", "play", "exit_before_start"}) ||
-		events[5]["timeToExitMs"] != 8900.0 {
+	if got := eventTypes(events); !reflect.DeepEqual(got, []string{"ad_block_start", "ad_block_end", "view_start", "startup", "play"}) {
 		t.Fatalf("beacon events %v", events)
+	}
+	_, parameters, _ = mime.ParseMediaType(requests[1].contentType)
+	form, _ = multipart.NewReader(strings.NewReader(requests[1].body), parameters["boundary"]).ReadForm(1 << 20)
+	if _, events := payloadEvents(t, form.Value["payload"][0]); len(events) != 1 ||
+		events[0]["event_type"] != "exit_before_start" || events[0]["timeToExitMs"] != 8900.0 {
+		t.Fatalf("pagehide beacon events %v", events)
 	}
 }
 
@@ -490,14 +501,19 @@ func TestViewTelemetryOverHTTP(t *testing.T) {
 	ctx := context.Background()
 
 	headers, err := client.MediaHeaders(ctx, id, PlaybackReport{Resolution: "720"})
-	if err != nil || headers.TTL != activeHeadersTTL {
+	if err != nil || headers.TTL != activeHeadersTTL || headers.Proxy != "/v1/media/"+id+"/cdn" {
 		t.Fatalf("headers = %+v, %v", headers, err)
+	}
+	// The receiver loads the 720 the router chose.
+	if _, err := client.QualityPlaylist(ctx, id, "720"); err != nil {
+		t.Fatal(err)
 	}
 	waitFor(t, "/stat", func() bool { return len(fake.telemetryOf("/stat")) == 1 })
 	sameOrigin := func(record telemetryRecord, contentType string, xhr bool) {
 		t.Helper()
 		for name, want := range map[string]string{
-			"User-Agent": defaultUserAgent, "Accept": "*/*", "Content-Type": contentType,
+			"User-Agent": chromeUserAgent, "Accept": "*/*", "Content-Type": contentType,
+			"Sec-Fetch-Site": "same-origin", "Sec-Fetch-Dest": "empty", "sec-ch-ua-platform": chromePlatform,
 			"Origin": fake.player.URL, "Referer": fake.url(), "Cookie": "page=1",
 		} {
 			if got := record.header.Get(name); got != want {

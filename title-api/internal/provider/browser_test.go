@@ -311,3 +311,68 @@ func TestBrowserCORSCacheAndCookies(t *testing.T) {
 		t.Errorf("%d fetches and %d revalidations of two scripts loaded twice", gets.Load(), revalidations.Load())
 	}
 }
+
+// The player page loads as an iframe of the provider's page: a cross-site
+// navigation with the provider's origin as Referer, then its stylesheet and
+// scripts as subresources of it, before the playback request.
+func TestAlternativePlayerPageLoad(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var seen []string
+	headers := map[string]http.Header{}
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		mu.Lock()
+		seen = append(seen, request.Method+" "+request.URL.Path)
+		headers[request.URL.Path] = request.Header.Clone()
+		mu.Unlock()
+		switch request.URL.Path {
+		case "/":
+			_, _ = io.WriteString(response, `<meta name="viewporti" content="nonce">
+<link rel="stylesheet" href="/build/app.css" integrity="sha384-x">
+<script src="./js/rmp-vast.min.js?v=2.6"></script>
+<script src="/build/app.js" defer integrity="sha384-y"></script>
+<script>const userParam = { token: 'tok' }; const fileList = JSON.parse('{"type":"movie","active":{"id":7,"id_file":"8"},"all":{}}');</script>`)
+		case "/bnsi/movies/7":
+			_, _ = io.WriteString(response, `{"hlsSource":[{"label":"Dub","quality":{"480":"`+server.URL+`/480.m3u8"}}],"time":1}`)
+		}
+	}))
+	defer server.Close()
+	client, err := NewClient(Config{BaseURL: "https://go.example.pro", MediaBaseURL: "https://api.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	streams, err := client.alternativeStreams(context.Background(), server.URL+"/?token_movie=abc&token=tok", 0, "")
+	if err != nil || len(streams) != 1 {
+		t.Fatalf("streams %+v, %v", streams, err)
+	}
+	waitFor(t, "the icon sprite", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return headers["/images/allplay.svg"] != nil
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	if seen[0] != "GET /" || len(seen) != 6 || !strings.HasPrefix(seen[4]+seen[5], "POST /bnsi/movies/7") &&
+		!strings.HasPrefix(seen[5], "POST /bnsi/movies/7") {
+		t.Fatalf("requests %v", seen)
+	}
+	page := server.URL + "/?token_movie=abc&token=tok"
+	for path, want := range map[string]map[string]string{
+		"/": {"Sec-Fetch-Dest": "iframe", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Site": "cross-site",
+			"Referer": "https://go.example.pro/", "Upgrade-Insecure-Requests": "1", "Accept": navigationAccept, "Priority": "u=0, i"},
+		"/build/app.css":      {"Sec-Fetch-Dest": "style", "Sec-Fetch-Mode": "no-cors", "Sec-Fetch-Site": "same-origin", "Referer": page, "Priority": "u=0"},
+		"/js/rmp-vast.min.js": {"Sec-Fetch-Dest": "script", "Sec-Fetch-Mode": "no-cors", "Referer": page, "Priority": "u=1"},
+		"/build/app.js":       {"Sec-Fetch-Dest": "script", "Priority": ""},
+		"/bnsi/movies/7":      {"Sec-Fetch-Mode": "cors", "Sec-Fetch-Site": "same-origin", "X-Requested-With": "XMLHttpRequest", "Origin": server.URL},
+	} {
+		for name, value := range want {
+			if got := headers[path].Get(name); got != value {
+				t.Errorf("%s %s = %q, want %q", path, name, got, value)
+			}
+		}
+	}
+	if (alternativeFile{ID: 7, IDFile: "8"}).statID() != 8 || (alternativeFile{ID: 7, IDFile: "0"}).statID() != 7 {
+		t.Error("statID of a string id_file")
+	}
+}

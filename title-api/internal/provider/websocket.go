@@ -4,27 +4,22 @@ import (
 	"bufio"
 	"bytes"
 	"compress/flate"
-	"context"
 	"crypto/rand"
-	"crypto/sha1"
-	"crypto/tls"
-	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
-	"time"
 )
 
 // A minimal RFC 6455 client, enough for the alternative player's playback
-// socket: text messages both ways, pings answered, a clean close. net/http
-// does the handshake, through the same proxy as every other request, and
-// hands over the connection on 101.
+// socket: text messages both ways, pings answered, a clean close, and
+// compressed messages read when the server takes up the permessage-deflate
+// Chrome offers (ours go uncompressed, which the extension allows). The
+// browser does the handshake (see browser.dialWebSocket).
 
 const (
 	wsContinuation = 0x0
@@ -84,81 +79,6 @@ func (inflater *wsInflater) inflate(payload []byte) ([]byte, error) {
 		inflater.window = append([]byte(nil), inflater.window[excess:]...)
 	}
 	return message, nil
-}
-
-// newWSTransport is an HTTP/1.1-only transport: an upgrade needs the
-// connection to itself, which HTTP/2 would not offer.
-func newWSTransport() *http.Transport {
-	return &http.Transport{
-		Proxy:               http.ProxyFromEnvironment,
-		DialContext:         (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		ForceAttemptHTTP2:   false,
-		TLSNextProto:        map[string]func(string, *tls.Conn) http.RoundTripper{},
-		TLSHandshakeTimeout: 10 * time.Second,
-	}
-}
-
-// dialWebSocket opens a ws:// or wss:// URL with the given extra headers
-// (Origin, User-Agent and the like). ctx bounds the handshake only.
-func dialWebSocket(ctx context.Context, transport http.RoundTripper, rawURL string, header http.Header) (*wsConn, error) {
-	target, err := wsHTTPURL(rawURL)
-	if err != nil {
-		return nil, err
-	}
-	nonce := make([]byte, 16)
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, err
-	}
-	key := base64.StdEncoding.EncodeToString(nonce)
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	for name, values := range header {
-		request.Header[name] = values
-	}
-	request.Header.Set("Connection", "Upgrade")
-	request.Header.Set("Upgrade", "websocket")
-	request.Header.Set("Sec-WebSocket-Version", "13")
-	request.Header.Set("Sec-WebSocket-Key", key)
-	response, err := transport.RoundTrip(request)
-	if err != nil {
-		return nil, err
-	}
-	if response.StatusCode != http.StatusSwitchingProtocols {
-		response.Body.Close()
-		return nil, &alternativeStatusError{status: response.Status, code: response.StatusCode, vd: response.Header.Get("X-VD")}
-	}
-	rwc, ok := response.Body.(io.ReadWriteCloser)
-	if !ok {
-		response.Body.Close()
-		return nil, errors.New("websocket upgrade: connection not writable")
-	}
-	digest := sha1.Sum([]byte(key + wsAcceptGUID))
-	if !strings.EqualFold(response.Header.Get("Upgrade"), "websocket") ||
-		!headerHasToken(response.Header, "Connection", "upgrade") ||
-		response.Header.Get("Sec-WebSocket-Accept") != base64.StdEncoding.EncodeToString(digest[:]) {
-		rwc.Close()
-		return nil, errors.New("websocket upgrade: bad handshake reply")
-	}
-	return &wsConn{rwc: rwc, br: bufio.NewReader(rwc)}, nil
-}
-
-// wsHTTPURL is the http(s) URL the handshake of a ws(s) URL goes to.
-func wsHTTPURL(rawURL string) (*url.URL, error) {
-	target, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, err
-	}
-	switch target.Scheme {
-	case "ws":
-		target.Scheme = "http"
-	case "wss":
-		target.Scheme = "https"
-	default:
-		return nil, fmt.Errorf("not a websocket URL: %q", rawURL)
-	}
-	return target, nil
 }
 
 func headerHasToken(header http.Header, name, token string) bool {

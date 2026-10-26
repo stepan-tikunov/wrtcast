@@ -12,6 +12,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -65,8 +66,8 @@ var viewMilestones = []int{0, 10, 30, 60, 97}
 type telemetryTiming struct {
 	heartbeat time.Duration // heartbeat event while playing
 	flush     time.Duration // /events batch
-	// The preroll whose ad lists came back empty: two requests to the ad
-	// network, which title-api does not make.
+	// The preroll whose ad lists came back empty, when the ad network is
+	// not asked (tests; see adListURL).
 	adBlock time.Duration
 	// Without a report from the TV, the first frame is assumed this long
 	// after the play once bytes were loaded, and a switch complete after
@@ -84,13 +85,45 @@ var defaultTelemetryTiming = telemetryTiming{
 	request:        10 * time.Second,
 }
 
-// What the player learns of the browser: a TV, as the User-Agent says.
+// What the player learns of the browser: the desktop Chrome of chrome.go
+// with a Full HD screen, the player in an iframe of the provider's page
+// (window.inner* and the video element's size), on a wired connection,
+// which Chrome tells as 4g, in the time zone of TZ (see browserTimeZone).
 const (
 	screenWidth, screenHeight = 1920, 1080
+	embedWidth, embedHeight   = 854, 480
 	devicePixelRatio          = 1
 	connectionType            = "4g" // navigator.connection.effectiveType
 	downlinkMbps              = 10   // navigator.connection.downlink, which Chrome caps at 10
+	connectionRTT             = 50   // navigator.connection.rtt, in steps of 25 ms
+	navigatorLanguage         = "ru-RU"
 )
+
+// browserZone is Intl's time zone of the browser: TZ when it names one,
+// else Moscow's.
+type browserZone struct {
+	name     string
+	location *time.Location
+}
+
+func browserTimeZone() browserZone {
+	if name := os.Getenv("TZ"); name != "" {
+		if location, err := time.LoadLocation(name); err == nil && strings.Contains(name, "/") {
+			return browserZone{name: name, location: location}
+		}
+	}
+	location, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		location = time.FixedZone("Europe/Moscow", 3*3600)
+	}
+	return browserZone{name: "Europe/Moscow", location: location}
+}
+
+// offset is -getTimezoneOffset(): minutes east of UTC at at.
+func (zone browserZone) offset(at time.Time) int {
+	_, seconds := at.In(zone.location).Zone()
+	return seconds / 60
+}
 
 var platformPattern = regexp.MustCompile(`\b(Linux [A-Za-z0-9_]+|Windows|Macintosh)\b`)
 
@@ -115,11 +148,11 @@ type viewChange struct {
 	paused, seeked bool
 }
 
-// telemetryRequest is one POST to the player's origin: a jQuery form (xhr)
-// or a fetch or beacon body.
+// telemetryRequest is one POST to the player's origin: a jQuery form
+// (fetchXHR), a fetch() body (fetchFetch) or a beacon (fetchBeacon).
 type telemetryRequest struct {
 	path, contentType, body string
-	xhr                     bool
+	kind                    fetchKind
 }
 
 type viewSession struct {
@@ -168,6 +201,26 @@ type viewSession struct {
 	events                                              []jsObject
 	dropped                                             int
 	outbox                                              []telemetryRequest
+	// The media element's waiting and playing, and the rebuffers of the
+	// view so far.
+	isBuffering     bool
+	rebufferStarted time.Time
+	rebuffers       int
+	rebufferTotal   int64 // milliseconds
+	// Ad lists due (see adCall), whether the preroll waits for its own,
+	// and the midroll slots done this view.
+	adCalls                      []adCall
+	prerollPending               bool
+	midrollStarted, midrollAt300 bool
+	// /errors: the hls.js errors buffered, their session, and the last
+	// one's signature, which a repeat of is not buffered.
+	errors                           []jsObject
+	errorsDropped                    int
+	errorsSessionID, errorsRequestID string
+	lastErrorSignature               string
+	lastErrorAt                      time.Time
+	nextErrorsFlush, nextReload      time.Time
+	reloadDue                        bool
 
 	// The run: from the router's first headers request to the end or the
 	// lease running out.
@@ -189,6 +242,7 @@ func newViewSession(client *Client, player *alternativePlayer, statID int64) *vi
 		navigationStart: player.navigationStart, playerInitAt: player.started,
 		backendSent: backendSent, backendAnswered: backendAnswered,
 		sessionID: randomID(), requestID: randomID(),
+		errorsSessionID: randomID(), errorsRequestID: randomID(),
 		fileChangeStarted: backendSent,
 		statPercent:       -1,
 		percents:          map[int]bool{},
@@ -287,6 +341,8 @@ func (v *viewSession) beginLocked(now time.Time, source *alternativeSource, repo
 	v.running, v.ending = true, false
 	v.nextHeartbeat = nextTick(v.playerInitAt, v.timing.heartbeat, now)
 	v.nextFlush = nextTick(v.playerInitAt, v.timing.flush, now)
+	v.nextErrorsFlush = v.nextFlush
+	v.nextReload = nextTick(v.playerInitAt, v.client.pageTiming.reload, now)
 	v.resetLocked(now)
 	v.setSourceLocked(now, source, report.Resolution)
 	if !v.head.started.IsZero() {
@@ -314,6 +370,8 @@ func (v *viewSession) resetLocked(now time.Time) {
 	v.playDue, v.firstFrameDue, v.switchDue = time.Time{}, time.Time{}, time.Time{}
 	v.head.resetBytes()
 	v.lastHeartbeatBytes = 0
+	v.isBuffering, v.rebufferStarted, v.rebuffers, v.rebufferTotal = false, time.Time{}, 0, 0
+	v.midrollStarted, v.midrollAt300, v.prerollPending = false, false, false
 }
 
 // setSourceLocked makes source and the quality the router plays (want, or
@@ -351,22 +409,29 @@ func (v *viewSession) setSourceLocked(now time.Time, source *alternativeSource, 
 	}
 }
 
-// switchLocked is the player's quality or audio change: the batch so far
-// goes, the request id is new, and the switch completes on the next play.
+// switchLocked is the player's quality or audio change: the batches so far
+// go, the request ids are new, and the switch completes on the next play.
 func (v *viewSession) switchLocked(now time.Time, kind string, event jsObject) {
 	v.flushLocked(now, false)
-	v.requestID = randomID()
+	v.flushErrorsLocked(now, false)
+	v.requestID, v.errorsRequestID = randomID(), randomID()
 	v.pendingSwitch, v.switchStartedAt = kind, now
 	v.switchDue = now.Add(v.timing.switchComplete)
 	v.pushLocked(now, event)
 }
 
-// beginPrerollLocked is the play button: the preroll starts, and its ad
-// lists come back empty a moment later (see playLocked).
+// beginPrerollLocked is the play button: the preroll starts and asks the
+// ad network for its lists, which ends it (see playLocked) once they are
+// in, or without the ad network a moment later.
 func (v *viewSession) beginPrerollLocked(now time.Time) {
 	v.prerolled = true
 	v.adStartedAt = now
 	v.pushLocked(now, jsObject{{"event_type", "ad_block_start"}})
+	if calls := v.player.adSlot(slotPreroll); len(calls) > 0 {
+		v.adCalls = append(v.adCalls, calls...)
+		v.prerollPending = true
+		return
+	}
 	v.playDue = now.Add(v.timing.adBlock)
 }
 
@@ -389,7 +454,7 @@ func (v *viewSession) playLocked(now time.Time) {
 		{"event_type", "view_start"}, {"fileChangeType", "initial"}, {"autoplay", false},
 		{"resumeFrom", 0}, {"startupQuality", jsQuality(v.quality)}, {"startupAudio", v.label},
 		{"startupBitrate", bitrate}, {"startupFrameRate", frameRate},
-		{"renderWidth", screenWidth}, {"renderHeight", screenHeight},
+		{"renderWidth", embedWidth}, {"renderHeight", embedHeight},
 	})
 	var manifestLoad any
 	if !v.manifestRequested.IsZero() && !v.manifestLoaded.IsZero() {
@@ -402,7 +467,7 @@ func (v *viewSession) playLocked(now time.Time) {
 	v.pushLocked(now, jsObject{
 		{"event_type", "startup"}, {"fileChangeType", "initial"},
 		{"playerStartupMs", milliseconds(now.Sub(v.playerInitAt))}, {"manifestLoadMs", manifestLoad},
-		{"userWaitMs", userWait}, {"bandwidthEstimate", defaultBandwidthEstimate}, {"startupBitrate", bitrate},
+		{"userWaitMs", userWait}, {"bandwidthEstimate", v.bandwidthLocked()}, {"startupBitrate", bitrate},
 	})
 	v.pushLocked(now, jsObject{{"event_type", "play"}})
 	v.firstFrameDue = now.Add(v.timing.firstFrame)
@@ -457,6 +522,9 @@ func (v *viewSession) reportLocked(now time.Time, source *alternativeSource, rep
 		}
 	}
 	change.paused = v.head.paused
+	if report.HasBuffering {
+		v.bufferingLocked(now, report.Buffering && !v.head.paused)
+	}
 	if v.playAttempted && v.playDue.IsZero() && !v.viewStarted && report.Duration > 0 {
 		change.seeked = v.firstFrameLocked(now) || change.seeked
 	} else if v.pendingSwitch != "" && now.Sub(v.switchStartedAt) >= time.Second {
@@ -464,6 +532,28 @@ func (v *viewSession) reportLocked(now time.Time, source *alternativeSource, rep
 	}
 	v.progressLocked(now)
 	return change
+}
+
+// bufferingLocked follows the receiver waiting for data: the media
+// element's waiting is rebuffer_start once the view started, and its
+// playing ends it with rebuffer_end and the view's count and time.
+func (v *viewSession) bufferingLocked(now time.Time, waiting bool) {
+	switch {
+	case waiting && !v.isBuffering && v.viewStarted && v.pendingSwitch == "":
+		v.isBuffering, v.rebufferStarted = true, now
+		v.pushLocked(now, jsObject{
+			{"event_type", "rebuffer_start"}, {"bandwidthEstimate", v.bandwidthLocked()}, {"bufferLengthAtStart", v.bufferLocked(now)},
+		})
+	case !waiting && v.isBuffering && v.pendingSwitch == "":
+		duration := milliseconds(now.Sub(v.rebufferStarted))
+		v.isBuffering = false
+		v.rebuffers++
+		v.rebufferTotal += duration
+		v.pushLocked(now, jsObject{
+			{"event_type", "rebuffer_end"}, {"rebufferDurationMs", duration}, {"rebufferCountTotal", v.rebuffers},
+			{"rebufferTotalMsSession", v.rebufferTotal}, {"bandwidthEstimate", v.bandwidthLocked()},
+		})
+	}
 }
 
 // seekLocked is a seek of the receiver. The player takes seekFrom when the
@@ -496,6 +586,7 @@ func (v *viewSession) firstFrameLocked(now time.Time) bool {
 	})
 	v.firstFrameAt = now
 	v.viewStarted, v.viewEverStarted = true, true
+	v.midrollLocked(now)
 	var adDuration any
 	if v.adDuration > 0 {
 		adDuration = v.adDuration.Milliseconds()
@@ -533,13 +624,23 @@ func (v *viewSession) firstFrameLocked(now time.Time) bool {
 	return seeked
 }
 
+// switchCompleteLocked is the first frame after a switch, which loaded
+// the new quality's master (see QualityPlaylist), unless it was loaded
+// before.
 func (v *viewSession) switchCompleteLocked(now time.Time) {
+	switchMs := milliseconds(now.Sub(v.switchStartedAt))
+	var manifestLoad, segmentLoad any
+	if info := v.variant; !info.requested.IsZero() && !info.requested.Before(v.switchStartedAt) && info.loaded.After(info.requested) {
+		load := milliseconds(info.loaded.Sub(info.requested))
+		manifestLoad = load
+		if switchMs > load {
+			segmentLoad = switchMs - load
+		}
+	}
 	v.pushLocked(now, jsObject{
 		{"event_type", "switch_complete"}, {"switchType", v.pendingSwitch},
-		{"switchToFirstFrameMs", milliseconds(now.Sub(v.switchStartedAt))},
-		// The receiver loads the new playlists itself; title-api has the
-		// masters already.
-		{"manifestLoadMs", nil}, {"segmentLoadMs", nil}, {"bandwidthEstimate", v.bandwidthLocked()},
+		{"switchToFirstFrameMs", switchMs},
+		{"manifestLoadMs", manifestLoad}, {"segmentLoadMs", segmentLoad}, {"bandwidthEstimate", v.bandwidthLocked()},
 	})
 	v.pendingSwitch, v.switchStartedAt, v.switchDue = "", time.Time{}, time.Time{}
 }
@@ -556,6 +657,9 @@ func (v *viewSession) progressLocked(now time.Time) {
 		v.playedSeconds += delta
 	}
 	v.evaluated = position
+	if position >= midrollTime {
+		v.midrollLocked(now)
+	}
 	duration := v.head.duration
 	if duration <= 0 {
 		return
@@ -609,52 +713,80 @@ func (v *viewSession) heartbeatLocked(now time.Time) {
 		return
 	}
 	v.progressLocked(now)
-	loaded := v.head.loaded(now)
 	played := v.playedSeconds - v.lastHeartbeatPlayed
-	delta := max(0, loaded-v.lastHeartbeatBytes)
-	v.lastHeartbeatPlayed, v.lastHeartbeatBytes = v.playedSeconds, loaded
-	v.head.shown = loaded
+	v.lastHeartbeatPlayed = v.playedSeconds
 	bitrate, frameRate := v.levelLocked()
 	var width, height, upscaling any
 	if v.variant.width > 0 && v.variant.height > 0 {
-		width, height, upscaling = v.variant.width, v.variant.height, screenWidth > v.variant.width
+		width, height, upscaling = v.variant.width, v.variant.height, embedWidth > v.variant.width
 	}
+	// The bundle counts the bytes of FRAG_LOADED's payload, which hls.js
+	// has handed to its worker (and so emptied) by then: none, in a
+	// desktop Chrome.
 	v.pushLocked(now, jsObject{
 		{"event_type", "heartbeat"}, {"bandwidthEstimate", v.bandwidthLocked()},
 		{"droppedFrames", 0}, {"droppedFramesDelta", 0}, {"playedSecondsDelta", round3(played)},
-		{"isBuffering", false}, {"isSeeking", false}, {"playbackRate", 1},
+		{"isBuffering", v.isBuffering}, {"isSeeking", false}, {"playbackRate", 1},
 		{"currentBitrate", bitrate}, {"currentFrameRate", frameRate},
 		{"videoWidth", width}, {"videoHeight", height}, {"isUpscaling", upscaling},
-		{"rebufferCountSession", 0}, {"rebufferTotalMsSession", 0},
-		{"bytesLoadedTotal", loaded}, {"bytesLoadedDelta", delta},
+		{"rebufferCountSession", v.rebuffers}, {"rebufferTotalMsSession", v.rebufferTotal},
+		{"bytesLoadedTotal", 0}, {"bytesLoadedDelta", 0},
 	})
 }
 
-// finishLocked ends the view: at the end of the video view_finish goes
-// at once; a page going away tells of a view that never started and sends
-// what is left by beacon.
+// finishLocked ends the view: at the end of the video the media element
+// pauses and ends, view_finish goes at once, and the next play has its
+// preroll again; a page going away sends what is left by beacon when it is
+// hidden, and on pagehide tells of a view that never started.
 func (v *viewSession) finishLocked(now time.Time, ended bool) {
 	v.progressLocked(now)
 	if ended {
+		if !v.paused {
+			v.paused = true
+			v.pushLocked(now, jsObject{{"event_type", "pause"}})
+		}
 		v.pushLocked(now, jsObject{
 			{"event_type", "view_finish"}, {"watchTimeSec", int64(math.Floor(v.playedSeconds + 0.5))},
 			{"completed", true},
 		})
 		v.flushLocked(now, false)
 		v.resetLocked(now)
+		v.prerolled = false
 		return
 	}
+	v.flushLocked(now, true)
+	v.flushErrorsLocked(now, true)
 	if v.playAttempted && !v.viewEverStarted {
 		v.pushLocked(now, jsObject{
 			{"event_type", "exit_before_start"}, {"timeToExitMs", milliseconds(now.Sub(v.playReadyAt))},
 		})
+		v.flushLocked(now, true)
 	}
-	v.flushLocked(now, true)
+}
+
+// variantLocked takes in the variant of the quality played once its
+// master loaded (see QualityPlaylist), and the manifest's times for a view
+// that has not played yet.
+func (v *viewSession) variantLocked() {
+	if v.source == nil {
+		return
+	}
+	v.source.mu.Lock()
+	info, ok := v.source.variants[v.quality]
+	v.source.mu.Unlock()
+	if !ok {
+		return
+	}
+	v.variant = info
+	if !v.playAttempted && v.manifestLoaded.IsZero() && !v.fileChangeStarted.IsZero() {
+		v.manifestRequested, v.manifestLoaded = info.requested, info.loaded
+	}
 }
 
 // levelLocked is the bitrate and the frame rate of the level played, as
 // hls.js has them from the variant.
 func (v *viewSession) levelLocked() (bitrate, frameRate any) {
+	v.variantLocked()
 	if v.variant.bandwidth > 0 {
 		bitrate = v.variant.bandwidth
 	}
@@ -664,18 +796,30 @@ func (v *viewSession) levelLocked() (bitrate, frameRate any) {
 	return bitrate, frameRate
 }
 
-// bandwidthLocked is hls.js's estimate: what the router measured, or the
+// bandwidthLocked is hls.js's estimate: from the fragments title-api
+// relayed (see mediaState), else what the router measured, else the
 // default before a fragment loaded.
-func (v *viewSession) bandwidthLocked() int64 {
+func (v *viewSession) bandwidthLocked() any {
+	if v.source != nil {
+		if estimate, _, _ := v.source.media.stats(); estimate > 0 {
+			return estimate
+		}
+	}
 	if v.head.bandwidth > 0 {
 		return v.head.bandwidth
 	}
 	return defaultBandwidthEstimate
 }
 
-// bufferLocked is the length buffered ahead: the seconds the bytes loaded
+// bufferLocked is the length buffered ahead: up to the end of the last
+// fragment title-api relayed, else the seconds the bytes the router loaded
 // stand for at the variant's bitrate, less those played.
 func (v *viewSession) bufferLocked(now time.Time) any {
+	if v.source != nil {
+		if _, loadedEnd, _ := v.source.media.stats(); loadedEnd > 0 {
+			return round3(min(max(loadedEnd-v.head.at(now), 0), maxBufferSeconds))
+		}
+	}
 	bitrate := v.variant.averageBandwidth
 	if bitrate <= 0 {
 		bitrate = v.variant.bandwidth
@@ -733,22 +877,7 @@ func (v *viewSession) flushLocked(now time.Time, beacon bool) {
 		{"events", v.events},
 	})
 	v.events, v.dropped = nil, 0
-	if beacon {
-		boundary := "----WebKitFormBoundary" + formBoundary()
-		var body strings.Builder
-		for _, part := range [][2]string{{"token", v.player.token}, {"payload", string(payload)}} {
-			fmt.Fprintf(&body, "--%s\r\nContent-Disposition: form-data; name=%q\r\n\r\n%s\r\n", boundary, part[0], part[1])
-		}
-		fmt.Fprintf(&body, "--%s--\r\n", boundary)
-		v.outbox = append(v.outbox, telemetryRequest{
-			path: "/events", contentType: "multipart/form-data; boundary=" + boundary, body: body.String(),
-		})
-		return
-	}
-	v.outbox = append(v.outbox, telemetryRequest{
-		path: "/events", contentType: "application/x-www-form-urlencoded;charset=UTF-8",
-		body: searchParams([][2]string{{"token", v.player.token}, {"payload", string(payload)}}),
-	})
+	v.outbox = append(v.outbox, pagePost("/events", v.player.token, string(payload), beacon))
 }
 
 // statLocked registers the view with /stat, or a milestone with percent.
@@ -764,14 +893,14 @@ func (v *viewSession) statLocked(percent *int) {
 		[2]string{"info[wasm]", "true"}, [2]string{"info[sw]", "false"},
 		[2]string{"info[resolution][screenWidth]", strconv.Itoa(screenWidth)},
 		[2]string{"info[resolution][screenHeight]", strconv.Itoa(screenHeight)},
-		[2]string{"info[resolution][windowWidth]", strconv.Itoa(screenWidth)},
-		[2]string{"info[resolution][windowHeight]", strconv.Itoa(screenHeight)},
+		[2]string{"info[resolution][windowWidth]", strconv.Itoa(embedWidth)},
+		[2]string{"info[resolution][windowHeight]", strconv.Itoa(embedHeight)},
 		[2]string{"info[resolution][devicePixelRatio]", strconv.Itoa(devicePixelRatio)},
-		[2]string{"info[webSocket]", "true"}, [2]string{"info[platform]", navigatorPlatform(v.client.userAgent)},
+		[2]string{"info[webSocket]", "true"}, [2]string{"info[platform]", navigatorPlatform(chromeUserAgent)},
 	)
 	v.outbox = append(v.outbox, telemetryRequest{
 		path: "/stat", contentType: "application/x-www-form-urlencoded; charset=UTF-8",
-		body: jqueryParam(fields), xhr: true,
+		body: jqueryParam(fields), kind: fetchXHR,
 	})
 }
 
@@ -807,6 +936,14 @@ func (v *viewSession) dueLocked(now time.Time) {
 		v.flushLocked(now, false)
 		v.nextFlush = nextTick(v.playerInitAt, v.timing.flush, now)
 	}
+	if !v.nextErrorsFlush.After(now) {
+		v.flushErrorsLocked(now, false)
+		v.nextErrorsFlush = nextTick(v.playerInitAt, v.timing.flush, now)
+	}
+	if !v.nextReload.After(now) {
+		v.reloadDue = true
+		v.nextReload = nextTick(v.playerInitAt, v.client.pageTiming.reload, now)
+	}
 	if !v.nextHeartbeat.After(now) {
 		v.heartbeatLocked(now)
 		v.nextHeartbeat = nextTick(v.playerInitAt, v.timing.heartbeat, now)
@@ -817,7 +954,7 @@ func (v *viewSession) dueLocked(now time.Time) {
 	// Without the duration from the TV, the bytes it loaded tell it plays.
 	if !v.firstFrameDue.IsZero() && !v.firstFrameDue.After(now) {
 		v.firstFrameDue = now.Add(v.timing.firstFrame)
-		if v.head.total > 0 {
+		if _, _, loads := v.source.media.stats(); v.head.total > 0 || loads > 0 {
 			v.firstFrameLocked(now)
 		}
 	}
@@ -829,7 +966,7 @@ func (v *viewSession) dueLocked(now time.Time) {
 
 func (v *viewSession) nextWakeLocked(now time.Time) time.Time {
 	next := v.leaseUntil
-	for _, due := range []time.Time{v.nextFlush, v.nextHeartbeat, v.playDue, v.firstFrameDue, v.switchDue, v.nextMilestoneLocked(now)} {
+	for _, due := range []time.Time{v.nextFlush, v.nextErrorsFlush, v.nextReload, v.nextHeartbeat, v.playDue, v.firstFrameDue, v.switchDue, v.nextMilestoneLocked(now)} {
 		if !due.IsZero() && due.Before(next) {
 			next = due
 		}
@@ -850,8 +987,9 @@ func (v *viewSession) run(ctx context.Context, previous, done chan struct{}) {
 		v.mu.Lock()
 		now := time.Now()
 		over := v.stepLocked(ctx, now)
-		requests := v.outbox
-		v.outbox = nil
+		requests, calls, reload := v.outbox, v.adCalls, v.reloadDue
+		v.outbox, v.adCalls, v.reloadDue = nil, nil, false
+		source, paused := v.source, v.head.paused
 		wake := v.nextWakeLocked(now)
 		v.mu.Unlock()
 		for _, request := range requests {
@@ -862,7 +1000,7 @@ func (v *viewSession) run(ctx context.Context, previous, done chan struct{}) {
 			requestCtx, cancel := context.WithTimeout(context.Background(), timeout)
 			// Failures are not retried, as the player's are not; one is
 			// logged.
-			if err := v.player.post(requestCtx, v.client.userAgent, request); err != nil && !failed {
+			if err := v.player.post(requestCtx, request); err != nil && !failed {
 				failed = true
 				log.Printf("player telemetry %s: %v", request.path, err)
 			}
@@ -870,6 +1008,13 @@ func (v *viewSession) run(ctx context.Context, previous, done chan struct{}) {
 		}
 		if over {
 			return
+		}
+		if len(calls) > 0 {
+			v.requestAds(ctx, calls)
+			continue
+		}
+		if reload && source != nil {
+			source.reloadLinks(ctx, paused)
 		}
 		timer.Reset(max(time.Until(wake), 0))
 		select {
@@ -881,22 +1026,18 @@ func (v *viewSession) run(ctx context.Context, previous, done chan struct{}) {
 }
 
 // post sends one telemetry request from the player page: same-origin, with
-// the page's cookies.
-func (player *alternativePlayer) post(ctx context.Context, userAgent string, telemetry telemetryRequest) error {
+// the page's cookies, by jQuery (with its Accept and X-Requested-With),
+// fetch() or a beacon.
+func (player *alternativePlayer) post(ctx context.Context, telemetry telemetryRequest) error {
 	endpoint := player.playerURL.ResolveReference(&url.URL{Path: telemetry.path})
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), strings.NewReader(telemetry.body))
-	if err != nil {
-		return err
+	header := [][2]string{{"Content-Type", telemetry.contentType}}
+	if telemetry.kind == fetchXHR {
+		header = append(header, [2]string{"Accept", "*/*"}, [2]string{"X-Requested-With", "XMLHttpRequest"})
 	}
-	request.Header.Set("User-Agent", userAgent)
-	request.Header.Set("Accept", "*/*")
-	request.Header.Set("Content-Type", telemetry.contentType)
-	if telemetry.xhr {
-		request.Header.Set("X-Requested-With", "XMLHttpRequest")
-	}
-	request.Header.Set("Origin", player.playerURL.Scheme+"://"+player.playerURL.Host)
-	request.Header.Set("Referer", player.playerURL.String())
-	response, err := player.client.Do(request)
+	response, err := player.browser.do(ctx, browserRequest{
+		kind: telemetry.kind, method: http.MethodPost, url: endpoint.String(),
+		initiator: player.playerURL, referer: player.playerURL.String(), header: header, body: []byte(telemetry.body),
+	})
 	if err != nil {
 		return err
 	}
@@ -1012,14 +1153,16 @@ func jsQuality(quality string) any {
 	return nil
 }
 
-const boundaryAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+// Blink's alphabet for multipart boundaries, whose last two letters repeat
+// so that it has 64.
+const boundaryAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789AB"
 
 // formBoundary is the random part of Chrome's multipart boundary.
 func formBoundary() string {
 	random := make([]byte, 16)
 	_, _ = rand.Read(random)
 	for i := range random {
-		random[i] = boundaryAlphabet[int(random[i])%len(boundaryAlphabet)]
+		random[i] = boundaryAlphabet[random[i]&0x3f]
 	}
 	return string(random)
 }

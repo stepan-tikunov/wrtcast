@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log"
 	"math"
-	"net/http"
 	"regexp"
 	"sort"
 	"strconv"
@@ -59,26 +58,32 @@ var defaultSessionTiming = sessionTiming{
 
 // PlaybackReport is what the router knows of a playback when it asks for
 // the headers of its media: the quality it plays ("720", empty when not
-// known), the position, whether it is paused, the duration the TV reports
-// once it plays, the bytes of the media's segments loaded so far and the
-// bandwidth they came at (bits/s), each when known.
+// known), the position, whether it is paused or waiting for data
+// (BUFFERING), the duration the TV reports once it plays, the bytes of the
+// media's segments loaded so far and the bandwidth they came at (bits/s),
+// each when known.
 type PlaybackReport struct {
-	Resolution  string
-	Position    float64
-	HasPosition bool
-	Paused      bool
-	HasPaused   bool
-	Duration    float64
-	Bytes       int64
-	HasBytes    bool
-	Bandwidth   int64
+	Resolution   string
+	Position     float64
+	HasPosition  bool
+	Paused       bool
+	HasPaused    bool
+	Buffering    bool
+	HasBuffering bool
+	Duration     float64
+	Bytes        int64
+	HasBytes     bool
+	Bandwidth    int64
 }
 
 // MediaHeaders are the headers CDN requests of a media need now, and how
-// long they may be kept.
+// long they may be kept; Proxy, when set, is the path of title-api's relay
+// of the media's CDN requests (see FetchMedia), which a router that knows
+// it goes through instead.
 type MediaHeaders struct {
 	Headers []ProxyHeader
 	TTL     time.Duration
+	Proxy   string
 }
 
 // playbackSession is the playback socket of one source. A headers request
@@ -99,6 +104,7 @@ type playbackSession struct {
 	leaseUntil time.Time
 	running    bool
 	ending     bool // end() asked for ended and a close
+	gaveUp     bool // the reconnects ran out, which the player's never retry
 	restart    bool // the resolution changed: playback_start is due
 	paused     bool // the router's playback is paused
 	announced  bool // resumed was sent for the playing of now
@@ -110,6 +116,7 @@ type playbackSession struct {
 	openedAt, tokenAt                  time.Time
 	kick                               chan struct{}
 	done                               chan struct{} // of the last run
+	changed                            chan struct{} // closed on a connection or an edge_hash
 }
 
 func newPlaybackSession(client *Client, player *alternativePlayer, view *viewSession, pnr, pnk, trackID string, qualities map[string]string) *playbackSession {
@@ -117,6 +124,35 @@ func newPlaybackSession(client *Client, player *alternativePlayer, view *viewSes
 		client: client, player: player, view: view, pnr: pnr, pnk: pnk, trackID: trackID, qualities: qualities,
 		resolution: pickResolution(qualities, ""),
 		kick:       make(chan struct{}, 1),
+		changed:    make(chan struct{}),
+	}
+}
+
+// changedLocked wakes those who wait for the socket (see wait).
+func (s *playbackSession) changedLocked() {
+	close(s.changed)
+	s.changed = make(chan struct{})
+}
+
+// wait waits up to timeout for ready, which it checks under the lock;
+// whether it came.
+func (s *playbackSession) wait(ctx context.Context, timeout time.Duration, ready func() bool) bool {
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	for {
+		s.mu.Lock()
+		done, changed := ready(), s.changed
+		s.mu.Unlock()
+		if done {
+			return true
+		}
+		select {
+		case <-changed:
+		case <-deadline.C:
+			return false
+		case <-ctx.Done():
+			return false
+		}
 	}
 }
 
@@ -213,7 +249,7 @@ func (s *playbackSession) end() {
 }
 
 func (s *playbackSession) startLocked() {
-	if s.running {
+	if s.running || s.gaveUp {
 		return
 	}
 	client := s.client
@@ -259,6 +295,7 @@ func (s *playbackSession) over(ctx context.Context, lease *time.Timer) (code int
 func (s *playbackSession) stopLocked() {
 	s.running, s.ending, s.restart = false, false, false
 	s.edgeHash, s.edgeTTL = "", 0
+	s.changedLocked()
 }
 
 // sessionRun is the state of one run, across its reconnects.
@@ -290,6 +327,7 @@ func (s *playbackSession) run(ctx context.Context, previous, done chan struct{})
 		if err == nil {
 			s.mu.Lock()
 			s.openedAt = time.Now()
+			s.changedLocked()
 			reconnect := r.opened
 			if reconnect {
 				s.reconnects++
@@ -317,6 +355,7 @@ func (s *playbackSession) run(ctx context.Context, previous, done chan struct{})
 			log.Printf("playback socket %s: gave up after %d attempts", s.pnr, attempts)
 			r.stats("reconnect_failed", [2]string{"error", "max_attempts_30"})
 			s.mu.Lock()
+			s.gaveUp = true
 			s.stopLocked()
 			s.mu.Unlock()
 			return
@@ -356,11 +395,11 @@ func (r *sessionRun) stats(status string, extra ...[2]string) {
 	r.mu.Unlock()
 	request := telemetryRequest{
 		path: "/stats", contentType: "application/x-www-form-urlencoded",
-		body: searchParams(append(fields, extra...)),
+		body: searchParams(append(fields, extra...)), kind: fetchBeacon,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), r.client.telemetryTiming.request)
 	defer cancel()
-	if err := r.player.post(ctx, r.client.userAgent, request); err != nil && !r.failed {
+	if err := r.player.post(ctx, request); err != nil && !r.failed {
 		r.failed = true
 		log.Printf("playback socket %s: /stats: %v", r.pnr, err)
 	}
@@ -384,27 +423,13 @@ func (r *sessionRun) wait(delay time.Duration) bool {
 	}
 }
 
+// connect opens the socket as the page does, with the player's origin
+// and the cookies Chrome would send.
 func (s *playbackSession) connect(ctx context.Context) (*wsConn, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.client.sessionTiming.connectTimeout)
 	defer cancel()
 	rawURL := s.pnr + "?sid=" + encodeURIComponentJS(s.pnk) + "&v=2.1&t=" + strconv.FormatInt(time.Now().UnixMilli(), 10)
-	header := http.Header{}
-	header.Set("User-Agent", s.client.userAgent)
-	header.Set("Origin", s.player.playerURL.Scheme+"://"+s.player.playerURL.Host)
-	header.Set("Cache-Control", "no-cache")
-	header.Set("Pragma", "no-cache")
-	header.Set("Accept-Encoding", "gzip, deflate, br")
-	// The cookies the player page set, as a browser would send them.
-	if page, err := wsHTTPURL(s.pnr); err == nil && s.player.client.Jar != nil {
-		var cookies []string
-		for _, cookie := range s.player.client.Jar.Cookies(page) {
-			cookies = append(cookies, cookie.Name+"="+cookie.Value)
-		}
-		if len(cookies) > 0 {
-			header.Set("Cookie", strings.Join(cookies, "; "))
-		}
-	}
-	return dialWebSocket(ctx, s.client.wsTransport, rawURL, header)
+	return s.player.browser.dialWebSocket(ctx, rawURL, serializedOrigin(s.player.playerURL))
 }
 
 // serve runs one connection: true when it was lost and the run goes on,
@@ -566,6 +591,7 @@ func (s *playbackSession) receive(message []byte) {
 	s.edgeTTL = time.Duration(max(update.TTL, 0)) * time.Second
 	s.attempts, s.tokenAt = 0, time.Now()
 	s.tokens++
+	s.changedLocked()
 }
 
 // encodeURIComponentJS is JavaScript's encodeURIComponent, which the

@@ -3,6 +3,7 @@ package provider
 import (
 	"bufio"
 	"bytes"
+	"compress/flate"
 	"context"
 	"crypto/sha1"
 	"encoding/base64"
@@ -35,7 +36,9 @@ func newWSTestServer(t *testing.T, accept func(*http.Request) int, peers chan<- 
 		if request.Method != http.MethodGet || request.Header.Get("Upgrade") != "websocket" ||
 			!headerHasToken(request.Header, "Connection", "upgrade") ||
 			request.Header.Get("Sec-WebSocket-Version") != "13" || len(key) != 16 ||
-			request.ProtoMajor != 1 || request.Header.Get("Sec-WebSocket-Extensions") != "" {
+			request.ProtoMajor != 1 || request.Header.Get("Sec-WebSocket-Extensions") != "permessage-deflate; client_max_window_bits" ||
+			request.Header.Get("Pragma") != "no-cache" || request.Header.Get("Cache-Control") != "no-cache" ||
+			request.UserAgent() != chromeUserAgent || request.Header.Get("Accept-Language") != chromeAcceptLanguage {
 			t.Errorf("bad handshake: %s %s %v", request.Method, request.Proto, request.Header)
 			response.WriteHeader(http.StatusBadRequest)
 			return
@@ -52,8 +55,13 @@ func newWSTestServer(t *testing.T, accept func(*http.Request) int, peers chan<- 
 			return
 		}
 		digest := sha1.Sum([]byte(request.Header.Get("Sec-WebSocket-Key") + wsAcceptGUID))
+		// ?deflate takes up the compression the client offers.
+		extensions := ""
+		if request.URL.Query().Has("deflate") {
+			extensions = "Sec-WebSocket-Extensions: permessage-deflate\r\n"
+		}
 		_, _ = rw.WriteString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
-			"Sec-WebSocket-Accept: " + base64.StdEncoding.EncodeToString(digest[:]) + "\r\n\r\n")
+			"Sec-WebSocket-Accept: " + base64.StdEncoding.EncodeToString(digest[:]) + "\r\n" + extensions + "\r\n")
 		_ = rw.Flush()
 		peer := &wsTestPeer{t: t, conn: conn, br: rw.Reader, request: request}
 		t.Cleanup(func() { conn.Close() })
@@ -163,8 +171,7 @@ func TestWebSocketExchange(t *testing.T) {
 	peers := make(chan *wsTestPeer, 1)
 	server := newWSTestServer(t, nil, peers)
 	ctx, cancel := context.WithCancel(context.Background())
-	conn, err := dialWebSocket(ctx, newWSTransport(), wsTestURL(server, "/ws/?sid=a%2Bb"),
-		http.Header{"Origin": {"https://player.example"}, "User-Agent": {"receiver"}})
+	conn, err := newBrowser(false).dialWebSocket(ctx, wsTestURL(server, "/ws/?sid=a%2Bb"), "https://player.example")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,8 +179,7 @@ func TestWebSocketExchange(t *testing.T) {
 	// The connection outlives the context of its handshake.
 	cancel()
 	peer := waitPeer(t, peers)
-	if peer.request.URL.RawQuery != "sid=a%2Bb" || peer.request.Header.Get("Origin") != "https://player.example" ||
-		peer.request.UserAgent() != "receiver" {
+	if peer.request.URL.RawQuery != "sid=a%2Bb" || peer.request.Header.Get("Origin") != "https://player.example" {
 		t.Fatalf("handshake request: %s %v", peer.request.URL, peer.request.Header)
 	}
 
@@ -223,7 +229,7 @@ func TestWebSocketRejects(t *testing.T) {
 
 	refusing := newWSTestServer(t, func(*http.Request) int { return http.StatusForbidden }, nil)
 	var refused *alternativeStatusError
-	if _, err := dialWebSocket(ctx, newWSTransport(), wsTestURL(refusing, "/"), nil); !errors.As(err, &refused) || refused.code != http.StatusForbidden {
+	if _, err := newBrowser(false).dialWebSocket(ctx, wsTestURL(refusing, "/"), "https://player.example"); !errors.As(err, &refused) || refused.code != http.StatusForbidden {
 		t.Fatalf("refused handshake: %v", err)
 	}
 
@@ -234,18 +240,18 @@ func TestWebSocketRejects(t *testing.T) {
 		_ = rw.Flush()
 	}))
 	defer wrongAccept.Close()
-	if _, err := dialWebSocket(ctx, newWSTransport(), wsTestURL(wrongAccept, "/"), nil); err == nil {
+	if _, err := newBrowser(false).dialWebSocket(ctx, wsTestURL(wrongAccept, "/"), "https://player.example"); err == nil {
 		t.Fatal("accepted a wrong Sec-WebSocket-Accept")
 	}
 
-	if _, err := dialWebSocket(ctx, newWSTransport(), "https://example.com/", nil); err == nil {
+	if _, err := newBrowser(false).dialWebSocket(ctx, "https://example.com/", "https://player.example"); err == nil {
 		t.Fatal("dialed a non-websocket URL")
 	}
 
 	// Server frames must not be masked.
 	peers := make(chan *wsTestPeer, 1)
 	server := newWSTestServer(t, nil, peers)
-	conn, err := dialWebSocket(ctx, newWSTransport(), wsTestURL(server, "/"), nil)
+	conn, err := newBrowser(false).dialWebSocket(ctx, wsTestURL(server, "/"), "https://player.example")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,5 +260,37 @@ func TestWebSocketRejects(t *testing.T) {
 	_, _ = peer.conn.Write([]byte{0x81, 0x82, 1, 2, 3, 4, 'h' ^ 1, 'i' ^ 2})
 	if _, err := conn.readMessage(); !errors.Is(err, errWSProtocol) {
 		t.Fatalf("masked server frame: %v", err)
+	}
+}
+
+// A server that takes up permessage-deflate may compress its messages and
+// refer back into earlier ones; ours go uncompressed.
+func TestWebSocketDeflate(t *testing.T) {
+	t.Parallel()
+	peers := make(chan *wsTestPeer, 1)
+	server := newWSTestServer(t, nil, peers)
+	conn, err := newBrowser(false).dialWebSocket(context.Background(), wsTestURL(server, "/?deflate"), "https://player.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	peer := waitPeer(t, peers)
+	var compressed bytes.Buffer
+	writer, _ := flate.NewWriter(&compressed, flate.BestCompression)
+	for _, message := range []string{`{"type":"config_update","edge_hash":"abc"}`, `{"type":"config_update","edge_hash":"abd"}`} {
+		compressed.Reset()
+		_, _ = writer.Write([]byte(message))
+		_ = writer.Flush()
+		payload := bytes.TrimSuffix(compressed.Bytes(), []byte{0, 0, 0xff, 0xff})
+		peer.writeFrame(true, wsText|0x40, payload)
+		if got, err := conn.readMessage(); err != nil || string(got) != message {
+			t.Fatalf("message = %q, %v", got, err)
+		}
+	}
+	if err := conn.writeText([]byte("plain")); err != nil {
+		t.Fatal(err)
+	}
+	if opcode, payload, err := peer.readFrame(); err != nil || opcode != wsText || string(payload) != "plain" {
+		t.Fatalf("frame: opcode %d, %q, %v", opcode, payload, err)
 	}
 }

@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -169,7 +172,7 @@ func TestMediaHeadersHandler(t *testing.T) {
 		status    int
 	}{
 		{"known", "?q=720&t=12.5", http.StatusOK}, {"known", "", http.StatusOK},
-		{"known", "?q=1080&t=30&p=1&d=2640.04&b=123456789&e=8000000", http.StatusOK},
+		{"known", "?q=1080&t=30&p=1&w=0&d=2640.04&b=123456789&e=8000000", http.StatusOK},
 		{"known", "?q=720p", http.StatusBadRequest}, {"known", "?t=-1", http.StatusBadRequest},
 		{"known", "?p=yes", http.StatusBadRequest}, {"known", "?b=-5", http.StatusBadRequest},
 		{"known", "?d=1e3", http.StatusBadRequest}, {"known", "?e=1.5", http.StatusBadRequest},
@@ -189,7 +192,7 @@ func TestMediaHeadersHandler(t *testing.T) {
 		source.reports[0] != (provider.PlaybackReport{Resolution: "720", Position: 12.5, HasPosition: true}) ||
 		source.reports[1] != (provider.PlaybackReport{}) ||
 		source.reports[2] != (provider.PlaybackReport{
-			Resolution: "1080", Position: 30, HasPosition: true, Paused: true, HasPaused: true,
+			Resolution: "1080", Position: 30, HasPosition: true, Paused: true, HasPaused: true, HasBuffering: true,
 			Duration: 2640.04, Bytes: 123456789, HasBytes: true, Bandwidth: 8000000,
 		}) {
 		t.Fatalf("reports = %+v", source.reports)
@@ -208,5 +211,65 @@ func TestMediaSessionHandler(t *testing.T) {
 	}
 	if len(source.ended) != 2 || source.ended[0] != "known" {
 		t.Fatalf("ended = %v", source.ended)
+	}
+}
+
+type fakeRelay struct{}
+
+func (fakeRelay) FetchMedia(_ context.Context, id, rawURL string) (*http.Response, error) {
+	switch {
+	case id != "known":
+		return nil, provider.ErrMasterNotFound
+	case rawURL == "https://cdn.example/seg.ts":
+		return &http.Response{
+			StatusCode: http.StatusOK, ContentLength: 5,
+			Header: http.Header{"Content-Type": {"video/mp2t"}, "Set-Cookie": {"a=b"}},
+			Body:   io.NopCloser(strings.NewReader("bytes")),
+		}, nil
+	case rawURL == "https://cdn.example/blocked.ts":
+		return &http.Response{
+			StatusCode: http.StatusForbidden, ContentLength: -1,
+			Header: http.Header{"X-Vd": {"client_blocked"}}, Body: io.NopCloser(strings.NewReader("")),
+		}, nil
+	}
+	return nil, provider.ErrMediaURL
+}
+
+func (fakeRelay) QualityPlaylist(_ context.Context, id, quality string) ([]byte, error) {
+	if id != "known" || quality != "720" {
+		return nil, provider.ErrMasterNotFound
+	}
+	return []byte("#EXTM3U\n"), nil
+}
+
+// The relay passes the CDN's status, type and X-VD on and streams the
+// body; URLs not of the media are refused.
+func TestMediaRelayHandler(t *testing.T) {
+	t.Parallel()
+	handler := mediaRelayHandler(fakeRelay{})
+	for _, test := range []struct {
+		id, target, body, vd string
+		status               int
+	}{
+		{"known", "https://cdn.example/seg.ts", "bytes", "", http.StatusOK},
+		{"known", "https://cdn.example/blocked.ts", "", "client_blocked", http.StatusForbidden},
+		{"known", "https://elsewhere.example/seg.ts", "", "", http.StatusBadRequest},
+		{"missing", "https://cdn.example/seg.ts", "", "", http.StatusNotFound},
+	} {
+		response := httptest.NewRecorder()
+		handler(response, httptest.NewRequest(http.MethodGet, "/v1/media/x/cdn?u="+url.QueryEscape(test.target), nil), map[string]string{"id": test.id})
+		if response.Code != test.status || response.Header().Get("X-VD") != test.vd ||
+			test.status == http.StatusOK && (response.Body.String() != test.body || response.Header().Get("Content-Type") != "video/mp2t" ||
+				response.Header().Get("Content-Length") != "5" || response.Header().Get("Set-Cookie") != "") {
+			t.Errorf("%s %s: %d %v %q", test.id, test.target, response.Code, response.Header(), response.Body.String())
+		}
+	}
+	playlist := qualityPlaylistHandler(fakeRelay{})
+	for quality, status := range map[string]int{"720": http.StatusOK, "1080": http.StatusNotFound, "x": http.StatusBadRequest} {
+		response := httptest.NewRecorder()
+		playlist(response, httptest.NewRequest(http.MethodGet, "/", nil), map[string]string{"id": "known", "quality": quality})
+		if response.Code != status {
+			t.Errorf("quality %s: %d", quality, response.Code)
+		}
 	}
 }
