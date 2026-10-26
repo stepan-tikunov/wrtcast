@@ -231,10 +231,16 @@ type mediaRelaySource interface {
 func mediaRelayHandler(source mediaRelaySource) runtime.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
 		upstream, err := source.FetchMedia(request.Context(), pathParams["id"], request.URL.Query().Get("u"))
+		if err != nil && request.Context().Err() == nil {
+			log.Printf("media relay %s: %v", pathParams["id"], err)
+		}
 		if mediaError(response, err) {
 			return
 		}
 		defer upstream.Body.Close()
+		if upstream.StatusCode >= http.StatusBadRequest {
+			log.Printf("media relay %s: CDN answered %d (X-VD: %q)", pathParams["id"], upstream.StatusCode, upstream.Header.Get("X-VD"))
+		}
 		for _, name := range []string{"Content-Type", "X-VD", "Last-Modified", "ETag"} {
 			if value := upstream.Header.Get(name); value != "" {
 				response.Header().Set(name, value)
