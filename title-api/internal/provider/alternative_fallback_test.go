@@ -298,11 +298,11 @@ func TestAlternativePlayerRetriesRejectedLinks(t *testing.T) {
 			master, err := client.MasterPlaylist(context.Background(), id)
 			pages, playbacks, cdnRequests := fake.counts()
 			// The first attempt's master, of the 480 the page starts
-			// with, is refused; the second attempt's loads, and the
-			// master lists both qualities.
+			// with, is refused; the second attempt's loads, then the
+			// 720 one, and the master lists both qualities.
 			if err != nil || !strings.Contains(string(master), "/quality/480/playlist.m3u8") ||
 				!strings.Contains(string(master), "/quality/720/playlist.m3u8") ||
-				pages != test.pages || playbacks != 2 || cdnRequests != 2 {
+				pages != test.pages || playbacks != 2 || cdnRequests != 3 {
 				t.Fatalf("master = %q, err = %v after %d pages, %d playback and %d CDN requests",
 					master, err, pages, playbacks, cdnRequests)
 			}

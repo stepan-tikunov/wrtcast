@@ -21,10 +21,13 @@ import (
 // master of the quality the page starts with (the last one played, which
 // the page keeps in its storage, else 480, else 360) as soon as the
 // playback reply is in, and a quality change loads another one. title-api
-// does the same for the router. A source's master lists every quality,
-// with the attributes of those loaded and the others' derived from them,
-// each pointing at title-api, which loads that quality's master and media
-// playlist when the receiver asks for it (QualityPlaylist). The router
+// starts the same way, but the receiver needs every quality's attributes
+// up front (a codec string copied from another quality names a profile
+// and level its stream doesn't have, and the receiver fails to load it),
+// so the other qualities' masters follow, one at a time. A source's
+// master lists the qualities loaded, each pointing at title-api, which
+// serves that quality's media playlist when the receiver asks for it
+// (QualityPlaylist). The router
 // fetches everything else of the session through title-api too
 // (FetchMedia), so one Chrome plays the whole session to the CDN, and
 // title-api sees every fragment, as hls.js does for its bandwidth
@@ -182,6 +185,7 @@ func (source *alternativeSource) resolve(ctx context.Context) ([]byte, error) {
 		source.startSession(ctx)
 		_, err := source.loadQuality(ctx, source.initialQuality())
 		if err == nil {
+			source.loadOtherQualities(ctx)
 			return source.master(), nil
 		}
 		if vd, blocked := cdnBlocked(err); blocked {
@@ -306,6 +310,28 @@ func (source *alternativeSource) loadQuality(ctx context.Context, quality string
 	return nil, lastErr
 }
 
+// loadOtherQualities loads the masters of the qualities not loaded yet,
+// highest first; one that fails is left out of the master, and a block
+// stops the rest.
+func (source *alternativeSource) loadOtherQualities(ctx context.Context) {
+	source.mu.Lock()
+	keys := make([]int, 0, len(source.qualities))
+	for key := range source.qualities {
+		if value, err := strconv.Atoi(key); err == nil && value > 0 {
+			keys = append(keys, value)
+		}
+	}
+	source.mu.Unlock()
+	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
+	for _, key := range keys {
+		if _, err := source.loadQuality(ctx, strconv.Itoa(key)); err != nil {
+			if _, blocked := cdnBlocked(err); blocked || ctx.Err() != nil {
+				return
+			}
+		}
+	}
+}
+
 // cdnGet loads a playlist of the source from the CDN as hls.js does, and
 // tells the view of a failure (see viewSession.loadError).
 func (source *alternativeSource) cdnGet(ctx context.Context, rawURL, kind string) ([]byte, error) {
@@ -379,9 +405,8 @@ func absoluteURL(base, reference string) (string, error) {
 	return baseURL.ResolveReference(referenceURL).String(), nil
 }
 
-// master is the source's master: every quality, lowest first, with the
-// attributes of its master once loaded, else those of a loaded one scaled
-// to it, pointing at title-api's QualityPlaylist.
+// master is the source's master: every quality loaded, lowest first, with
+// the attributes of its master, pointing at title-api's QualityPlaylist.
 func (source *alternativeSource) master() []byte {
 	source.mu.Lock()
 	qualities, levels := source.qualities, source.levels
@@ -393,61 +418,25 @@ func (source *alternativeSource) master() []byte {
 		}
 	}
 	sort.Ints(keys)
-	attributes := map[int]string{}
-	reference := 0
+	var master strings.Builder
+	master.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n")
 	for _, key := range keys {
 		level := levels[strconv.Itoa(key)]
 		if level == nil {
 			continue
 		}
 		level.mu.Lock()
+		text := ""
 		if level.loaded {
-			attributes[key] = level.attributes
-			reference = key
+			text = level.attributes
 		}
 		level.mu.Unlock()
-	}
-	var master strings.Builder
-	master.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n")
-	for _, key := range keys {
-		text, ok := attributes[key]
-		if !ok && reference > 0 {
-			text = scaleAttributes(attributes[reference], float64(key)/float64(reference))
-		}
 		if text == "" {
 			continue
 		}
 		fmt.Fprintf(&master, "#EXT-X-STREAM-INF:%s\n%s/v1/media/%s/quality/%d/playlist.m3u8\n", text, source.client.mediaBaseURL, source.id, key)
 	}
 	return []byte(master.String())
-}
-
-var attributePattern = regexp.MustCompile(`([A-Z0-9-]+)=("[^"]*"|[^,]*)`)
-
-// scaleAttributes are a variant's attributes for a quality factor times
-// its own: the resolution scaled (to even sizes), the bandwidths by the
-// pixels, the rest (codecs, frame rate) kept.
-func scaleAttributes(attributes string, factor float64) string {
-	parts := attributePattern.FindAllStringSubmatch(attributes, -1)
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		name, value := part[1], part[2]
-		switch name {
-		case "RESOLUTION":
-			width, height, ok := strings.Cut(value, "x")
-			w, errW := strconv.ParseFloat(width, 64)
-			h, errH := strconv.ParseFloat(height, 64)
-			if ok && errW == nil && errH == nil {
-				value = fmt.Sprintf("%dx%d", 2*int(math.Round(w*factor/2)), 2*int(math.Round(h*factor/2)))
-			}
-		case "BANDWIDTH", "AVERAGE-BANDWIDTH":
-			if bandwidth, err := strconv.ParseFloat(value, 64); err == nil {
-				value = strconv.FormatInt(int64(math.Round(bandwidth*factor*factor)), 10)
-			}
-		}
-		out = append(out, name+"="+value)
-	}
-	return strings.Join(out, ",")
 }
 
 // QualityPlaylist is the media playlist of a quality of an alternative

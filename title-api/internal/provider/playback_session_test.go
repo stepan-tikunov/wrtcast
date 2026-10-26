@@ -86,9 +86,10 @@ func TestPlaybackSessionReportsPlayback(t *testing.T) {
 	client, fake, id, peers := newSessionFixture(t, testSessionTiming, nil)
 	ctx := context.Background()
 
-	// The first headers request resolves the master, which opens the socket.
+	// The first headers request resolves the master, which opens the socket
+	// and loads the masters of both qualities.
 	headers, err := client.MediaHeaders(ctx, id, PlaybackReport{})
-	if _, _, cdnRequests := fake.counts(); err != nil || cdnRequests != 1 ||
+	if _, _, cdnRequests := fake.counts(); err != nil || cdnRequests != 2 ||
 		controlOf(headers.Headers) != fake.fingerprint || headers.TTL != pendingHeadersTTL || len(headers.Headers) != 4 {
 		t.Fatalf("headers = %+v, %v after %d CDN requests", headers, err, cdnRequests)
 	}

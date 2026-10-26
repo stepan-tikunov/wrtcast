@@ -173,17 +173,6 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 	}
 }
 
-// The synthetic master lists every quality: the one loaded with its own
-// attributes, the others scaled from it.
-func TestScaleAttributes(t *testing.T) {
-	t.Parallel()
-	got := scaleAttributes(`BANDWIDTH=1000000,AVERAGE-BANDWIDTH=800000,RESOLUTION=854x480,CODECS="avc1.64001f,mp4a.40.2",FRAME-RATE=25.000`, 1.5)
-	want := `BANDWIDTH=2250000,AVERAGE-BANDWIDTH=1800000,RESOLUTION=1282x720,CODECS="avc1.64001f,mp4a.40.2",FRAME-RATE=25.000`
-	if got != want {
-		t.Fatalf("scaleAttributes = %q, want %q", got, want)
-	}
-}
-
 type memoryFingerprintStore struct {
 	value string
 	saves int
