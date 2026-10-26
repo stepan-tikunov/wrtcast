@@ -6,7 +6,7 @@
 // Configured in /etc/config/wrtcast.
 'use strict';
 
-import { popen, readfile, writefile, rename, unlink, lsdir, mkdir, stat, access, stdin, stdout } from 'fs';
+import { popen, open, readfile, writefile, rename, unlink, lsdir, mkdir, stat, access, stdin, stdout } from 'fs';
 import { cursor } from 'uci';
 
 const STATE = '/tmp/wrtcast.now.';         // + host key; what /play started
@@ -26,6 +26,8 @@ const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const DRC = '/tmp/wrtcast.drc/';             // audio playlists and segments of the leveler
 const ERR = '/tmp/wrtcast.err.';           // + ns; stderr of a proxied fetch
 const HDR = '/tmp/wrtcast.hdr.';           // + media id; its CDN headers from title-api
+const BYTES = '/tmp/wrtcast.bytes.';       // + media id; "<bytes> <ms>" of each segment streamed
+const POS = '/tmp/wrtcast.pos.';           // + media id; position and pause the TV last told
 const COMMANDS = {
 	pause: null, resume: null, stop: null, quit: null, mute: null, unmute: null,
 	seek: 'num', ff: 'num', rew: 'num', volume: 'num', audio: 'str', subs: 'str',
@@ -211,10 +213,14 @@ function quality_digits(l) {
 
 // The headers of media m as "Name: value" lines; null without any. Stale
 // ones (or with force) are asked for again, which tells title-api the
-// playback goes on, with q, the quality's digits, and t, the position,
-// when known. One request refreshes them while the others go on with what
-// there is for a few seconds (a few may still refresh at once); a failed
-// refresh keeps the stale ones too.
+// playback goes on (for the alternative player's telemetry too), with q,
+// the quality's digits, t, the position (else the TV's last one, run on
+// while playing), p, the pause, and d, the duration, as the TV last told
+// (see watch_end), b, the bytes of the media's segments streamed so far,
+// and e, the bandwidth of the last few (see count_bytes), when known. One
+// request refreshes them while the others go on with what there is for a
+// few seconds (a few may still refresh at once); a failed refresh keeps
+// the stale ones too.
 function media_headers(m, q, t, force) {
 	let f = HDR + m, c = load(f), now = time();
 	let claimed = now - (c?.claimed ?? 0) < 10;
@@ -225,16 +231,40 @@ function media_headers(m, q, t, force) {
 	if (c)
 		c.claimed = now;
 	save(f, c ?? { claimed: now });
-	let qs = [];
+	let qs = [], pos = load(POS + m), b = 0, n = 0, rb = 0, rms = 0;
+	if (now - (pos?.at ?? 0) > 180)
+		pos = null;
+	if (t == null && pos)
+		t = pos.pos + (pos.paused ? 0 : now - pos.at);
+	let lines = split(readfile(BYTES + m) ?? '', '\n');
+	for (let i, l in lines) {
+		let x = match(l, /^([0-9]+) ([0-9]+)$/);
+		if (!x)
+			continue;
+		b += +x[1];
+		n++;
+		if (i >= length(lines) - 6) {
+			rb += +x[1];
+			rms += +x[2];
+		}
+	}
 	if (q != null)
 		push(qs, `q=${q}`);
 	if (type(t) in ['int', 'double'] && t >= 0)
 		push(qs, sprintf('t=%d', t));
+	if (pos)
+		push(qs, `p=${pos.paused ? 1 : 0}`);
+	if (+(pos?.dur ?? 0) > 0)
+		push(qs, sprintf('d=%.2f', pos.dur));
+	if (n)
+		push(qs, sprintf('b=%d', b));
+	if (rms > 0)
+		push(qs, sprintf('e=%d', rb * 8000 / rms));
 	let r = api_try(`/v1/media/${m}/headers` + (length(qs) ? '?' + join('&', qs) : ''));
-	let lines = map(filter(r?.headers ?? [], x => type(x?.name) == 'string' &&
+	let hl = map(filter(r?.headers ?? [], x => type(x?.name) == 'string' &&
 		type(x?.value) == 'string'), x => `${x.name}: ${x.value}`);
-	if (type(r?.headers) == 'array' && (!length(lines) || valid_headers(join('\n', lines)))) {
-		c = { headers: lines, fetched: time(), ttl: +r.ttl > 0 ? +r.ttl : 60 };
+	if (type(r?.headers) == 'array' && (!length(hl) || valid_headers(join('\n', hl)))) {
+		c = { headers: hl, fetched: time(), ttl: +r.ttl > 0 ? +r.ttl : 60 };
 		save(f, c);
 	}
 	return c?.headers;
@@ -247,6 +277,8 @@ function media_end(m) {
 	if (!valid_media(m))
 		return;
 	unlink(HDR + m);
+	unlink(BYTES + m);
+	unlink(POS + m);
 	system(`uclient-fetch -q -T 5 -O /dev/null --post-data= ` +
 		`${shq(API + '/v1/media/' + m + '/session/end')} </dev/null >/dev/null 2>&1 &`);
 }
@@ -567,6 +599,12 @@ function watch_end(now, st) {
 			playing: m.state != 'PAUSED', t: time(),
 			audio: active('AUDIO'), subs: active('TEXT'),
 		});
+		// For the next headers refresh of a title-api media (see
+		// media_headers), with no castctl call of its own.
+		if (valid_media(now.media))
+			save(POS + now.media, {
+				pos: +(m.time ?? 0), dur: +(m.duration ?? 0), paused: m.state == 'PAUSED', at: time(),
+			});
 		return;
 	}
 	if (!ended(now, st, load(SEEN + key)))
@@ -617,10 +655,10 @@ function tick() {
 			media_end(now.media);
 	}
 	// Error files of proxied fetches the web server cut short, and the
-	// headers of media not played for a day.
+	// headers, bytes and positions of media not played for a day.
 	for (let name in lsdir('/tmp') ?? []) {
 		let age = match(name, /^wrtcast\.err\.[0-9]+$/) ? 60 :
-			match(name, /^wrtcast\.hdr\./) ? 86400 : null;
+			match(name, /^wrtcast\.(hdr|bytes|pos)\./) ? 86400 : null;
 		let st = age ? stat('/tmp/' + name) : null;
 		if (st && st.mtime < time() - age)
 			unlink('/tmp/' + name);
@@ -1104,7 +1142,20 @@ function drc_segment(key, i) {
 	exit(0);
 }
 
+// Appends the bytes of a segment of media m streamed since start (a
+// clock()) and the milliseconds that took to BYTES<m>, for title-api (see
+// media_headers): one short line, which concurrent requests may append at
+// once.
+function count_bytes(m, n, start) {
+	let end = clock(), f = open(BYTES + m, 'a');
+	if (!f)
+		return;
+	f.write(sprintf('%d %d\n', n, (end[0] - start[0]) * 1000 + (end[1] - start[1]) / 1000000));
+	f.close();
+}
+
 function proxy(name, u, q, h, drc, m) {
+	let start = clock();
 	let url = proxy_target(u);
 	if (!url)
 		fail(400, 'bad url');
@@ -1143,11 +1194,16 @@ function proxy(name, u, q, h, drc, m) {
 	// Gone before the stream, which the receiver may cut short.
 	unlink(err);
 	media_head(200, MIME[e] ?? 'application/octet-stream');
+	let n = 0;
 	while (chunk != null && chunk != '') {
 		stdout.write(chunk);
+		n += length(chunk);
 		chunk = pipe.read(65536);
 	}
 	pipe.close();
+	// The media's segments, as the player counts the fragments it loaded.
+	if (valid_media(m) && !(e in ['vtt', 'webvtt', 'key']))
+		count_bytes(m, n, start);
 	exit(0);
 }
 
@@ -1248,9 +1304,12 @@ function play(dev, p, keep) {
 	// start=0 plays it from the beginning.
 	let start = p.start ?? (p.reuse == '1' ? null : resume_at(id, season, episode));
 	// Tells title-api the quality and the position before the CDN sees
-	// a request.
-	if (m)
+	// a request; what the TV told of an earlier play of the media doesn't
+	// count.
+	if (m) {
+		unlink(POS + m);
 		media_headers(m, quality_digits(quality), start != null ? +start : null, true);
+	}
 	// Probed once per source, on the variant this play picks.
 	if (body != null) {
 		s.fmp4 = is_fmp4(s.url, body, h, width, m);
@@ -1320,7 +1379,11 @@ function play(dev, p, keep) {
 	for (let k in ['audio', 'subs'])
 		if (p[k] != null)
 			st = castctl_try(dev, k, p[k]) ?? st;
-	return with_now(st, dev);
+	st = with_now(st, dev);
+	// The TV plays: title-api learns the duration and the position now.
+	if (m)
+		media_headers(m, quality_digits(quality), null, true);
+	return st;
 }
 
 // Plays the episode after the one that has just ended on the TV of key (see
@@ -1479,15 +1542,20 @@ const routes = {
 			unlink(SEEN + state_key(dev));
 			media_end(load(state_file(dev))?.media);
 		}
-		if (kind == null)
-			return with_now(castctl(dev, c), dev);
 		if (kind == 'num' && !match(arg, /^[0-9]+(\.[0-9]+)?$/))
 			fail(400, 'numeric arg required');
 		if (kind == 'str' && (arg == '' || length(arg) > 128))
 			fail(400, 'arg required');
 		if (kind == 'style' && !valid_style(arg))
 			fail(400, 'invalid subtitle style');
-		return with_now(castctl(dev, c, arg), dev);
+		let st = with_now(kind == null ? castctl(dev, c) : castctl(dev, c, arg), dev);
+		// A pause, a resume or a seek reaches title-api at once, not with
+		// the next refresh (which a paused TV may not ask for in a while).
+		let now = index(['pause', 'resume', 'seek', 'ff', 'rew'], c) >= 0 ?
+			load(state_file(dev)) : null;
+		if (valid_media(now?.media) && st.media?.url == now.url)
+			media_headers(now.media, quality_digits(now.quality), null, true);
+		return st;
 	},
 };
 
