@@ -516,6 +516,22 @@ function flush(P, force) {
 		save(PROGRESS_KEEP, P);
 }
 
+// What a title is watched with, for its next start (see play): the source,
+// the quality, and the dub and subtitles by name, since track ids differ
+// between sources and episodes; subs '' is off. A kind of track the TV
+// lists none of keeps what was there.
+function watched_with(now, m, was) {
+	let active = type => {
+		let all = filter(m.tracks ?? [], t => t.type == type);
+		return !length(all) ? null : filter(all, t => t.active)[0]?.label ?? '';
+	};
+	let audio = active('AUDIO'), subs = active('TEXT');
+	return {
+		source: now.source ?? was?.source, quality: now.quality ?? was?.quality,
+		audio: audio || was?.audio, subs: subs ?? was?.subs,
+	};
+}
+
 // Records the position of now (what /play started) from the receiver's
 // media status. Positions under a second are skipped: the receiver reports
 // 0 while it loads a stream started further in.
@@ -543,6 +559,8 @@ function remember(now, m) {
 	// the end: a poll can catch it right after the next one was started.
 	let done = finished || (!!x.done && dur > 0 && pos >= dur * DONE);
 	important ||= !!x.done != done;
+	let w = watched_with(now, m, e.prefs);
+	important ||= sprintf('%J', w) != sprintf('%J', e.prefs);
 	if (finished)
 		pos = dur;
 	// A long pause shouldn't keep rewriting the same position.
@@ -551,6 +569,7 @@ function remember(now, m) {
 	x.pos = pos;
 	x.dur = dur;
 	x.done = done;
+	e.prefs = w;
 	// For the recently watched list.
 	e.title = now.title ?? e.title;
 	e.poster = now.poster ?? e.poster;
@@ -1264,6 +1283,14 @@ function play(dev, p, keep) {
 	for (let k in ['drc', 'autonext'])
 		if (p[k] != null && !match(p[k], /^[01]$/))
 			fail(400, `invalid ${k}`);
+	// A title watched before starts again with what it was watched with
+	// (see watched_with); a replay (reuse) tells all of it itself, and a
+	// source or a stream asked for wins.
+	let pref = p.reuse == '1' ? null : progress().titles[id]?.prefs;
+	if (pref?.source != null && p.source == null && p.stream == null)
+		p.source = pref.source;
+	if (match(pref?.quality ?? '', /^(auto|[0-9]{3,4}p)$/))
+		p.quality = pref.quality;
 	let last = load(state_file(dev));
 	let list, fetched;
 	if (p.reuse == '1' && last?.streams && last.id == id &&
@@ -1316,6 +1343,12 @@ function play(dev, p, keep) {
 	let ks = keep?.subs ? filter(s.subs, t => t.url && t.name == keep.subs)[0] : null;
 	if (ks && p.subs == null)
 		p.subs = 'sub' + ks.id;
+	// Subtitles are off unless picked, so an off one needs nothing.
+	if (pref?.audio && p.audio == null)
+		p.audio = filter(s.audio, a => a.name == pref.audio)[0]?.id;
+	let ps = pref?.subs ? filter(s.subs, t => t.url && t.name == pref.subs)[0] : null;
+	if (ps && p.subs == null)
+		p.subs = 'sub' + ps.id;
 	let quals = s.variants;
 	// The best quality unless asked otherwise; a missing one falls back
 	// to the best below it.
@@ -1506,6 +1539,7 @@ const routes = {
 
 	// Where a title was left off: pos, dur and done of a movie, or the last
 	// episode and eps by "season:episode" of a series; null if never watched.
+	// prefs: what it was watched with (see watched_with).
 	// Without id: the recently watched titles, latest first, each with the
 	// position of the movie or of the last episode.
 	'GET /progress': p => {
@@ -1525,7 +1559,7 @@ const routes = {
 		}
 		let e = T[title_id(p)];
 		return { progress: !e ? null : e.eps ? { last: e.last, eps: e.eps } :
-			{ pos: e.pos, dur: e.dur, done: e.done } };
+			{ pos: e.pos, dur: e.dur, done: e.done }, prefs: e?.prefs ?? null };
 	},
 
 

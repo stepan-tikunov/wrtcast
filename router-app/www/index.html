@@ -344,7 +344,7 @@ svg.spring{animation:spring .3s ease-out}
 </section>
 <section id="srcs" class="sheet" hidden>
   <div class="handle"></div>
-  <h2><span>Источник недоступен</span></h2>
+  <h2><span id="srchead">Источник недоступен</span></h2>
   <div id="srclist"></div>
 </section>
 <section id="sty" class="sheet" hidden>
@@ -363,6 +363,7 @@ const $ = id => document.getElementById(id);
 const STATES = { PLAYING: 'Играет', PAUSED: 'Пауза', BUFFERING: 'Загрузка…', IDLE: 'Остановлено' };
 let token = localStorage.token || '', st = null, statusAt = 0, drag = null, busy = false, toastTimer;
 let pending = null;     // play request in flight; status polls are ignored meanwhile
+let asking = null;      // the first start of a title, while its sources load
 let item = null;        // movie or series shown on the details page
 let season = null;
 let pollError = '';
@@ -774,11 +775,11 @@ async function openDetails(m) {
   if (!layers.includes('det')) openLayer('det', titleUrl(m.id));
   else if (urlTitle() != encodeURIComponent(m.id)) history.replaceState(history.state, '', titleUrl(m.id));
   // Watch progress changes between visits, so unlike /title it isn't cached.
-  const prog = api('progress?id=' + encodeURIComponent(m.id)).then(r => r.progress, () => null);
+  const prog = api('progress?id=' + encodeURIComponent(m.id)).catch(() => ({}));
   let t;
   try {
     t = await title(m.id);
-    m.progress = await prog;
+    ({ progress: m.progress = null, prefs: m.prefs = null } = await prog);
   } catch (e) {
     if (item == m) {
       $('det').classList.remove('loading');
@@ -837,7 +838,7 @@ function playTarget(m) {
 function renderDetails() {
   if (!item?.type) return;
   const on = st?.media && st.now?.id == item.id;
-  const starting = pending?.id == item.id;
+  const starting = pending?.id == item.id || asking?.id == item.id;
   const t = playTarget(item);
   $('dplay').hidden = !t;
   if (!t) return;
@@ -845,7 +846,7 @@ function renderDetails() {
   $('dplay').lastChild.textContent = starting ? 'Запускаю…' : on ? 'Уже на ТВ — открыть плеер' :
     series ? `${t.season} сезон, ${t.episode} серия` + (t.resume ? ', ' + fmt(t.resume) : '') :
     t.resume ? 'Продолжить с ' + fmt(t.resume) : 'Смотреть на ТВ';
-  $('dplay').disabled = $('dfrom0').disabled = !!pending;
+  $('dplay').disabled = $('dfrom0').disabled = !!pending || !!asking;
   $('dfrom0').hidden = !t.resume || on || starting || t.season != null; // movies only
 }
 
@@ -942,23 +943,41 @@ async function reloadProgress(id) {
   loadRecent();
   if (item?.id != id) return;
   const shown = item;
-  const { progress } = await api('progress?id=' + encodeURIComponent(id)).catch(() => ({}));
+  const { progress, prefs } = await api('progress?id=' + encodeURIComponent(id)).catch(() => ({}));
   if (item == shown && progress !== undefined) {
     item.progress = progress;
+    item.prefs = prefs;
     renderDetails();
     renderEpisodes();
   }
 }
 
-// Starting from the details page plays the main player; another source is
-// picked in the player settings.
-function start(m) {
+// The first start of a title from the details page asks for the source;
+// later ones go on with the source, quality, dub and subtitles it was
+// watched with, which the router remembers. Another source is picked in
+// the player settings.
+async function start(m) {
   arm(); // still inside the tap
-  play(m);
+  if (asking) return;
+  if (m.source || pending || item?.id != m.id || item.prefs?.source) return play(m);
+  asking = m;
+  renderDetails();
+  let names = [];
+  try {
+    const q = m.season != null ? `&season=${m.season}&episode=${encodeURIComponent(m.episode)}` : '';
+    names = (await api(withDevice('streams?id=' + encodeURIComponent(m.id) + q))).streams.map(s => s.name);
+  } catch {} // play tells what went wrong
+  asking = null;
+  renderDetails();
+  if (item?.id != m.id) return;
+  if (names.length < 2) return play(m);
+  openLayer('src');
+  showSources(m, names);
 }
 
-// bad: the source that just failed.
+// bad: the source that just failed; without it the first start asks.
 function showSources(m, names, bad) {
+  $('srchead').textContent = bad ? 'Источник недоступен' : 'Выберите источник';
   $('srclist').replaceChildren(...names.map((n, i) => {
     const b = el('button', { className: 'dev', disabled: n == bad },
       el('span', {}, el('b', {}, n), n == bad ? el('small', {}, 'не открылся') : ''), el('i'));
