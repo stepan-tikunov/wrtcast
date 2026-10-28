@@ -222,15 +222,17 @@ func qualityPlaylistHandler(source qualityPlaylistSource) runtime.HandlerFunc {
 }
 
 type mediaRelaySource interface {
-	FetchMedia(ctx context.Context, id, rawURL string) (*http.Response, error)
+	FetchMedia(ctx context.Context, id, rawURL string, preview bool) (*http.Response, error)
 }
 
-// mediaRelayHandler serves GET /v1/media/{id}/cdn?u=<CDN URL>: the URL
-// fetched for the router as the media's player page fetches it, the
-// status, the type and X-VD passed on, the body streamed as it comes.
+// mediaRelayHandler serves GET /v1/media/{id}/cdn?u=<CDN URL>[&pv=1]: the
+// URL fetched for the router as the media's player page fetches it, the
+// status, the type and X-VD passed on, the body streamed as it comes. pv=1
+// marks a seek preview's fetch, which the player's view doesn't count.
 func mediaRelayHandler(source mediaRelaySource) runtime.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
-		upstream, err := source.FetchMedia(request.Context(), pathParams["id"], request.URL.Query().Get("u"))
+		upstream, err := source.FetchMedia(request.Context(), pathParams["id"], request.URL.Query().Get("u"),
+			request.URL.Query().Get("pv") == "1")
 		if err != nil && request.Context().Err() == nil {
 			log.Printf("media relay %s: %v", pathParams["id"], err)
 		}

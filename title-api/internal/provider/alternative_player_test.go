@@ -168,7 +168,7 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 		}
 	}
 	// Only the media's hosts go through the relay.
-	if _, err := client.FetchMedia(context.Background(), id[len(id)-1], "https://elsewhere.example/seg.m4s"); !errors.Is(err, ErrMediaURL) {
+	if _, err := client.FetchMedia(context.Background(), id[len(id)-1], "https://elsewhere.example/seg.m4s", false); !errors.Is(err, ErrMediaURL) {
 		t.Fatalf("relay of a foreign host: %v", err)
 	}
 }

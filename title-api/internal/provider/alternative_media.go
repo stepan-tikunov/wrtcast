@@ -503,8 +503,9 @@ func MediaStatus(err error) (int, string) {
 // hosts, the body streaming and the status passed on. A block of the CDN
 // is answered with its 403 from then on (see blockedFor) without asking it
 // again. Fragments feed the player's bandwidth estimate, failures its
-// /errors.
-func (c *Client) FetchMedia(ctx context.Context, id, rawURL string) (*http.Response, error) {
+// /errors, unless they are a preview's: the frames shown over a seek bar
+// while it is dragged are no part of the playback the page's hls.js sees.
+func (c *Client) FetchMedia(ctx context.Context, id, rawURL string, preview bool) (*http.Response, error) {
 	entry, err := c.masters.entry(id)
 	if err != nil {
 		return nil, err
@@ -528,7 +529,7 @@ func (c *Client) FetchMedia(ctx context.Context, id, rawURL string) (*http.Respo
 	response, err := source.cdnRequest(ctx, rawURL, subtitle)
 	kind := source.media.kindOf(rawURL)
 	if err != nil {
-		if !subtitle {
+		if !subtitle && !preview {
 			source.loadFailed(kind, rawURL, 0, started, err)
 		}
 		return nil, err
@@ -538,12 +539,12 @@ func (c *Client) FetchMedia(ctx context.Context, id, rawURL string) (*http.Respo
 		if response.StatusCode == http.StatusForbidden && blockedVD(vd) {
 			source.media.block(vd)
 		}
-		if !subtitle {
+		if !subtitle && !preview {
 			source.loadFailed(kind, rawURL, response.StatusCode, started, &alternativeStatusError{status: response.Status, code: response.StatusCode, vd: vd})
 		}
 		return response, nil
 	}
-	if kind == "fragment" {
+	if kind == "fragment" && !preview {
 		response.Body = &measuredBody{ReadCloser: response.Body, first: time.Now(), done: func(bytes int64, elapsed time.Duration) {
 			source.media.fragmentLoaded(rawURL, bytes, elapsed)
 		}}

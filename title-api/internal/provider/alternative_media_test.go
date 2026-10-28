@@ -36,7 +36,7 @@ func TestMediaRelay(t *testing.T) {
 	if err != nil || !strings.Contains(string(playlist), fake.cdn.URL+"/seg-0.ts") {
 		t.Fatalf("playlist %q, %v", playlist, err)
 	}
-	response, err := client.FetchMedia(ctx, id, fake.cdn.URL+"/seg-0.ts")
+	response, err := client.FetchMedia(ctx, id, fake.cdn.URL+"/seg-0.ts", false)
 	if err != nil || response.StatusCode != http.StatusOK {
 		t.Fatalf("fragment %+v, %v", response, err)
 	}
@@ -51,13 +51,13 @@ func TestMediaRelay(t *testing.T) {
 	fake.mu.Lock()
 	fake.segments = "client_blocked"
 	fake.mu.Unlock()
-	response, err = client.FetchMedia(ctx, id, fake.cdn.URL+"/seg-1.ts")
+	response, err = client.FetchMedia(ctx, id, fake.cdn.URL+"/seg-1.ts", false)
 	if err != nil || response.StatusCode != http.StatusForbidden || response.Header.Get("X-VD") != "client_blocked" {
 		t.Fatalf("blocked fragment %+v, %v", response, err)
 	}
 	response.Body.Close()
 	_, _, before := fake.counts()
-	if _, err := client.FetchMedia(ctx, id, fake.cdn.URL+"/seg-1.ts"); !errors.Is(err, ErrCDNBlocked) && MediaStatusOf(err) != http.StatusForbidden {
+	if _, err := client.FetchMedia(ctx, id, fake.cdn.URL+"/seg-1.ts", false); !errors.Is(err, ErrCDNBlocked) && MediaStatusOf(err) != http.StatusForbidden {
 		t.Fatalf("after the block: %v", err)
 	}
 	if _, _, after := fake.counts(); after != before {
