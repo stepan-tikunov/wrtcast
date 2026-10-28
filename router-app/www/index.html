@@ -114,13 +114,9 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #st .spin,#st i{display:none}
 #st.busy .spin{display:block}
 #st.sr.busy i{display:inline;font-style:normal}
-/* The mini player's position, by its play button. */
-#mt{flex:none;color:var(--mu);font-size:14px;font-variant-numeric:tabular-nums}
-#mt:empty{display:none}
 #tg{background:var(--tx);color:#111;width:46px;height:46px}
-/* Out of the way where they stood in the mini player, to fade in on folding. */
+/* Out of the way where it stood in the mini player, to fade in on folding. */
 #pl.open #tg{position:absolute;right:0;top:13px;visibility:hidden}
-#pl.open #mt{position:absolute;right:58px;top:13px;line-height:46px;visibility:hidden}
 /* Playback speed: white at 1x, the accent otherwise. An invisible select
    over it opens the browser's own picker. */
 #spd{position:relative;display:grid;place-items:center;flex:none;min-width:40px;height:48px;padding:0 2px;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
@@ -320,7 +316,6 @@ svg.spring{animation:spring .3s ease-out}
   <div id="bar">
     <img id="thumb" alt="">
     <div class="t"><b id="title"></b><span id="st"><span id="stEp"></span><i>·</i><span class="spin"></span><span id="sttm"></span></span></div>
-    <span id="mt"></span>
     <button class="ib" id="tg" data-c="toggle" aria-label="Пауза"><svg><use href="#i-play"/></svg></button>
     <div id="spd" hidden><span id="speed">1x</span><select id="spdsel" aria-label="Скорость"></select></div>
     <button class="ib" id="more" aria-label="Настройки" hidden><svg><use href="#i-tune"/></svg></button>
@@ -565,7 +560,6 @@ function foldPlayer(open) {
     go($('thumb'), k => ({ transform: `scale(${1 - k * (1 - s)})` })),
     go(t, k => ({ transform: `translate(${k * (m.x - f.x)}px,${k * (m.ty - f.ty)}px)` })),
     go($('tg'), k => ({ opacity: k, transform: `scale(${.6 + .4 * k})`, visibility: 'visible' })),
-    go($('mt'), k => ({ opacity: k, visibility: 'visible' })),
     ...[$('spd'), $('more'), $('collapse')].map(e => go(e, k => ({ opacity: 1 - k, transform: `scale(${1 - .4 * k})` }))),
   ];
   const a = slide[0];
@@ -1073,7 +1067,6 @@ function showTime() {
   if (m.state == 'PLAYING') t += (Date.now() - statusAt) / 1000 * (m.rate || 1);
   if (m.duration) t = Math.min(t, m.duration);
   showStatus(st.now, m.state == 'BUFFERING');
-  $('mt').textContent = m.duration ? fmt(t) : '';
   $('prog').firstChild.style.width = m.duration ? (100 * t / m.duration) + '%' : 0;
   if (drag != 'pos') showPos(t, m.duration);
 }
@@ -1109,7 +1102,6 @@ function renderBar() {
   if (pending) {
     // The controls of what starts, not of what was on.
     showStatus(pending, true);
-    $('mt').textContent = '';
     $('prog').firstChild.style.width = 0;
     showPos(0, 0);
     icon('tg', 'play');
