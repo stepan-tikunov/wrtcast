@@ -1049,7 +1049,7 @@ function playTarget(m) {
   return c && { ...base, ...c };
 }
 
-// Play button; offers the player instead when the title is already on.
+// Play button; grey and off while the title is on.
 function renderDetails() {
   if (!item?.type) return;
   const on = st?.media && st.now?.id == item.id;
@@ -1058,10 +1058,12 @@ function renderDetails() {
   $('dplay').hidden = !t;
   if (!t) return;
   const series = t.season != null;
-  $('dplay').lastChild.textContent = starting ? 'Запускаю…' : on ? 'Уже на ТВ — открыть плеер' :
+  $('dplay').lastChild.textContent = starting ? 'Запускаю…' : on ? 'Воспроизводится' :
     series ? `${t.season} сезон, ${t.episode} серия` + (t.resume ? ', ' + fmt(t.resume) : '') :
     t.resume ? 'Продолжить с ' + fmt(t.resume) : 'Смотреть на ТВ';
   $('dplay').disabled = $('dfrom0').disabled = !!pending || !!asking;
+  $('dplay').classList.toggle('ac', !on || starting);
+  if (on && !starting) $('dplay').disabled = true;
   $('dfrom0').hidden = !t.resume || on || starting || t.season != null; // movies only
 }
 
@@ -1106,10 +1108,8 @@ function renderEpisodes(force) {
   }));
 }
 
-$('dplay').onclick = () => {
-  if (st?.media && st.now?.id == item.id) return setPlayer(true);
-  start(playTarget(item)); // without start the router resumes where it was left off
-};
+// Without start the router resumes where it was left off.
+$('dplay').onclick = () => start(playTarget(item));
 $('dfrom0').onclick = () => start({ ...playTarget(item), start: 0 });
 $('dback').onclick = closeTop;
 
