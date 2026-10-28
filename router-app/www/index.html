@@ -105,15 +105,20 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #thumb{width:48px;height:72px;margin-right:-8px;object-fit:cover;border-radius:6px;background:var(--s2);transform:scale(.8333);transform-origin:left center}
 #bar .t{flex:1;min-width:0}
 #title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
-#st{display:flex;align-items:center;gap:6px;min-height:18px;overflow:hidden;color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
-/* The episode, then the time folded or a spinner while loading; open, the
-   time is under the slider. */
+#st{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:0 6px;min-height:18px;overflow:hidden;color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* The episode, and folded the time under it; while loading a spinner after
+   it instead. Open, the time is under the slider. */
 #st>*{flex:none}
+#stEp:empty{display:none}
 #sttm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#st:not(.busy) #sttm{flex-basis:100%}
 #st .spin,#st i{display:none}
 #st.busy .spin{display:block}
-#st.sr.tm i{display:inline;font-style:normal}
-#pl.open:not(.sliding) #st:not(.busy) i,#pl.open:not(.sliding) #st:not(.busy) #sttm{display:none}
+#st.sr.busy i{display:inline;font-style:normal}
+#pl.open:not(.sliding) #st:not(.busy) #sttm{display:none}
+/* On the way the open layout stays, the time of a series hangs under it. */
+#pl.sliding #st{overflow:visible}
+#pl.sliding #st.sr:not(.busy) #sttm{position:absolute;left:0;right:0;top:100%}
 #tg{background:var(--tx);color:#111;width:46px;height:46px}
 /* Out of the way where it stood in the mini player, to fade in on folding. */
 #pl.open #tg{position:absolute;right:0;top:13px;visibility:hidden}
@@ -517,10 +522,13 @@ function foldPlayer(open) {
   const p = $('pl'), t = $('title').parentNode, box = e => e.getBoundingClientRect();
   const from = box($('bar')).top; // mid-slide too
   slide.forEach(a => a.cancel());
+  p.classList.remove('sliding');
   const lay = on => {
     p.classList.toggle('open', on);
     $('collapse').hidden = $('more').hidden = $('spd').hidden = !on;
-    return { y: box($('bar')).top, edge: box(p).top, w: box($('thumb')).width, x: box(t).left, tw: box(t).width };
+    const b = box($('bar'));
+    return { y: b.top, edge: box(p).top, w: box($('thumb')).width, x: box(t).left, tw: box(t).width,
+      ty: box(t).top - b.top };
   };
   const m = lay(false), f = lay(true);
   // The buttons of the other state are on screen while fading, not to be hit.
@@ -559,7 +567,8 @@ function foldPlayer(open) {
     go($('handle'), k => ({ opacity: 1 - k })),
     go($('prog'), k => ({ opacity: k })),
     go($('thumb'), k => ({ transform: `scale(${1 - k * (1 - s)})` })),
-    go(t, k => ({ transform: `translateX(${k * (m.x - f.x)}px)` })),
+    // Folded the time line moves the title up.
+    go(t, k => ({ transform: `translate(${k * (m.x - f.x)}px,${k * (m.ty - f.ty)}px)` })),
     go($('tg'), k => ({ opacity: k, transform: `scale(${.6 + .4 * k})`, visibility: 'visible' })),
     ...[$('spd'), $('more'), $('collapse')].map(e => go(e, k => ({ opacity: 1 - k, transform: `scale(${1 - .4 * k})` }))),
     ...$('st').classList.contains('busy') ? [] :
