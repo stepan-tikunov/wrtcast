@@ -92,6 +92,10 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 
 /* player */
 #shade{position:fixed;inset:0;z-index:5;background:#000a;animation:fade .2s}
+/* The open player and the shade don't pan the page, so a pull on them
+   can't start the browser's pull-to-refresh, and the page doesn't bounce. */
+#pl.open,#shade{touch-action:none}
+:root:has(#pl.open){overscroll-behavior-y:none}
 @keyframes fade{from{opacity:0}}
 #pl{position:fixed;left:0;right:0;bottom:0;z-index:6;padding:0 16px max(10px,env(safe-area-inset-bottom));border-radius:20px 20px 0 0}
 /* The panel's own layer: it slides off the handle near the mini player. */
