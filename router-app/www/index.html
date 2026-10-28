@@ -485,7 +485,10 @@ function showLayer(name, on) {
 // uncovers the handle above the bar, so its top edge with the progress line
 // on it moves without a jump, the poster grows, the buttons swap. Below the
 // bar the panel is cut where the mini player ends: on a desktop it floats
-// above the bottom edge, and the controls would show under it.
+// above the bottom edge, and the controls would show under it. The cut stays
+// put on the panel while what is in it slides: a cut animated along with the
+// slide lags it on iOS, the slide running apart from the page, and the edge
+// rose off the bottom showing the page under it.
 let slide = [];
 function foldPlayer(open) {
   const p = $('pl'), t = $('title').parentNode, box = e => e.getBoundingClientRect();
@@ -503,6 +506,7 @@ function foldPlayer(open) {
   const done = () => {
     p.classList.toggle('open', open);
     $('collapse').hidden = $('more').hidden = !open;
+    p.style.clipPath = '';
   };
   if (p.hidden || m.y == f.y || matchMedia('(prefers-reduced-motion:reduce)').matches) return done();
   const k = (from - f.y) / (m.y - f.y), to = open ? 0 : 1; // 0 open, 1 mini
@@ -510,12 +514,10 @@ function foldPlayer(open) {
   const r = getComputedStyle(p).borderBottomLeftRadius;
   const opt = { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)' };
   const go = (e, at) => e.animate([at(k), at(to)], opt);
+  // Room above for the shadow.
+  p.style.clipPath = `inset(-60px 0 0 round 0 0 ${r} ${r})`;
   slide = [
-    // Room above for the shadow.
-    go(p, k => ({
-      transform: `translateY(${k * (m.y - f.y)}px)`,
-      clipPath: `inset(-60px 0 ${k * (m.y - f.y)}px round 0 0 ${r} ${r})`,
-    })),
+    ...[...p.children].map(e => go(e, k => ({ translate: `0 ${k * (m.y - f.y)}px` }))),
     // Gone by the middle of the slide: it shows under the bar till the end.
     $('full').animate([
       { opacity: Math.max(0, 1 - 2 * k) },
