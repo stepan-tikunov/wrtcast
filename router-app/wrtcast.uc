@@ -6,29 +6,19 @@
 // Configured in /etc/config/wrtcast.
 'use strict';
 
-import { popen, open, readfile, writefile, rename, unlink, lsdir, mkdir, stat, access, stdin, stdout } from 'fs';
+import { popen, readfile, writefile, rename, unlink, lsdir, mkdir, stat, access, stdin, stdout } from 'fs';
 import { cursor } from 'uci';
+import * as sqlite from 'sqlite';
 
-const STATE = '/tmp/wrtcast.now.';         // + host key; what /play started
-const SUBS = '/tmp/wrtcast.subs.';         // + host key; subtitle URLs for /sub
-const LIST = '/tmp/wrtcast.list.';         // + host key; streams last asked for
-const WATCH = '/tmp/wrtcast.watch.';       // + host key; failed tick checks
-const SEEN = '/tmp/wrtcast.seen.';         // + host key; when what /play started last played
-const NEXT = '/tmp/wrtcast.next.';         // + host key; lock while the next episode starts
-const PLAYED = '/tmp/wrtcast.played.';     // + URL hash; what /play started with that URL
-const PROGRESS = '/tmp/wrtcast.progress.json'; // watch progress, copied to flash
+const DB = '/tmp/wrtcast.db';                // all state, see "state" below
 const MAX_TITLES = 200;                      // progress kept for this many titles
 const MAX_EPISODES = 50;                     // and this many episodes of each
 const FLUSH = 300;                           // seconds between flash writes
 const DONE = 0.85;                           // an episode left this far in is watched
 const TTL = 30 * 86400;                      // progress older than this is forgotten
-const DEVICES = '/tmp/wrtcast.devices.json'; // last discovery result
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
-const DRC = '/tmp/wrtcast.drc/';             // audio playlists and segments of the leveler
+const DRC = '/tmp/wrtcast.drc/';             // audio segments of the leveler
 const ERR = '/tmp/wrtcast.err.';           // + ns; stderr of a proxied fetch
-const HDR = '/tmp/wrtcast.hdr.';           // + media id; its CDN headers from title-api
-const BYTES = '/tmp/wrtcast.bytes.';       // + media id; "<bytes> <ms>" of each segment streamed
-const POS = '/tmp/wrtcast.pos.';           // + media id; position and pause the TV last told
 const COMMANDS = {
 	pause: null, resume: null, stop: null, quit: null, mute: null, unmute: null,
 	seek: 'num', ff: 'num', rew: 'num', volume: 'num', audio: 'str', subs: 'str',
@@ -36,8 +26,8 @@ const COMMANDS = {
 };
 const REASONS = {
 	'200': 'OK', '400': 'Bad Request', '401': 'Unauthorized', '403': 'Forbidden',
-	'404': 'Not Found', '405': 'Method Not Allowed', '502': 'Bad Gateway',
-	'503': 'Service Unavailable',
+	'404': 'Not Found', '405': 'Method Not Allowed', '500': 'Internal Server Error',
+	'502': 'Bad Gateway', '503': 'Service Unavailable',
 };
 const MIME = {
 	m3u8: 'application/vnd.apple.mpegurl', m3u: 'application/vnd.apple.mpegurl',
@@ -57,7 +47,8 @@ const USER_AGENT = conf('user_agent', 'Mozilla/5.0 (X11; Linux armv7l) ' +
 	'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.225 Safari/537.36 ' +
 	'CrKey/1.56.500000');
 const HEADERS = conf('header', []);
-const PROGRESS_KEEP = conf('progress_file', '/etc/wrtcast.progress.json');
+// The watch history on flash (see keep).
+const KEEP = conf('db_file', '/etc/wrtcast.db');
 // A minimal static ffmpeg (scripts/build-ffmpeg.sh); without it the volume
 // leveler is not offered.
 const FFMPEG = conf('ffmpeg', '/usr/bin/wrtcast-ffmpeg');
@@ -73,13 +64,14 @@ function reply(code, body) {
 let undo = null;
 
 function fail(code, msg) {
-	if (undo)
-		undo();
+	let u = undo;
+	undo = null;
+	if (u)
+		u();
 	reply(code, { error: msg });
 }
 
-// A state file as JSON, or null when it is missing or cut short (a full /tmp
-// truncates writes, and a parse error would otherwise abort the request).
+// A JSON file, or null when it is missing or cut short.
 function load(f) {
 	try {
 		return json(readfile(f) ?? 'null');
@@ -88,11 +80,173 @@ function load(f) {
 	}
 }
 
-// Writes JSON through a temporary file so readers never see it cut short.
-function save(f, v) {
-	let s = sprintf('%J', v), tmp = `${f}.${clock()[1]}`;
-	if (writefile(tmp, s) != length(s) || !rename(tmp, f))
-		unlink(tmp);
+// ---- state -----------------------------------------------------------------
+//
+// What wrtcast keeps between requests is in one SQLite database in /tmp
+// (sqlite/sqlite.c), shared by the concurrent CGI processes: per TV, what
+// /play started and the like (tvs); what /play started with each URL
+// (played); per title-api media, its CDN headers, the position the TV told
+// and the bytes of its segments streamed (media, segments); the playlists of
+// the volume leveler (drc); the devices found (kv); and the watch history
+// (titles, progress). Only the history outlives a reboot: it is copied to
+// flash every few minutes (see keep) and back on the first request after a
+// boot. Files are left for the leveler's segments and fetches' stderr.
+
+const SCHEMA = 1;
+
+// The history tables in schema s: per title, when it was last watched, its
+// name and poster for the recently watched list, a series' last episode and
+// what it was watched with (see watched_with); the position in a movie (ep
+// '') or in each episode ("season:episode").
+const HISTORY = s => `
+	CREATE TABLE ${s}.titles (
+		id TEXT PRIMARY KEY, title TEXT, poster TEXT,
+		season INTEGER, episode TEXT, prefs TEXT, t INTEGER NOT NULL
+	);
+	CREATE TABLE ${s}.progress (
+		id TEXT NOT NULL, ep TEXT NOT NULL, pos REAL NOT NULL, dur REAL NOT NULL,
+		done INTEGER NOT NULL, t INTEGER NOT NULL, PRIMARY KEY (id, ep)
+	);`;
+const TITLE_COLS = 'id, title, poster, season, episode, prefs, t';
+const PROGRESS_COLS = 'id, ep, pos, dur, done, t';
+
+// Documents are JSON text: per TV (key, see state_key) now, what /play
+// started; subs, the subtitles it side-loaded (see /sub); list, the streams
+// last asked for (see title_streams); watch, the tick's failed checks; seen,
+// when now last played (see watch_end); next_lock, while the next episode
+// starts (see play_next).
+const TABLES = `
+	CREATE TABLE tvs (
+		key TEXT PRIMARY KEY, now TEXT, subs TEXT, list TEXT, watch TEXT,
+		seen TEXT, next_lock INTEGER
+	);
+	CREATE TABLE played (url TEXT PRIMARY KEY, now TEXT NOT NULL, t INTEGER NOT NULL);
+	CREATE TABLE media (id TEXT PRIMARY KEY, hdr TEXT, pos TEXT, t INTEGER NOT NULL);
+	CREATE TABLE segments (media TEXT NOT NULL, bytes INTEGER NOT NULL,
+		ms INTEGER NOT NULL, t INTEGER NOT NULL);
+	CREATE INDEX segments_media ON segments (media);
+	CREATE TABLE drc (key TEXT PRIMARY KEY, meta TEXT NOT NULL, t INTEGER NOT NULL);
+	CREATE TABLE kv (key TEXT PRIMARY KEY, value);`;
+
+let db = null;
+
+function db_fail() {
+	fail(500, 'state: ' + (db?.error() ?? sqlite.error() ?? 'unknown error'));
+}
+
+// The history as the wrtcast before the database kept it, into the titles
+// and progress of db: { titles: { <id>: { title, poster, t, prefs, pos,
+// dur, done (a movie) or last: { season, episode }, eps: {
+// "<season>:<episode>": { pos, dur, done, t } } } } }.
+function import_json(P) {
+	let put = (q, ...a) => db.run(q, ...a) ?? db_fail();
+	for (let id, e in (type(P?.titles) == 'object' ? P.titles : {})) {
+		let eps = type(e?.eps) == 'object' ? e.eps : null;
+		if (!+e?.t || (eps && !e.last))
+			continue;
+		put(`INSERT INTO titles (${TITLE_COLS}) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			id, e.title, e.poster, eps ? +e.last.season : null,
+			eps ? `${e.last.episode}` : null, e.prefs, +e.t);
+		for (let ep, x in eps ?? { '': e })
+			if (x?.pos != null)
+				put(`INSERT INTO progress (${PROGRESS_COLS}) VALUES (?, ?, ?, ?, ?, ?)`,
+					id, ep, +x.pos, +(x.dur ?? 0), !!x.done, +(x.t ?? e.t));
+	}
+}
+
+// Creates the tables in a new database (after a boot) and fills the history
+// from flash, or from the JSON file of the wrtcast before the database.
+// Another request may be doing the same: the one that gets the write lock
+// first does it.
+function init() {
+	let exec = q => db.exec(q) ?? db_fail();
+	let version = () => (db.query('PRAGMA user_version') ?? db_fail())[0].user_version;
+	exec('PRAGMA journal_mode = WAL');
+	let keep = access(KEEP) ? KEEP : null;
+	if (keep)
+		db.run('ATTACH ? AS keep', `file:${keep}?mode=ro`) ?? db_fail();
+	exec('BEGIN IMMEDIATE');
+	if (version() != SCHEMA) {
+		exec(HISTORY('main') + TABLES);
+		if (keep)
+			exec(`INSERT INTO titles (${TITLE_COLS}) SELECT ${TITLE_COLS} FROM keep.titles;
+				INSERT INTO progress (${PROGRESS_COLS}) SELECT ${PROGRESS_COLS} FROM keep.progress`);
+		else
+			import_json(load('/tmp/wrtcast.progress.json') ??
+				load(conf('progress_file', '/etc/wrtcast.progress.json')));
+		exec(`PRAGMA user_version = ${SCHEMA}`);
+	}
+	exec('COMMIT');
+	if (keep)
+		exec('DETACH keep');
+}
+
+function store() {
+	if (db)
+		return db;
+	db = sqlite.open(DB, 5000);
+	if (!db)
+		db_fail();
+	if (db.exec('PRAGMA synchronous = OFF') == null) // tmpfs
+		db_fail();
+	if (db.query('PRAGMA user_version')?.[0]?.user_version != SCHEMA)
+		init();
+	return db;
+}
+
+// Rows of a query; null parameters are NULL, objects and arrays JSON.
+function sql_rows(q, ...a) {
+	let r = store().query(q, ...a);
+	if (r == null)
+		db_fail();
+	return r;
+}
+
+const sql_row = (q, ...a) => sql_rows(q, ...a)[0];
+
+// Runs a statement; the number of rows it changed.
+function sql_do(q, ...a) {
+	let n = store().run(q, ...a);
+	if (n == null)
+		db_fail();
+	return n;
+}
+
+function sql_exec(q) {
+	if (store().exec(q) == null)
+		db_fail();
+}
+
+function kv_get(k) {
+	return sql_row('SELECT value FROM kv WHERE key = ?', k)?.value;
+}
+
+function kv_set(k, v) {
+	sql_do('INSERT INTO kv (key, value) VALUES (?, ?) ' +
+	       'ON CONFLICT (key) DO UPDATE SET value = excluded.value', k, v);
+}
+
+// A JSON document of the TV with state key (see TABLES); null without one.
+function tv_get(key, what) {
+	let v = sql_row(`SELECT ${what} AS v FROM tvs WHERE key = ?`, key)?.v;
+	return v != null ? json(v) : null;
+}
+
+function tv_set(key, what, v) {
+	sql_do(`INSERT INTO tvs (key, ${what}) VALUES (?, ?) ` +
+	       `ON CONFLICT (key) DO UPDATE SET ${what} = excluded.${what}`, key, v);
+}
+
+// hdr or pos of a title-api media (see media_headers); null without it.
+function media_get(m, what) {
+	let v = sql_row(`SELECT ${what} AS v FROM media WHERE id = ?`, m)?.v;
+	return v != null ? json(v) : null;
+}
+
+function media_set(m, what, v) {
+	sql_do(`INSERT INTO media (id, ${what}, t) VALUES (?, ?, ?) ` +
+	       `ON CONFLICT (id) DO UPDATE SET ${what} = excluded.${what}, t = excluded.t`,
+	       m, v, time());
 }
 
 // FNV-1a, for short file names.
@@ -195,7 +349,7 @@ function api_try(path) {
 // title-api holds the player's playback socket, whose edge_hash replaces the
 // device fingerprint. So the proxy URLs of a stream that is a title-api
 // master carry its media id (&m=) instead of the headers (&h=), and fetches
-// take the headers from HDR<id>, kept for the ttl title-api gives. A
+// take the headers from its media row, kept for the ttl title-api gives. A
 // title-api that names a relay of the media's CDN requests (proxy) gets
 // them instead: it fetches them as the player's page would, so the CDN sees
 // one browser for the whole playback.
@@ -236,7 +390,7 @@ function quality_digits(l) {
 // few seconds (a few may still refresh at once); a failed refresh keeps
 // the stale ones too.
 function media_headers(m, q, t, force) {
-	let f = HDR + m, c = load(f), now = time();
+	let c = media_get(m, 'hdr'), now = time();
 	let claimed = now - (c?.claimed ?? 0) < 10;
 	if (type(c?.headers) != 'array')
 		c = null;
@@ -244,24 +398,16 @@ function media_headers(m, q, t, force) {
 		return c?.headers;
 	if (c)
 		c.claimed = now;
-	save(f, c ?? { claimed: now });
-	let qs = [], pos = load(POS + m), b = 0, n = 0, rb = 0, rms = 0;
+	media_set(m, 'hdr', c ?? { claimed: now });
+	let qs = [], pos = media_get(m, 'pos');
 	if (now - (pos?.at ?? 0) > 180)
 		pos = null;
 	if (t == null && pos)
 		t = pos.pos + (pos.paused ? 0 : now - pos.at);
-	let lines = split(readfile(BYTES + m) ?? '', '\n');
-	for (let i, l in lines) {
-		let x = match(l, /^([0-9]+) ([0-9]+)$/);
-		if (!x)
-			continue;
-		b += +x[1];
-		n++;
-		if (i >= length(lines) - 6) {
-			rb += +x[1];
-			rms += +x[2];
-		}
-	}
+	let all = sql_row('SELECT count(*) AS n, total(bytes) AS b FROM segments WHERE media = ?', m);
+	let last = sql_row('SELECT total(bytes) AS b, total(ms) AS ms FROM (SELECT bytes, ms ' +
+		'FROM segments WHERE media = ? ORDER BY rowid DESC LIMIT 5)', m);
+	let n = all.n, b = all.b, rb = last.b, rms = last.ms;
 	if (q != null)
 		push(qs, `q=${q}`);
 	if (type(t) in ['int', 'double'] && t >= 0)
@@ -280,7 +426,7 @@ function media_headers(m, q, t, force) {
 	if (type(r?.headers) == 'array' && (!length(hl) || valid_headers(join('\n', hl)))) {
 		c = { headers: hl, fetched: time(), ttl: +r.ttl > 0 ? +r.ttl : 60,
 			proxy: match(r.proxy ?? '', /^\/v1\/media\/[0-9a-f]{32}\/cdn$/) ? r.proxy : null };
-		save(f, c);
+		media_set(m, 'hdr', c);
 	}
 	return c?.headers;
 }
@@ -291,9 +437,8 @@ function media_headers(m, q, t, force) {
 function media_end(m) {
 	if (!valid_media(m))
 		return;
-	unlink(HDR + m);
-	unlink(BYTES + m);
-	unlink(POS + m);
+	sql_do('DELETE FROM media WHERE id = ?', m);
+	sql_do('DELETE FROM segments WHERE media = ?', m);
 	system(`uclient-fetch -q -T 5 -O /dev/null --post-data= ` +
 		`${shq(API + '/v1/media/' + m + '/session/end')} </dev/null >/dev/null 2>&1 &`);
 }
@@ -302,7 +447,7 @@ function media_end(m) {
 
 // Cached device list no older than max_age seconds (any age when null).
 function cached(max_age) {
-	let c = load(DEVICES);
+	let v = kv_get('devices'), c = v != null ? json(v) : null;
 	if (type(c) != 'object' || type(c.devices) != 'array' ||
 	    (max_age != null && time() - c.time >= max_age))
 		return null;
@@ -320,7 +465,7 @@ function discover() {
 	// A TV in standby may miss the scan; an empty one keeps the last devices
 	// for lookups, but without a fresh time, so /devices scans again.
 	if (length(list) || !length(cached() ?? []))
-		save(DEVICES, { time: time(), devices: list });
+		kv_set('devices', { time: time(), devices: list });
 	return list;
 }
 
@@ -398,26 +543,29 @@ function castctl_try(dev, ...args) {
 }
 
 const state_key = dev => replace(host_of(dev), /[^0-9A-Za-z.]/g, '_');
-const state_file = dev => STATE + state_key(dev);
 
-// What /play started with a URL, kept apart from the state of its TV: a play
-// castctl gave up on may start on the TV all the same, and of two plays to
-// one TV at once the one that lost puts back the state from before both.
-const played_file = u => PLAYED + hash(u);
+// What /play started on the TV of a state key; null for nothing.
+const now_get = key => tv_get(key, 'now');
+const now_set = (key, v) => tv_set(key, 'now', v);
 
-// The state f of a TV (now, at host) when the TV plays media m of another
-// stream: what /play started with that URL, which becomes the state. Not
-// while a play is under way, the TV still plays the last stream then
-// (castctl waits for the receiver up to 20 s, again at a new address).
-function adopt(f, host, now, m) {
+// What /play started with a URL is kept apart from the state of its TV too
+// (played): a play castctl gave up on may start on the TV all the same, and
+// of two plays to one TV at once the one that lost puts back the state from
+// before both. Returns the state of the TV (key, at host) that plays media
+// m: now, or when m is another stream, what /play started with that URL,
+// which becomes the state. Not while a play is under way, the TV still
+// plays the last stream then (castctl waits for the receiver up to 20 s,
+// again at a new address).
+function adopt(key, host, now, m) {
 	let u = m?.url;
 	if (!u || now?.url == u || time() - (now?.started ?? 0) < 90)
 		return now;
-	let p = load(played_file(u));
-	if (p?.url != u)
+	let p = sql_row('SELECT now FROM played WHERE url = ?', u);
+	if (!p)
 		return now;
+	p = json(p.now);
 	p.host = host;
-	save(f, p);
+	now_set(key, p);
 	return p;
 }
 
@@ -492,58 +640,68 @@ function streams(id, season, episode) {
 // sources before playing and may retry with another, all from one provider
 // request. force asks the provider again.
 function title_streams(dev, id, season, episode, force) {
-	let f = LIST + state_key(dev), c = load(f);
+	let key = state_key(dev), c = tv_get(key, 'list');
 	if (!force && c?.streams && c.id == id && c.season == season &&
 	    c.episode == episode && time() - c.fetched < 600)
 		return c;
 	c = { id, season, episode, streams: streams(id, season, episode), fetched: time() };
-	writefile(f, sprintf('%J', c));
+	tv_set(key, 'list', c);
 	return c;
 }
 
 // ---- watch progress --------------------------------------------------------
 //
 // Where each title was left off: a movie's position, or a series' last
-// episode and the position in each of its episodes. Kept in /tmp and copied
-// to flash every few minutes, or right away when a title or an episode
-// starts or gets watched. Beyond MAX_TITLES and MAX_EPISODES the least
-// recently watched ones are dropped, and anything untouched for TTL is
-// forgotten, so a title opened a month later starts over.
+// episode and the position in each of its episodes (titles, progress).
+// Copied to flash every few minutes, or right away when a title or an
+// episode starts or gets watched. Beyond MAX_TITLES and MAX_EPISODES the
+// least recently watched ones are dropped, and anything untouched for TTL is
+// forgotten (see tick), so a title opened a month later starts over.
 
-function progress() {
-	let p = load(PROGRESS) ?? load(PROGRESS_KEEP);
-	if (type(p?.titles) != 'object')
-		return { titles: {} };
-	let old = time() - TTL;
-	for (let id, e in p.titles) {
-		if (e.t < old) {
-			delete p.titles[id];
-			continue;
-		}
-		for (let k, x in e.eps ?? {})
-			if (x.t < old)
-				delete e.eps[k];
-	}
-	return p;
+// The progress row of a movie ('') or an episode.
+const ep_key = (season, episode) => season == null ? '' : `${season}:${episode}`;
+
+// { id, title, poster, season, episode (a series' last), prefs, t } of a
+// title; null if it was never watched.
+function title_row(id) {
+	let e = sql_row(`SELECT ${TITLE_COLS} FROM titles WHERE id = ?`, id);
+	if (e)
+		e.prefs = e.prefs != null ? json(e.prefs) : null;
+	return e;
 }
 
-// Keeps the n most recently watched entries of o.
-function trim_lru(o, n) {
-	let k = sort(keys(o), (a, b) => o[b].t - o[a].t);
-	for (let i = n; i < length(k); i++)
-		delete o[k[i]];
+// { pos, dur, done, t } of a movie or an episode (see ep_key), or null.
+function progress_row(id, ep) {
+	let x = sql_row('SELECT pos, dur, done, t FROM progress WHERE id = ? AND ep = ?', id, ep);
+	if (x)
+		x.done = !!x.done;
+	return x;
 }
 
-const ep_key = (season, episode) => `${season}:${episode}`;
+// Copies the history to flash, into a new file renamed over KEEP, so a cut
+// never leaves half of one. A failed copy waits for the next change or tick.
+function keep() {
+	let d = store(), tmp = `${KEEP}.${clock()[1]}`;
+	let ok = d.run('ATTACH ? AS keep', tmp) != null;
+	ok = ok && d.exec(`PRAGMA keep.journal_mode = OFF; BEGIN; ${HISTORY('keep')}
+		INSERT INTO keep.titles (${TITLE_COLS}) SELECT ${TITLE_COLS} FROM titles;
+		INSERT INTO keep.progress (${PROGRESS_COLS}) SELECT ${PROGRESS_COLS} FROM progress;
+		COMMIT`) != null;
+	if (!ok)
+		d.exec('ROLLBACK');
+	d.exec('DETACH keep');
+	if (ok && rename(tmp, KEEP))
+		kv_set('flushed', time());
+	else
+		unlink(tmp);
+}
 
-// Copies progress to flash when forced or FLUSH seconds after the last copy.
-function flush(P, force) {
-	let due = force || time() - (P.flushed ?? 0) >= FLUSH;
-	if (due)
-		P.flushed = time();
-	save(PROGRESS, P);
-	if (due)
-		save(PROGRESS_KEEP, P);
+// The history changed: copied to flash when forced or FLUSH seconds after
+// the last copy.
+function changed(force) {
+	kv_set('changed', time());
+	if (force || time() - (kv_get('flushed') ?? 0) >= FLUSH)
+		keep();
 }
 
 // What a title is watched with, for its next start (see play): the source,
@@ -570,57 +728,57 @@ function remember(now, m) {
 	let pos = +(m.time ?? 0), dur = +(m.duration ?? 0);
 	if (!finished && (pos < 1 || index(['PLAYING', 'PAUSED', 'BUFFERING'], m.state) < 0))
 		return;
-	let P = progress(), e = P.titles[now.id], t = time();
-	let important = !e;
-	e ??= {};
-	let x = e;
-	if (now.season != null) {
-		let k = ep_key(now.season, now.episode);
-		important ||= e.last?.season != now.season || e.last?.episode != now.episode;
-		e.last = { season: now.season, episode: now.episode };
-		e.eps ??= {};
-		important ||= !e.eps[k];
-		x = e.eps[k] ??= {};
-		x.t = t;
-		trim_lru(e.eps, MAX_EPISODES);
-	}
+	let e = title_row(now.id), k = ep_key(now.season, now.episode);
+	let x = progress_row(now.id, k), t = time();
+	let important = !e || !x;
+	if (now.season != null)
+		important ||= e?.season != now.season || e?.episode != now.episode;
 	// Only an end the receiver reached itself marks a title watched here
 	// (see next_episode). A watched episode stays so while it is still near
 	// the end: a poll can catch it right after the next one was started.
-	let done = finished || (!!x.done && dur > 0 && pos >= dur * DONE);
-	important ||= !!x.done != done;
-	let w = watched_with(now, m, e.prefs);
-	important ||= sprintf('%J', w) != sprintf('%J', e.prefs);
+	let done = finished || (!!x?.done && dur > 0 && pos >= dur * DONE);
+	important ||= !!x?.done != done;
+	let w = watched_with(now, m, e?.prefs);
+	important ||= sprintf('%J', w) != sprintf('%J', e?.prefs);
 	if (finished)
 		pos = dur;
 	// A long pause shouldn't keep rewriting the same position.
 	if (!important && x.pos == pos && x.dur == dur)
 		return;
-	x.pos = pos;
-	x.dur = dur;
-	x.done = done;
-	e.prefs = w;
-	// For the recently watched list.
-	e.title = now.title ?? e.title;
-	e.poster = now.poster ?? e.poster;
-	e.t = t;
-	P.titles[now.id] = e;
-	trim_lru(P.titles, MAX_TITLES);
-	P.changed = t;
-	flush(P, important);
+	sql_exec('BEGIN IMMEDIATE');
+	// The title and the poster are for the recently watched list.
+	sql_do(`INSERT INTO titles (${TITLE_COLS}) VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (id) DO UPDATE SET title = coalesce(excluded.title, title),
+		poster = coalesce(excluded.poster, poster), season = excluded.season,
+		episode = excluded.episode, prefs = excluded.prefs, t = excluded.t`,
+		now.id, now.title, now.poster, now.season,
+		now.season != null ? now.episode : null, w, t);
+	sql_do(`INSERT INTO progress (${PROGRESS_COLS}) VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT (id, ep) DO UPDATE SET pos = excluded.pos, dur = excluded.dur,
+		done = excluded.done, t = excluded.t`, now.id, k, pos, dur, done, t);
+	sql_do('DELETE FROM progress WHERE id = ? AND ep NOT IN ' +
+	       '(SELECT ep FROM progress WHERE id = ? ORDER BY t DESC LIMIT ?)',
+	       now.id, now.id, MAX_EPISODES);
+	if (sql_do('DELETE FROM titles WHERE id NOT IN ' +
+	           '(SELECT id FROM titles ORDER BY t DESC LIMIT ?)', MAX_TITLES))
+		sql_do('DELETE FROM progress WHERE id NOT IN (SELECT id FROM titles)');
+	sql_exec('COMMIT');
+	changed(important);
 }
 
 // Starting another episode of a series marks the last one watched if it was
 // left near the end: people switch off during the credits, which may run
 // for minutes. Movies just resume wherever they were stopped.
 function next_episode(id, season, episode) {
-	let P = progress(), e = P.titles[id], l = e?.last;
-	let x = l ? e.eps?.[ep_key(l.season, l.episode)] : null;
-	if (!x || x.done || ep_key(l.season, l.episode) == ep_key(season, episode) ||
+	let e = title_row(id);
+	if (e?.season == null)
+		return;
+	let l = ep_key(e.season, e.episode), x = progress_row(id, l);
+	if (!x || x.done || l == ep_key(season, episode) ||
 	    !(x.dur > 0 && x.pos >= x.dur * DONE))
 		return;
-	x.done = true;
-	flush(P, true);
+	sql_do('UPDATE progress SET done = 1 WHERE id = ? AND ep = ?', id, l);
+	changed(true);
 }
 
 // Whether the episode now has played to the end and the next one is due
@@ -644,12 +802,13 @@ function ended(now, st, seen) {
 // Records when now was last seen on the TV and, once it has ended, starts
 // the next episode. Another process does that, so the status request or
 // the tick neither waits for title-api and the TV nor fails with them; a
-// lock keeps polls and ticks from starting it twice.
+// lock keeps polls and ticks from starting it twice (two minutes at most:
+// by then play_next has marked the episode, see ended).
 function watch_end(now, st) {
 	let key = state_key({ host: now.host }), m = st.media;
 	if (m?.url == now.url && index(['PLAYING', 'BUFFERING', 'PAUSED'], m.state) >= 0) {
 		let active = type => now.labels?.[filter(m.tracks ?? [], t => t.type == type && t.active)[0]?.name];
-		save(SEEN + key, {
+		tv_set(key, 'seen', {
 			url: now.url, pos: +(m.time ?? 0), dur: +(m.duration ?? 0),
 			playing: m.state != 'PAUSED', t: time(),
 			audio: active('AUDIO'), subs: active('TEXT'),
@@ -657,23 +816,23 @@ function watch_end(now, st) {
 		// For the next headers refresh of a title-api media (see
 		// media_headers), with no castctl call of its own.
 		if (valid_media(now.media))
-			save(POS + now.media, {
+			media_set(now.media, 'pos', {
 				pos: +(m.time ?? 0), dur: +(m.duration ?? 0), paused: m.state == 'PAUSED',
 				buffering: m.state == 'BUFFERING', at: time(),
 			});
 		return;
 	}
-	if (!ended(now, st, load(SEEN + key)))
+	if (!ended(now, st, tv_get(key, 'seen')))
 		return;
-	let lock = NEXT + key;
-	system(`(mkdir ${shq(lock)} && { ${shq(sourcepath())} next ${shq(key)}; ` +
-	       `rmdir ${shq(lock)}; }) </dev/null >/dev/null 2>&1 &`);
+	let t = time();
+	if (sql_do('UPDATE tvs SET next_lock = ? WHERE key = ? AND coalesce(next_lock, 0) < ?',
+	           t, key, t - 120))
+		system(`${shq(sourcepath())} next ${shq(key)} </dev/null >/dev/null 2>&1 &`);
 }
 
 // The position to resume a movie or an episode from; null to start over.
 function resume_at(id, season, episode) {
-	let e = progress().titles[id];
-	let x = season == null ? e : e?.eps?.[ep_key(season, episode)];
+	let x = progress_row(id, ep_key(season, episode));
 	return x && !x.done && x.pos > 10 ? x.pos - 5 : null;
 }
 
@@ -682,26 +841,23 @@ function resume_at(id, season, episode) {
 // fails five checks in a row (switched off, or playing something else) is
 // left alone until the next /play.
 function tick() {
-	for (let name in lsdir('/tmp') ?? []) {
-		let k = match(name, /^wrtcast\.now\.(.+)$/)?.[1];
-		let now = k ? load(STATE + k) : null;
-		// The key must be the host's own: save() leaves "<key>.<ns>" temp
-		// files for a moment, and host keys have dots too.
-		if (!now?.host || !now.url || state_key({ host: now.host }) != k)
+	for (let r in sql_rows('SELECT key, now FROM tvs WHERE now IS NOT NULL')) {
+		let k = r.key, now = json(r.now);
+		if (!now?.host || !now.url)
 			continue;
-		let w = load(WATCH + k);
+		let w = tv_get(k, 'watch');
 		let misses = w?.url == now.url ? w.misses : 0;
 		if (misses >= 5)
 			continue;
 		let st = castctl_try({ host: now.host }, 'status'), m = st?.media;
-		now = adopt(STATE + k, now.host, now, m);
+		now = adopt(k, now.host, now, m);
 		if (st)
 			watch_end(now, st);
 		if (m?.url == now.url)
 			remember(now, m);
 		misses = m?.url == now.url && m.state != 'IDLE' ? 0 : misses + 1;
 		if (misses != w?.misses || w?.url != now.url)
-			save(WATCH + k, { url: now.url, misses });
+			tv_set(k, 'watch', { url: now.url, misses });
 		// title-api keeps the playback socket open while the headers are
 		// asked for, also while the receiver has enough buffered to fetch
 		// nothing, and learns the position.
@@ -711,20 +867,28 @@ function tick() {
 		if (misses == 5)
 			media_end(now.media);
 	}
-	// Error files of proxied fetches the web server cut short, and the
-	// headers, bytes and positions of media not played for a day.
+	// Progress untouched for TTL; the headers, positions and bytes of media
+	// not played for a day, what /play started and the leveler's playlists
+	// of a day ago.
+	let t = time();
+	if (sql_do('DELETE FROM titles WHERE t < ?', t - TTL))
+		sql_do('DELETE FROM progress WHERE id NOT IN (SELECT id FROM titles)');
+	sql_do('DELETE FROM progress WHERE t < ?', t - TTL);
+	sql_do('DELETE FROM media WHERE t < ?', t - 86400);
+	sql_do('DELETE FROM segments WHERE t < ?', t - 86400);
+	sql_do('DELETE FROM played WHERE t < ?', t - 86400);
+	sql_do('DELETE FROM drc WHERE t < ?', t - 86400);
+	// Error files of proxied fetches the web server cut short.
 	for (let name in lsdir('/tmp') ?? []) {
-		let age = match(name, /^wrtcast\.err\.[0-9]+$/) ? 60 :
-			match(name, /^wrtcast\.(hdr|bytes|pos|played)\./) ? 86400 : null;
-		let st = age ? stat('/tmp/' + name) : null;
-		if (st && st.mtime < time() - age)
+		let st = match(name, /^wrtcast\.err\.[0-9]+$/) ? stat('/tmp/' + name) : null;
+		if (st && st.mtime < t - 60)
 			unlink('/tmp/' + name);
 	}
-	// The last position before playback stopped would otherwise stay in
-	// /tmp only.
-	let P = load(PROGRESS);
-	if (P?.changed > (P?.flushed ?? 0) && time() - P.flushed >= FLUSH)
-		flush(P);
+	// The last position before playback stopped would otherwise not reach
+	// flash.
+	let flushed = kv_get('flushed') ?? 0;
+	if ((kv_get('changed') ?? 0) > flushed && t - flushed >= FLUSH)
+		keep();
 }
 
 // ---- media proxy -----------------------------------------------------------
@@ -745,7 +909,7 @@ function fetch_cmd(url, h, err, m) {
 	let cmd = `uclient-fetch ${err ? '' : '-q '}-T 20`;
 	let lines = valid_headers(h) ? split(h, '\n') : [];
 	if (valid_media(m) && substr(url, 0, length(API) + 1) != API + '/') {
-		let dyn = media_headers(m), relay = load(HDR + m)?.proxy;
+		let dyn = media_headers(m), relay = media_get(m, 'hdr')?.proxy;
 		if (relay)
 			return `${cmd} ${out(API + relay + '?u=' + urlenc(url))}`;
 		if (dyn == null && !length(lines)) {
@@ -886,7 +1050,7 @@ function qualities(body) {
 // title-api track id.
 function with_now(st, dev) {
 	st.device = { id: dev.id ?? null, name: dev.name ?? host_of(dev) };
-	let now = adopt(state_file(dev), host_of(dev), load(state_file(dev)), st.media);
+	let key = state_key(dev), now = adopt(key, host_of(dev), now_get(key), st.media);
 	if (now)
 		watch_end(now, st);
 	if (!now || !st.media || st.media.url != now.url)
@@ -900,7 +1064,7 @@ function with_now(st, dev) {
 		now.variants = v;
 		now.qualities = map(v, x => x.label);
 		now.quality = 'auto';
-		save(state_file(dev), now);
+		now_set(key, now);
 	}
 	st.now = {
 		id: now.id, stream: now.stream, title: now.title, poster: now.poster,
@@ -1060,9 +1224,8 @@ function drc_playlist(body, url, h, m) {
 		push(durs, dur);
 		return `/api/a/${key}/${length(segs) - 1}.ts`;
 	});
-	mkdir(DRC);
-	save(`${DRC}${key}.json`, { segs, durs, h: valid_headers(h) ? h : null,
-		m: valid_media(m) ? m : null });
+	sql_do('INSERT OR REPLACE INTO drc (key, meta, t) VALUES (?, ?, ?)', key,
+		{ segs, durs, h: valid_headers(h) ? h : null, m: valid_media(m) ? m : null }, time());
 	return join('\n', out);
 }
 
@@ -1107,6 +1270,7 @@ function drc_raw(meta, key, i) {
 	s = pipe?.read('all');
 	if (!pipe || pipe.close() != 0 || ord(s ?? '', 0) != 0x47)
 		return null;
+	mkdir(DRC);
 	let tmp = `${f}.${clock()[1]}`;
 	if (writefile(tmp, s) != length(s) || !rename(tmp, f))
 		unlink(tmp);
@@ -1169,18 +1333,18 @@ function drc_level(meta, key, i, cur) {
 // files for a while (another TV may be playing them).
 function drc_gc(key, i) {
 	for (let f in lsdir(DRC) ?? []) {
-		let m = match(f, /^([0-9a-f]{8})\.(json|([0-9]+)\..*)$/);
+		let m = match(f, /^([0-9a-f]{8})\.([0-9]+)\./);
 		if (!m)
 			continue;
 		let st = stat(DRC + f);
-		if (m[1] == key ? m[3] != null && (+m[3] < i - 2 || +m[3] > i + 2) :
-		    st && st.mtime < time() - (m[2] == 'json' ? 86400 : 600))
+		if (m[1] == key ? +m[2] < i - 2 || +m[2] > i + 2 : st && st.mtime < time() - 600)
 			unlink(DRC + f);
 	}
 }
 
 function drc_segment(key, i) {
-	let meta = load(`${DRC}${key}.json`);
+	let meta = sql_row('SELECT meta FROM drc WHERE key = ?', key)?.meta;
+	meta = meta != null ? json(meta) : null;
 	if (i >= length(meta?.segs ?? []))
 		fail(404, 'no such segment');
 	let s = readfile(`${DRC}${key}.${i}.out`);
@@ -1196,16 +1360,12 @@ function drc_segment(key, i) {
 	exit(0);
 }
 
-// Appends the bytes of a segment of media m streamed since start (a
-// clock()) and the milliseconds that took to BYTES<m>, for title-api (see
-// media_headers): one short line, which concurrent requests may append at
-// once.
+// Records the bytes of a segment of media m streamed since start (a clock())
+// and the milliseconds that took, for title-api (see media_headers).
 function count_bytes(m, n, start) {
-	let end = clock(), f = open(BYTES + m, 'a');
-	if (!f)
-		return;
-	f.write(sprintf('%d %d\n', n, (end[0] - start[0]) * 1000 + (end[1] - start[1]) / 1000000));
-	f.close();
+	let end = clock();
+	sql_do('INSERT INTO segments (media, bytes, ms, t) VALUES (?, ?, ?, ?)', m, n,
+		int((end[0] - start[0]) * 1000 + (end[1] - start[1]) / 1000000), time());
 }
 
 function proxy(name, u, q, h, drc, m) {
@@ -1309,12 +1469,12 @@ function play(dev, p, keep) {
 	// A title watched before starts again with what it was watched with
 	// (see watched_with); a replay (reuse) tells all of it itself, and a
 	// source or a stream asked for wins.
-	let pref = p.reuse == '1' ? null : progress().titles[id]?.prefs;
+	let pref = p.reuse == '1' ? null : title_row(id)?.prefs;
 	if (pref?.source != null && p.source == null && p.stream == null)
 		p.source = pref.source;
 	if (match(pref?.quality ?? '', /^(auto|[0-9]{3,4}p)$/))
 		p.quality = pref.quality;
-	let last = load(state_file(dev));
+	let key = state_key(dev), last = now_get(key);
 	let list, fetched;
 	if (p.reuse == '1' && last?.streams && last.id == id &&
 	    last.season == season && last.episode == episode &&
@@ -1389,7 +1549,7 @@ function play(dev, p, keep) {
 	// a request; what the TV told of an earlier play of the media doesn't
 	// count.
 	if (m) {
-		unlink(POS + m);
+		sql_do('UPDATE media SET pos = NULL WHERE id = ?', m);
 		media_headers(m, quality_digits(quality), start != null ? +start : null, true);
 	}
 	// Probed once per source, on the variant this play picks.
@@ -1411,13 +1571,11 @@ function play(dev, p, keep) {
 		push(args, '-f', 'fmp4');
 	// Signed subtitle URLs can be ~2 KB each through the proxy, too much
 	// for the 64 KB LOAD message, so the receiver gets short /sub/<tv>/<n>
-	// links that look the real URL up in a file written beforehand.
+	// links that look the real URL up in what is written beforehand.
 	let picked = pick_subs(s.subs);
-	writefile(SUBS + state_key(dev), sprintf('%J', {
-		urls: map(picked, t => t.url), headers: h, media: m,
-	}));
+	tv_set(key, 'subs', { urls: map(picked, t => t.url), headers: h, media: m });
 	for (let i, t in picked) {
-		push(args, '-s', PROXY ? `${public_base()}/api/sub/${state_key(dev)}/${i}.vtt` : t.url,
+		push(args, '-s', PROXY ? `${public_base()}/api/sub/${key}/${i}.vtt` : t.url,
 		     t.lang || 'und', 'sub' + t.id);
 		labels['sub' + t.id] = t.name;
 	}
@@ -1428,7 +1586,7 @@ function play(dev, p, keep) {
 	// The state goes first: uhttpd may kill us (script_timeout, or the
 	// phone went away) while castctl waits for playback, and the TV then
 	// plays this stream all the same. A failed play puts the last one back.
-	let f = state_file(dev), now = {
+	let now = {
 		id, stream: n, source: s.name, url, host: host_of(dev), media: m,
 		title: p.title ?? null, season,
 		episode, labels, quality, qualities: map(quals, v => v.label),
@@ -1443,9 +1601,9 @@ function play(dev, p, keep) {
 		poster: length(p.poster ?? '') <= 4096 &&
 			match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
 	};
-	let put_back = () => last ? save(f, last) : unlink(f);
-	save(f, now);
-	save(played_file(url), now);
+	let put_back = () => now_set(key, last);
+	now_set(key, now);
+	sql_do('INSERT OR REPLACE INTO played (url, now, t) VALUES (?, ?, ?)', url, now, time());
 	undo = put_back;
 	let st = castctl(dev, ...args);
 	undo = null;
@@ -1456,7 +1614,7 @@ function play(dev, p, keep) {
 	// its key, and the old key gets back what it had.
 	if (host_of(dev) != now.host) {
 		now.host = host_of(dev);
-		save(state_file(dev), now);
+		now_set(state_key(dev), now);
 		put_back();
 	}
 	for (let k in ['audio', 'subs'])
@@ -1473,14 +1631,17 @@ function play(dev, p, keep) {
 // ended), crossing into the next season, with the source, quality, leveler,
 // subtitle style, dub and subtitles of the last one.
 function play_next(key) {
-	let f = STATE + key, now = load(f), seen = load(SEEN + key);
+	let now = now_get(key), seen = tv_get(key, 'seen');
 	let dev = { host: now?.host }, st = now?.host ? castctl_try(dev, 'status') : null;
-	if (!st || !ended(now, st, seen))
+	if (!st || !ended(now, st, seen)) {
+		// Not over after all: polls and ticks may start it later.
+		sql_do('UPDATE tvs SET next_lock = NULL WHERE key = ?', key);
 		return;
+	}
 	// One try per episode: a failed play puts this state back, and a
 	// failure here leaves it as well.
 	now.next_at = time();
-	save(f, now);
+	now_set(key, now);
 	let S = api(`/v1/titles/${now.id}`).seasons ?? [], si = -1, ei = -1;
 	for (let i, x in S)
 		if (`${x.seasonNumber}` == `${now.season}`) {
@@ -1567,23 +1728,25 @@ const routes = {
 	// Without id: the recently watched titles, latest first, each with the
 	// position of the movie or of the last episode.
 	'GET /progress': p => {
-		let T = progress().titles;
-		if (p.id == null) {
-			let recent = [];
-			for (let id, e in T) {
-				let x = e.eps ? e.eps[ep_key(e.last?.season, e.last?.episode)] : e;
-				if (e.title && x)
-					push(recent, {
-						id, title: e.title, poster: e.poster ?? null, t: e.t,
-						season: e.last?.season, episode: e.last?.episode,
-						pos: x.pos, dur: x.dur, done: x.done,
-					});
-			}
-			return { recent: sort(recent, (a, b) => b.t - a.t) };
+		if (p.id == null)
+			return {
+				recent: map(sql_rows(`SELECT t.id, t.title, t.poster, t.t, t.season,
+					t.episode, p.pos, p.dur, p.done FROM titles t JOIN progress p
+					ON p.id = t.id AND p.ep = CASE WHEN t.season IS NULL THEN ''
+					ELSE t.season || ':' || t.episode END
+					WHERE t.title IS NOT NULL ORDER BY t.t DESC`), r => ({ ...r, done: !!r.done })),
+			};
+		let id = title_id(p), e = title_row(id), progress = null;
+		if (e?.season != null) {
+			let eps = {};
+			for (let x in sql_rows("SELECT ep, pos, dur, done, t FROM progress WHERE id = ? AND ep != ''", id))
+				eps[x.ep] = { pos: x.pos, dur: x.dur, done: !!x.done, t: x.t };
+			progress = { last: { season: e.season, episode: e.episode }, eps };
+		} else if (e) {
+			let x = progress_row(id, '');
+			progress = x ? { pos: x.pos, dur: x.dur, done: x.done } : null;
 		}
-		let e = T[title_id(p)];
-		return { progress: !e ? null : e.eps ? { last: e.last, eps: e.eps } :
-			{ pos: e.pos, dur: e.dur, done: e.done }, prefs: e?.prefs ?? null };
+		return { progress, prefs: e?.prefs ?? null };
 	},
 
 
@@ -1607,10 +1770,10 @@ const routes = {
 	'POST /autonext': p => {
 		if (!match(p.on ?? '', /^[01]$/))
 			fail(400, 'invalid on');
-		let dev = device(p), f = state_file(dev), now = load(f);
+		let dev = device(p), key = state_key(dev), now = now_get(key);
 		if (now) {
 			now.autonext = p.on == '1';
-			save(f, now);
+			now_set(key, now);
 		}
 		return with_now(castctl(dev, 'status'), dev);
 	},
@@ -1623,8 +1786,8 @@ const routes = {
 		// Stopped from the page, the episode has not ended (see ended),
 		// and the playback has.
 		if (c == 'stop' || c == 'quit') {
-			unlink(SEEN + state_key(dev));
-			media_end(load(state_file(dev))?.media);
+			tv_set(state_key(dev), 'seen', null);
+			media_end(now_get(state_key(dev))?.media);
 		}
 		if (kind == 'num' && !match(arg, /^[0-9]+(\.[0-9]+)?$/))
 			fail(400, 'numeric arg required');
@@ -1636,7 +1799,7 @@ const routes = {
 		// A pause, a resume or a seek reaches title-api at once, not with
 		// the next refresh (which a paused TV may not ask for in a while).
 		let now = index(['pause', 'resume', 'seek', 'ff', 'rew'], c) >= 0 ?
-			load(state_file(dev)) : null;
+			now_get(state_key(dev)) : null;
 		if (valid_media(now?.media) && st.media?.url == now.url)
 			media_headers(now.media, quality_digits(now.quality), null, true);
 		return st;
@@ -1674,7 +1837,7 @@ if (am) {
 // Subtitles of what /play started, by index (see the short links in /play).
 let sm = match(path, /^\/sub\/([0-9A-Za-z._]+)\/([0-9]+)\.vtt$/);
 if (sm) {
-	let subs = load(SUBS + sm[1]);
+	let subs = tv_get(sm[1], 'subs');
 	let url = subs?.urls?.[+sm[2]];
 	if (!url)
 		fail(404, 'no such subtitle');

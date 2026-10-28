@@ -2,6 +2,7 @@
 # Installs wrtcast on the router and creates a dedicated uhttpd instance
 # on port 8088: /api/* is aliased to the CGI script, /www/cast is the web root.
 # Existing /etc/config/wrtcast is kept. Adds a cron job for watch progress.
+# Needs build/sqlite.so (scripts/build-sqlite.sh).
 set -e
 cd "$(dirname "$0")/.."
 ROUTER=${ROUTER:-root@192.168.1.1}
@@ -10,6 +11,9 @@ SSH="ssh ${SSH_OPTS:--o ControlPath=/tmp/ssh-owrt} $ROUTER"
 $SSH "mkdir -p /www/cast/cgi-bin && cat > /www/cast/cgi-bin/wrtcast && chmod 755 /www/cast/cgi-bin/wrtcast" < wrtcast.uc
 $SSH "cat > /www/cast/index.html" < www/index.html
 $SSH "[ -f /etc/config/wrtcast ] || cat > /etc/config/wrtcast" < files/wrtcast.config
+# The state's SQLite module (scripts/build-sqlite.sh) and its library.
+$SSH "opkg list-installed libsqlite3-0 | grep -q . || opkg install libsqlite3-0"
+$SSH "cat > /usr/lib/ucode/sqlite.so.new && mv /usr/lib/ucode/sqlite.so.new /usr/lib/ucode/sqlite.so" < build/sqlite.so
 # The volume leveler's ffmpeg, if built (scripts/build-ffmpeg.sh); unchanged
 # copies are skipped, it takes a third of a small overlay.
 if [ -f build/wrtcast-ffmpeg ]; then
@@ -44,8 +48,8 @@ if ! grep -qF "$CRON" /etc/crontabs/root 2>/dev/null; then
 	/etc/init.d/cron enable
 	/etc/init.d/cron restart
 fi
-# Watch progress survives firmware upgrades.
-grep -qx /etc/wrtcast.progress.json /etc/sysupgrade.conf ||
-	echo /etc/wrtcast.progress.json >> /etc/sysupgrade.conf
+# The watch history survives firmware upgrades.
+grep -qx /etc/wrtcast.db /etc/sysupgrade.conf ||
+	echo /etc/wrtcast.db >> /etc/sysupgrade.conf
 REMOTE
 echo "deployed: http://${ROUTER#*@}:8088/api/status"
