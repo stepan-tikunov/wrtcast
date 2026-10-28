@@ -13,7 +13,8 @@ html{color-scheme:dark}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.35 system-ui,-apple-system,sans-serif;-webkit-user-select:none;user-select:none}
 button,select,input{font:inherit;color:inherit}
 button{cursor:pointer;touch-action:manipulation}
-button:disabled{opacity:.45}
+/* Off: dim, and no hover or press look that would tell otherwise. */
+button:disabled{opacity:.45;pointer-events:none}
 svg{width:24px;height:24px;fill:currentColor;flex:none}
 .ib{display:grid;place-items:center;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:none}
 .ib:active,.pill:active,.card:active,.ep:active{transform:scale(.96)}
