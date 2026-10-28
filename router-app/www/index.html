@@ -113,7 +113,7 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #st .spin,#st i{display:none}
 #st.busy .spin{display:block}
 #st.sr.tm i{display:inline;font-style:normal}
-#pl.open #st:not(.busy) i,#pl.open #st:not(.busy) #sttm{display:none}
+#pl.open:not(.sliding) #st:not(.busy) i,#pl.open:not(.sliding) #st:not(.busy) #sttm{display:none}
 #tg{background:var(--tx);color:#111;width:46px;height:46px}
 /* Out of the way where it stood in the mini player, to fade in on folding. */
 #pl.open #tg{position:absolute;right:0;top:13px;visibility:hidden}
@@ -528,6 +528,7 @@ function foldPlayer(open) {
   $('tg').inert = open;
   const done = () => {
     p.classList.toggle('open', open);
+    p.classList.remove('sliding');
     $('collapse').hidden = $('more').hidden = $('spd').hidden = !open;
     p.style.clipPath = '';
   };
@@ -537,6 +538,8 @@ function foldPlayer(open) {
   const r = getComputedStyle(p).borderBottomLeftRadius;
   const opt = { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)' };
   const go = (e, at) => e.animate([at(k), at(to)], opt);
+  // The time of the mini player fades along, shown all the way.
+  p.classList.add('sliding');
   // Room above for the shadow.
   p.style.clipPath = `inset(-60px 0 0 round 0 0 ${r} ${r})`;
   slide = [
@@ -554,6 +557,8 @@ function foldPlayer(open) {
     go(t, k => ({ transform: `translateX(${k * (m.x - f.x)}px)` })),
     go($('tg'), k => ({ opacity: k, transform: `scale(${.6 + .4 * k})`, visibility: 'visible' })),
     ...[$('spd'), $('more'), $('collapse')].map(e => go(e, k => ({ opacity: 1 - k, transform: `scale(${1 - .4 * k})` }))),
+    ...$('st').classList.contains('busy') ? [] :
+      [$('sttm'), $('st').querySelector('i')].map(e => go(e, k => ({ opacity: k }))),
   ];
   const a = slide[0];
   a.onfinish = () => {
