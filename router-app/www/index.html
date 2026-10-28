@@ -519,7 +519,8 @@ function foldPlayer(open) {
   slide.forEach(a => a.cancel());
   const lay = on => {
     p.classList.toggle('open', on);
-    return { y: box($('bar')).top, edge: box(p).top, w: box($('thumb')).width, x: box(t).left };
+    $('collapse').hidden = $('more').hidden = $('spd').hidden = !on;
+    return { y: box($('bar')).top, edge: box(p).top, w: box($('thumb')).width, x: box(t).left, tw: box(t).width };
   };
   const m = lay(false), f = lay(true);
   // The buttons of the other state are on screen while fading, not to be hit.
@@ -529,6 +530,7 @@ function foldPlayer(open) {
   const done = () => {
     p.classList.toggle('open', open);
     p.classList.remove('sliding');
+    for (const c of t.children) c.style.width = '';
     $('collapse').hidden = $('more').hidden = $('spd').hidden = !open;
     p.style.clipPath = '';
   };
@@ -538,8 +540,11 @@ function foldPlayer(open) {
   const r = getComputedStyle(p).borderBottomLeftRadius;
   const opt = { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)' };
   const go = (e, at) => e.animate([at(k), at(to)], opt);
-  // The time of the mini player fades along, shown all the way.
+  // The time of the mini player fades along, shown all the way, and the
+  // title and that line keep the width of the mini player, where there are
+  // fewer buttons, and do not cut off on the way.
   p.classList.add('sliding');
+  for (const c of t.children) c.style.width = m.tw + 'px';
   // Room above for the shadow.
   p.style.clipPath = `inset(-60px 0 0 round 0 0 ${r} ${r})`;
   slide = [
