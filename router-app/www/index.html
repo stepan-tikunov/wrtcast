@@ -105,23 +105,22 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #thumb{width:48px;height:72px;margin-right:-8px;object-fit:cover;border-radius:6px;background:var(--s2);transform:scale(.8333);transform-origin:left center}
 #bar .t{flex:1;min-width:0}
 #title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
-#st{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:0 6px;min-height:18px;overflow:hidden;color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
-/* The episode, and folded the time under it; while loading a spinner after
-   it instead. Open, the time is under the slider. */
+#st{display:flex;align-items:center;gap:6px;overflow:hidden;color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* The episode, and while loading a spinner after it; a movie has no line. */
+#st:not(.sr):not(.busy){display:none}
 #st>*{flex:none}
 #stEp:empty{display:none}
 #sttm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
-#st:not(.busy) #sttm{flex-basis:100%}
 #st .spin,#st i{display:none}
 #st.busy .spin{display:block}
 #st.sr.busy i{display:inline;font-style:normal}
-#pl.open:not(.sliding) #st:not(.busy) #sttm{display:none}
-/* On the way the open layout stays, the time of a series hangs under it. */
-#pl.sliding #st{overflow:visible}
-#pl.sliding #st.sr:not(.busy) #sttm{position:absolute;left:0;right:0;top:100%}
+/* The mini player's position, by its play button. */
+#mt{flex:none;color:var(--mu);font-size:14px;font-variant-numeric:tabular-nums}
+#mt:empty{display:none}
 #tg{background:var(--tx);color:#111;width:46px;height:46px}
-/* Out of the way where it stood in the mini player, to fade in on folding. */
+/* Out of the way where they stood in the mini player, to fade in on folding. */
 #pl.open #tg{position:absolute;right:0;top:13px;visibility:hidden}
+#pl.open #mt{position:absolute;right:58px;top:13px;line-height:46px;visibility:hidden}
 /* Playback speed: white at 1x, the accent otherwise. An invisible select
    over it opens the browser's own picker. */
 #spd{position:relative;display:grid;place-items:center;flex:none;min-width:40px;height:48px;padding:0 2px;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
@@ -321,6 +320,7 @@ svg.spring{animation:spring .3s ease-out}
   <div id="bar">
     <img id="thumb" alt="">
     <div class="t"><b id="title"></b><span id="st"><span id="stEp"></span><i>·</i><span class="spin"></span><span id="sttm"></span></span></div>
+    <span id="mt"></span>
     <button class="ib" id="tg" data-c="toggle" aria-label="Пауза"><svg><use href="#i-play"/></svg></button>
     <div id="spd" hidden><span id="speed">1x</span><select id="spdsel" aria-label="Скорость"></select></div>
     <button class="ib" id="more" aria-label="Настройки" hidden><svg><use href="#i-tune"/></svg></button>
@@ -522,7 +522,6 @@ function foldPlayer(open) {
   const p = $('pl'), t = $('title').parentNode, box = e => e.getBoundingClientRect();
   const from = box($('bar')).top; // mid-slide too
   slide.forEach(a => a.cancel());
-  p.classList.remove('sliding');
   const lay = on => {
     p.classList.toggle('open', on);
     $('collapse').hidden = $('more').hidden = $('spd').hidden = !on;
@@ -537,7 +536,6 @@ function foldPlayer(open) {
   $('tg').inert = open;
   const done = () => {
     p.classList.toggle('open', open);
-    p.classList.remove('sliding');
     for (const c of t.children) c.style.width = '';
     $('collapse').hidden = $('more').hidden = $('spd').hidden = !open;
     p.style.clipPath = '';
@@ -548,10 +546,8 @@ function foldPlayer(open) {
   const r = getComputedStyle(p).borderBottomLeftRadius;
   const opt = { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)' };
   const go = (e, at) => e.animate([at(k), at(to)], opt);
-  // The time of the mini player fades along, shown all the way, and the
-  // title and that line keep the width of the mini player, where there are
-  // fewer buttons, and do not cut off on the way.
-  p.classList.add('sliding');
+  // The title and the line under it keep the width of the mini player,
+  // where there are fewer buttons, and do not cut off on the way.
   for (const c of t.children) c.style.width = m.tw + 'px';
   // Room above for the shadow.
   p.style.clipPath = `inset(-60px 0 0 round 0 0 ${r} ${r})`;
@@ -567,12 +563,10 @@ function foldPlayer(open) {
     go($('handle'), k => ({ opacity: 1 - k })),
     go($('prog'), k => ({ opacity: k })),
     go($('thumb'), k => ({ transform: `scale(${1 - k * (1 - s)})` })),
-    // Folded the time line moves the title up.
     go(t, k => ({ transform: `translate(${k * (m.x - f.x)}px,${k * (m.ty - f.ty)}px)` })),
     go($('tg'), k => ({ opacity: k, transform: `scale(${.6 + .4 * k})`, visibility: 'visible' })),
+    go($('mt'), k => ({ opacity: k, visibility: 'visible' })),
     ...[$('spd'), $('more'), $('collapse')].map(e => go(e, k => ({ opacity: 1 - k, transform: `scale(${1 - .4 * k})` }))),
-    ...$('st').classList.contains('busy') ? [] :
-      [$('sttm'), $('st').querySelector('i')].map(e => go(e, k => ({ opacity: k }))),
   ];
   const a = slide[0];
   a.onfinish = () => {
@@ -1078,20 +1072,20 @@ function showTime() {
   let t = m.time || 0;
   if (m.state == 'PLAYING') t += (Date.now() - statusAt) / 1000 * (m.rate || 1);
   if (m.duration) t = Math.min(t, m.duration);
-  showStatus(st.now, m.state == 'BUFFERING', m.duration ? `${fmt(t)} / ${fmt(m.duration)}` : '');
+  showStatus(st.now, m.state == 'BUFFERING');
+  $('mt').textContent = m.duration ? fmt(t) : '';
   $('prog').firstChild.style.width = m.duration ? (100 * t / m.duration) + '%' : 0;
   if (drag != 'pos') showPos(t, m.duration);
 }
 
-// The line under the title: the episode of a series, and folded the time,
-// or loading. Only texts and classes change on every tick: a re-created
-// spinner would restart its animation and jerk instead of spinning.
-function showStatus(n, busy, time) {
+// The line under the title: the episode of a series, and loading. Only
+// texts and classes change on every tick: a re-created spinner would
+// restart its animation and jerk instead of spinning.
+function showStatus(n, busy) {
   const s = $('st'), ep = n?.season != null ? epShort(n) : '';
   $('stEp').textContent = ep;
-  $('sttm').textContent = busy ? 'Загрузка…' : time;
+  $('sttm').textContent = busy ? 'Загрузка…' : '';
   s.classList.toggle('sr', !!ep);
-  s.classList.toggle('tm', busy || !!time);
   s.classList.toggle('busy', busy);
 }
 
@@ -1114,7 +1108,8 @@ function renderBar() {
   $('opts').classList.toggle('pending', !!pending);
   if (pending) {
     // The controls of what starts, not of what was on.
-    showStatus(pending, true, '');
+    showStatus(pending, true);
+    $('mt').textContent = '';
     $('prog').firstChild.style.width = 0;
     showPos(0, 0);
     icon('tg', 'play');
