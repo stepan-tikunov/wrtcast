@@ -145,6 +145,13 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .sl.on i{left:-6px;right:-6px;top:10px;height:12px;border-radius:6px}
 .sl.on i b{background:var(--ac)}
 .times{display:flex;justify-content:space-between;margin:-4px 0 0;color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums;transition:.2s;transition-property:color,margin}
+/* The frame at the time dragged to, over the bar where it ends (see preview). */
+#frame{--w:min(44vw,240px);position:absolute;bottom:calc(100% - 2px);left:clamp(-6px,calc(var(--f,0) * 100% - var(--w) / 2),calc(100% + 6px - var(--w)));width:var(--w);aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#000;box-shadow:0 4px 24px #000c;pointer-events:none;opacity:0;transform:translateY(8px) scale(.94);transition:.15s;transition-property:opacity,transform}
+#frame.on{opacity:1;transform:none}
+#frame video{display:block;width:100%;height:100%;object-fit:contain;transition:opacity .15s}
+#frame.stale video{opacity:.4}
+#frame .spin{display:none;position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px;border-color:#fff;border-top-color:transparent}
+#frame.busy.stale .spin{display:block}
 #pos.on+.times{margin:-2px -6px 0;color:var(--tx);font-weight:600}
 .ctl{display:flex;align-items:center;justify-content:center;gap:20px;margin:10px 0}
 .ctl.series{justify-content:space-between;gap:0}
@@ -350,7 +357,7 @@ svg.spring{animation:spring .3s ease-out}
   </div>
   <div id="full"><div>
     <div class="live">
-    <div class="sl" id="pos" role="slider" aria-label="Позиция"><i><b></b></i></div>
+    <div class="sl" id="pos" role="slider" aria-label="Позиция"><i><b></b></i><div id="frame"><video muted playsinline></video><span class="spin"></span></div></div>
     <div class="times"><span id="cur">0:00</span><span id="rem"></span></div>
     <div class="ctl" id="ctl">
       <button class="ib ep-nav" id="prev" aria-label="Предыдущая серия"><svg><use href="#i-prev"/></svg></button>
@@ -1650,6 +1657,419 @@ function setStyle(s) {
   if (st?.media) cmd('substyle', styleSpec(s || {}));
 }
 
+// ---- seek preview -------------------------------------------------------
+//
+// While the seek bar is dragged, the frame at the time dragged to shows
+// above it. Nothing is prepared ahead: the segment of that time is fetched
+// from the lightest H.264 variant through the media proxy, its video is
+// remuxed into fragmented MP4 for a MediaSource, and a video element of its
+// own seeks to the time. WebCodecs would do without the remux, but like
+// WebCrypto it needs a secure context, which a page on the router's address
+// isn't; so encrypted streams get no preview. A CDN that bans clients for
+// too many requests must see no more than a player seeking: a fetch starts
+// only once the finger rests, one at a time, each segment once (pv=1 keeps
+// them out of the TV's playback the router and title-api report), and a
+// refusal or a few failures end the previews of that stream.
+
+const preview = (() => {
+  const MS = window.ManagedMediaSource || window.MediaSource;
+  const REST = 250; // ms the finger rests on a time before its segment is fetched
+  const tip = $('frame'), video = tip.querySelector('video');
+  let s = null;     // the stream: its playlist, MediaSource and segments loaded
+  let active = false, want = null, rest = 0, fresh = false, timer = null, seekTo = null;
+
+  const get = async (u, text) => {
+    const r = await fetch(u + (u.includes('?') ? '&' : '?') + 'pv=1');
+    if (!r.ok) throw r.status;
+    return text ? r.text() : new Uint8Array(await r.arrayBuffer());
+  };
+  const attr = (l, k) => {
+    const m = l.match(new RegExp(`[:,]${k}=(?:"([^"]*)"|([^,]*))`));
+    return m && (m[1] ?? m[2]);
+  };
+
+  // The segments of the lightest H.264 variant, [{ t, dur, uri, init }], and
+  // its size.
+  async function playlist(url) {
+    let text = await get(url, 1), res = null;
+    if (!text.includes('#EXTINF')) {
+      const lines = text.split(/\r?\n/);
+      let best = null;
+      lines.forEach((l, i) => {
+        if (!l.startsWith('#EXT-X-STREAM-INF:')) return;
+        const codecs = attr(l, 'CODECS'), w = +attr(l, 'RESOLUTION')?.split('x')[0] || 1e5, bw = +attr(l, 'BANDWIDTH') || 0;
+        const uri = lines.slice(i + 1).find(x => x && x[0] != '#');
+        if (uri && (!codecs || /avc[13]/.test(codecs)) && (!best || w < best.w || w == best.w && bw < best.bw))
+          best = { uri, w, bw, res: attr(l, 'RESOLUTION') };
+      });
+      if (!best) throw 'no H.264 variant';
+      res = best.res?.split('x').map(Number);
+      url = new URL(best.uri, url).href;
+      text = await get(url, 1);
+    }
+    const segs = [];
+    let t = 0, dur = 0, init = null;
+    for (const l of text.split(/\r?\n/)) {
+      if (l.startsWith('#EXTINF:')) dur = parseFloat(l.slice(8)) || 0;
+      else if (l.startsWith('#EXT-X-MAP:')) init = attr(l, 'BYTERANGE') ? null : new URL(attr(l, 'URI'), url).href;
+      // The proxy passes no Range, and keys would take WebCrypto.
+      else if (l.startsWith('#EXT-X-BYTERANGE') || l.startsWith('#EXT-X-KEY:') && attr(l, 'METHOD') != 'NONE' ||
+        l.startsWith('#EXT-X-MAP:') && !init) throw 'unsupported';
+      else if (l && l[0] != '#') {
+        segs.push({ t, dur, uri: new URL(l, url).href, init });
+        t += dur;
+      }
+    }
+    if (!segs.length) throw 'empty playlist';
+    return { segs, total: t, w: res?.[0] || 640, h: res?.[1] || 360 };
+  }
+
+  const cat = parts => {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let o = 0;
+    for (const p of parts) out.set(p, o), o += p.length;
+    return out;
+  };
+  const u32 = (b, i) => (b[i] << 24 | b[i + 1] << 16 | b[i + 2] << 8 | b[i + 3]) >>> 0;
+  const str4 = (b, i) => String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]);
+  const be = (n, k = 4) => Array.from({ length: k }, (_, i) => Math.floor(n / 256 ** (k - 1 - i)) % 256);
+  const chars = t => [...t].map(c => c.charCodeAt(0));
+  const zero = n => new Uint8Array(n);
+  const box = (type, ...parts) => {
+    parts = parts.map(p => p instanceof Uint8Array ? p : Uint8Array.from(p));
+    const b = cat([zero(8), ...parts]);
+    b.set([...be(b.length), ...chars(type)]);
+    return b;
+  };
+  // The boxes from s to e: f(type, content start, end, box start).
+  const walk = (b, s, e, f) => {
+    while (s + 8 <= e) {
+      let n = u32(b, s), h = 8;
+      if (n == 1) n = u32(b, s + 8) * 2 ** 32 + u32(b, s + 12), h = 16;
+      else if (!n) n = e - s;
+      if (n < h) return;
+      f(str4(b, s + 4), s + h, Math.min(s + n, e), s);
+      s += n;
+    }
+  };
+  // The content [start, end] of the box down a path of types, or null.
+  const dig = (b, at, ...types) => types.reduce((at, type) => {
+    let r = null;
+    if (at) walk(b, at[0], at[1], (t, s, e) => r ??= t == type ? [s, e] : null);
+    return r;
+  }, at);
+  const hex = b => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+
+  // An MPEG-TS segment's H.264 video as samples, with a sample entry (avc1)
+  // made of its parameter sets and the variant's size.
+  function demuxTS(b, w, h) {
+    let pmt = -1, vid = -1, cur = null;
+    const pes = [];
+    for (let i = 0; i + 188 <= b.length; i += 188) {
+      if (b[i] != 0x47) throw 'not MPEG-TS';
+      const pid = (b[i + 1] & 31) << 8 | b[i + 2], start = b[i + 1] & 64, af = b[i + 3] >> 4 & 3;
+      let p = i + 4;
+      if (af & 2) p += 1 + b[p];
+      if (!(af & 1) || p >= i + 188) continue;
+      if (pid == 0 && start) {
+        p += 1 + b[p];
+        const end = p + 3 + ((b[p + 1] & 15) << 8 | b[p + 2]) - 4;
+        for (let q = p + 8; q + 4 <= end; q += 4)
+          if (b[q] << 8 | b[q + 1]) { pmt = (b[q + 2] & 31) << 8 | b[q + 3]; break; }
+      } else if (pid == pmt && start) {
+        p += 1 + b[p];
+        const end = p + 3 + ((b[p + 1] & 15) << 8 | b[p + 2]) - 4;
+        for (let q = p + 12 + ((b[p + 10] & 15) << 8 | b[p + 11]); q + 5 <= end; q += 5 + ((b[q + 3] & 15) << 8 | b[q + 4]))
+          if (b[q] == 0x1b) { vid = (b[q + 1] & 31) << 8 | b[q + 2]; break; }
+      } else if (pid == vid) {
+        if (start) pes.push(cur = []);
+        cur?.push(b.subarray(p, i + 188));
+      }
+    }
+    const stamp = (d, i) => (d[i] & 14) * 2 ** 29 + d[i + 1] * 2 ** 22 + (d[i + 2] >> 1) * 2 ** 15 + d[i + 3] * 128 + (d[i + 4] >> 1);
+    const aus = [];
+    let sps = null, pps = null;
+    for (const parts of pes) {
+      const d = cat(parts);
+      if (d[0] || d[1] || d[2] != 1) continue;
+      const pts = d[7] & 0x80 ? stamp(d, 9) : null, dts = d[7] & 0x40 ? stamp(d, 14) : pts;
+      // NAL units between Annex B start codes; parameter sets go to the
+      // sample entry, delimiters nowhere.
+      const nals = [], p = d.subarray(9 + d[8]);
+      let s = -1;
+      const unit = e => {
+        while (e > s && !p[e - 1]) e--;
+        const n = p.subarray(s, e), type = n[0] & 31;
+        if (type == 7) sps ??= n;
+        else if (type == 8) pps ??= n;
+        else if (type != 9 && n.length) nals.push(n);
+      };
+      for (let i = 0; i + 2 < p.length; i++)
+        if (!p[i] && !p[i + 1] && p[i + 2] == 1) {
+          if (s >= 0) unit(i);
+          s = i += 3;
+          i--;
+        }
+      if (s >= 0) unit(p.length);
+      if (pts == null) aus.at(-1)?.nals.push(...nals);
+      else aus.push({ pts, dts, nals });
+    }
+    if (!sps || !pps) throw 'no parameter sets';
+    const wrap = 2 ** 33, first = aus[0]?.dts;
+    const samples = aus.filter(a => a.nals.length).map(a => {
+      if (a.dts < first - wrap / 2) a.dts += wrap, a.pts += wrap;
+      return {
+        dts: a.dts, cts: a.pts - a.dts, key: a.nals.some(n => (n[0] & 31) == 5),
+        data: cat(a.nals.flatMap(n => [Uint8Array.from(be(n.length)), n])),
+      };
+    });
+    samples.forEach((x, i) => x.dur = i + 1 < samples.length ? samples[i + 1].dts - x.dts : samples[i - 1]?.dur ?? 3600);
+    const avc1 = box('avc1', zero(6), [0, 1], zero(16), be(w, 2), be(h, 2),
+      be(0x480000), be(0x480000), zero(4), [0, 1], zero(32), [0, 0x18, 0xff, 0xff],
+      box('avcC', [1, sps[1], sps[2], sps[3], 0xff, 0xe1], be(sps.length, 2), sps, [1], be(pps.length, 2), pps));
+    return { entry: avc1, codec: 'avc1.' + hex(sps.subarray(1, 4)), ts: 90000, samples };
+  }
+
+  // An init segment's video track: its id, timescale, sample entry and
+  // defaults.
+  function initMP4(b) {
+    const moov = dig(b, [0, b.length], 'moov');
+    let r = null;
+    if (moov) walk(b, moov[0], moov[1], (type, s, e) => {
+      const mdia = type == 'trak' && dig(b, [s, e], 'mdia'), hdlr = mdia && dig(b, mdia, 'hdlr');
+      if (r || !hdlr || str4(b, hdlr[0] + 8) != 'vide') return;
+      const tkhd = dig(b, [s, e], 'tkhd'), mdhd = dig(b, mdia, 'mdhd'), stsd = dig(b, mdia, 'minf', 'stbl', 'stsd');
+      const at = x => x[0] + (b[x[0]] == 1 ? 20 : 12), id = u32(b, at(tkhd));
+      const entry = b.slice(stsd[0] + 8, stsd[0] + 8 + u32(b, stsd[0] + 8)), kind = str4(entry, 4);
+      const avcC = dig(entry, [86, entry.length], 'avcC');
+      if (!/^avc[13]$/.test(kind) || !avcC) throw 'unsupported ' + kind;
+      let def = [0, 0, 0];
+      const mvex = dig(b, moov, 'mvex');
+      if (mvex) walk(b, mvex[0], mvex[1], (t, s) => {
+        if (t == 'trex' && u32(b, s + 4) == id) def = [u32(b, s + 12), u32(b, s + 16), u32(b, s + 20)];
+      });
+      r = { id, ts: u32(b, at(mdhd)), entry, def, codec: kind + '.' + hex(entry.subarray(avcC[0] + 1, avcC[0] + 4)) };
+    });
+    if (!r) throw 'no video track';
+    return r;
+  }
+
+  // A fragmented MP4 segment's samples of the init's video track.
+  function demuxMP4(b, init) {
+    const samples = [];
+    walk(b, 0, b.length, (type, s, e, moof) => type == 'moof' && walk(b, s, e, (type, s, e) => {
+      const tfhd = type == 'traf' && dig(b, [s, e], 'tfhd');
+      if (!tfhd || u32(b, tfhd[0] + 4) != init.id) return;
+      let q = tfhd[0] + 8, base = moof;
+      const rd = () => u32(b, (q += 4) - 4), fl = u32(b, tfhd[0]) & 0xffffff;
+      if (fl & 1) base = rd() * 2 ** 32 + rd();
+      if (fl & 2) rd();
+      const dd = fl & 8 ? rd() : init.def[0], ds = fl & 16 ? rd() : init.def[1], df = fl & 32 ? rd() : init.def[2];
+      const tfdt = dig(b, [s, e], 'tfdt');
+      let dts = !tfdt ? samples.length ? samples.at(-1).dts + samples.at(-1).dur : 0 :
+        b[tfdt[0]] == 1 ? u32(b, tfdt[0] + 4) * 2 ** 32 + u32(b, tfdt[0] + 8) : u32(b, tfdt[0] + 4);
+      let pos = base;
+      walk(b, s, e, (type, s) => {
+        if (type != 'trun') return;
+        q = s;
+        const f = rd() & 0xffffff, n = rd();
+        if (f & 1) pos = base + (rd() | 0);
+        const first = f & 4 ? rd() : null;
+        for (let k = 0; k < n; k++) {
+          const dur = f & 0x100 ? rd() : dd, size = f & 0x200 ? rd() : ds;
+          const flags = f & 0x400 ? rd() : k == 0 && first != null ? first : df;
+          samples.push({ dts, dur, cts: f & 0x800 ? rd() | 0 : 0, key: !(flags & 0x10000), data: b.subarray(pos, pos + size) });
+          dts += dur;
+          pos += size;
+        }
+      });
+    }));
+    return samples;
+  }
+
+  // A video-only fragmented MP4: the init segment of a sample entry and a
+  // fragment of the samples at the given decode time.
+  function initSeg(entry, ts) {
+    const w = entry[32] << 8 | entry[33], h = entry[34] << 8 | entry[35];
+    const matrix = [...be(0x10000), ...zero(12), ...be(0x10000), ...zero(12), ...be(0x40000000)];
+    return cat([
+      box('ftyp', chars('isom'), be(0), chars('isomiso6avc1')),
+      box('moov',
+        box('mvhd', zero(12), be(ts), be(0), be(0x10000), [1, 0], zero(10), matrix, zero(24), be(2)),
+        box('trak',
+          box('tkhd', [0, 0, 0, 3], zero(8), be(1), zero(4), be(0), zero(16), matrix, be(w * 65536), be(h * 65536)),
+          box('mdia',
+            box('mdhd', zero(12), be(ts), be(0), [0x55, 0xc4, 0, 0]),
+            box('hdlr', zero(8), chars('vide'), zero(13)),
+            box('minf',
+              box('vmhd', [0, 0, 0, 1], zero(8)),
+              box('dinf', box('dref', zero(4), be(1), box('url ', [0, 0, 0, 1]))),
+              box('stbl', box('stsd', zero(4), be(1), entry),
+                box('stts', zero(8)), box('stsc', zero(8)), box('stsz', zero(12)), box('stco', zero(8)))))),
+        box('mvex', box('trex', zero(4), be(1), be(1), zero(12)))),
+    ]);
+  }
+  function fragment(samples, time, seq) {
+    const table = [];
+    for (const x of samples)
+      table.push(...be(x.dur), ...be(x.data.length), ...be(x.key ? 0x2000000 : 0x1010000), ...be(x.cts >>> 0));
+    const trun = box('trun', [1, 0, 0x0f, 0x01], be(samples.length), be(0), table);
+    const moof = box('moof', box('mfhd', zero(4), be(seq)),
+      box('traf', box('tfhd', [0, 2, 0, 0], be(1)), box('tfdt', [1, 0, 0, 0], be(time, 8)), trun));
+    moof.set(be(moof.length + 8), moof.length - trun.length + 16);
+    return cat([moof, box('mdat', ...samples.map(x => x.data))]);
+  }
+
+  const append = (sb, d) => new Promise((ok, no) => {
+    sb.onupdateend = ok;
+    sb.onerror = no;
+    sb.appendBuffer(d);
+  });
+
+  // Fetches segment i and appends its video, at its time in the playlist.
+  async function load(my, i) {
+    const seg = my.segs[i], data = await get(seg.uri);
+    let v;
+    if (seg.init) {
+      const init = await (my.inits[seg.init] ??= get(seg.init).then(initMP4));
+      v = { ...init, samples: demuxMP4(data, init) };
+    } else v = demuxTS(data, my.w, my.h);
+    if (!v.samples.length) throw 'no video';
+    if (s != my) return;
+    // The first frame shown at the segment's time in the playlist, unless
+    // that would decode before 0.
+    const first = Math.min(...v.samples.map(x => x.dts + x.cts));
+    const off = Math.max(Math.round(seg.t * v.ts) - first, -v.samples[0].dts);
+    seg.a = (first + off) / v.ts;
+    seg.b = (Math.max(...v.samples.map(x => x.dts + x.cts + x.dur)) + off) / v.ts;
+    if (!my.sb) {
+      const type = `video/mp4; codecs="${v.codec}"`;
+      if (!MS.isTypeSupported(type)) throw 'unsupported ' + v.codec;
+      const ms = new MS();
+      video.disableRemotePlayback = true;
+      video.src = my.url = URL.createObjectURL(ms);
+      await new Promise(r => ms.addEventListener('sourceopen', r, { once: true }));
+      my.sb = ms.addSourceBuffer(type);
+      ms.duration = my.total;
+    }
+    await append(my.sb, initSeg(v.entry, v.ts));
+    await append(my.sb, fragment(v.samples, v.samples[0].dts + off, ++my.seq));
+  }
+
+  const find = t => {
+    const g = s.segs;
+    let lo = 0, hi = g.length - 1;
+    while (lo < hi) {
+      const mid = lo + hi + 1 >> 1;
+      if (g[mid].t <= t) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+  const buffered = seg => {
+    const t = (seg.a + seg.b) / 2, r = video.buffered;
+    for (let i = 0; i < r.length; i++) if (r.start(i) <= t && t < r.end(i)) return true;
+    return false;
+  };
+
+  function paint() {
+    tip.classList.toggle('on', !!(active && s && !s.dead && (s.shown || s.busy)));
+    tip.classList.toggle('stale', !fresh);
+    tip.classList.toggle('busy', !!s?.busy);
+  }
+  function seek(t) {
+    if (video.seeking) seekTo = t;
+    else video.currentTime = t;
+  }
+  video.onseeked = () => {
+    if (seekTo != null) {
+      video.currentTime = seekTo;
+      seekTo = null;
+    } else if (s?.sb && !s.shown) {
+      s.shown = true;
+      paint();
+    }
+  };
+  video.onresize = () => tip.style.aspectRatio = video.videoWidth + '/' + video.videoHeight;
+
+  // Shows the time wanted if its segment is there, else asks for it once the
+  // finger rests.
+  function update() {
+    if (!active || !s?.segs || s.dead || want == null) return paint();
+    const i = find(want), seg = s.segs[i];
+    if (s.done.has(i) && !buffered(seg)) s.done.delete(i); // evicted by the browser
+    fresh = s.done.has(i);
+    if (fresh) seek(Math.min(Math.max(want, seg.a), seg.b - .001));
+    else {
+      clearTimeout(timer);
+      timer = setTimeout(pump, REST);
+    }
+    paint();
+  }
+  async function pump() {
+    const my = s;
+    if (!active || !my?.segs || my.busy || my.dead) return;
+    const wait = rest + REST - Date.now();
+    if (wait > 0) return timer = setTimeout(pump, wait);
+    const i = find(want);
+    if (my.done.has(i) || my.failed.has(i)) return;
+    my.busy = true;
+    paint();
+    try {
+      await load(my, i);
+      my.done.add(i);
+    } catch (e) {
+      // A refusal, a stream that can't be shown or a few failures end it.
+      my.failed.add(i);
+      const transient = typeof e == 'number' && e != 403 || e instanceof TypeError;
+      if (!transient || ++my.fails >= 3) my.dead = true;
+    }
+    my.busy = false;
+    if (s == my) update();
+  }
+
+  return {
+    // A drag starts on media m: from the master the TV plays through the
+    // proxy, without the quality and the leveler it asked for.
+    start(m) {
+      const src = m?.url?.match(/\/api\/p\/.*/)?.[0];
+      if (!MS || !src) return;
+      if (s?.src != src) {
+        if (s?.url) {
+          video.removeAttribute('src');
+          video.load();
+          URL.revokeObjectURL(s.url);
+        }
+        const my = s = { src, segs: null, done: new Set(), failed: new Set(), inits: {}, fails: 0, seq: 0 };
+        const url = new URL(src.replace(/&(q|drc)=[^&]*/g, ''), location.href).href;
+        playlist(url).then(p => {
+          if (s != my) return;
+          Object.assign(my, p);
+          update();
+        }, () => my.dead = true);
+      }
+      active = true;
+      want = null;
+      fresh = false;
+    },
+    // The finger at time t, f of the way along the bar; moved once it has.
+    show(t, f, moved) {
+      if (!active) return;
+      tip.style.setProperty('--f', f);
+      if (!moved) return;
+      want = t;
+      rest = Date.now();
+      update();
+    },
+    end() {
+      active = false;
+      want = null;
+      clearTimeout(timer);
+      paint();
+    },
+  };
+})();
+
 // ---- wiring -------------------------------------------------------------
 
 $('f').onsubmit = e => {
@@ -1715,8 +2135,9 @@ $('spdsel').onchange = e => {
 // Sliders: a drag anywhere moves the value from where it was by as much as
 // the finger moves, not to under the finger; a mouse still jumps to the
 // click. A tap alone changes nothing. start() gives the value and its
-// maximum, or nothing when the slider can't be moved now; end() gets the
-// new value, or null if there's none.
+// maximum, or nothing when the slider can't be moved now; show() gets the
+// value, the maximum and whether it has moved yet; end() gets the new
+// value, or null if there's none.
 function slider(box, { start, show, end }) {
   let d = null;
   box.onpointerdown = e => {
@@ -1728,14 +2149,14 @@ function slider(box, { start, show, end }) {
     d = { ...v, x: e.clientX, w: r.width, moved: e.pointerType == 'mouse' };
     if (d.moved) d.v = Math.min(Math.max((e.clientX - r.left) / r.width * d.max, 0), d.max);
     box.classList.add('on');
-    show(d.v, d.max);
+    show(d.v, d.max, d.moved);
   };
   box.onpointermove = e => {
     if (!d || e.clientX == d.x) return;
     d.v = Math.min(Math.max(d.v + (e.clientX - d.x) / d.w * d.max, 0), d.max);
     d.x = e.clientX;
     d.moved = true;
-    show(d.v, d.max);
+    show(d.v, d.max, true);
   };
   const stop = ok => {
     if (!d) return;
@@ -1760,11 +2181,16 @@ slider($('pos'), {
     const m = st?.media;
     if (!m?.duration || pending) return;
     drag = 'pos';
+    preview.start(m);
     return { v: Math.min(position(m), m.duration), max: m.duration };
   },
-  show: showPos,
+  show(v, max, moved) {
+    showPos(v, max);
+    preview.show(v, v / max, moved);
+  },
   end(v) {
     drag = null;
+    preview.end();
     if (v != null && st?.media) {
       clearTimeout(seekTimer); // the drag wins over pending ±10 taps
       seekTimer = null;

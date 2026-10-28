@@ -904,14 +904,16 @@ function tick() {
 // which stand in for them only while there are none, or, once title-api
 // names its relay, the request goes to that, without headers of ours;
 // title-api's own URLs (the master, its quality playlists) need none.
-function fetch_cmd(url, h, err, m) {
+// pv marks a seek preview's fetch to the relay, which keeps it out of the
+// playback it reports.
+function fetch_cmd(url, h, err, m, pv) {
 	let out = u => `-O - ${shq(u)} 2>${err ? shq(err) : '/dev/null'}`;
 	let cmd = `uclient-fetch ${err ? '' : '-q '}-T 20`;
 	let lines = valid_headers(h) ? split(h, '\n') : [];
 	if (valid_media(m) && substr(url, 0, length(API) + 1) != API + '/') {
 		let dyn = media_headers(m), relay = media_get(m, 'hdr')?.proxy;
 		if (relay)
-			return `${cmd} ${out(API + relay + '?u=' + urlenc(url))}`;
+			return `${cmd} ${out(API + relay + '?u=' + urlenc(url) + (pv ? '&pv=1' : ''))}`;
 		if (dyn == null && !length(lines)) {
 			if (err)
 				unlink(err);
@@ -1368,7 +1370,9 @@ function count_bytes(m, n, start) {
 		int((end[0] - start[0]) * 1000 + (end[1] - start[1]) / 1000000), time());
 }
 
-function proxy(name, u, q, h, drc, m) {
+// pv marks the fetches of the seek preview (the web UI's frames over the
+// seek bar): not the receiver's, they don't count as its segments.
+function proxy(name, u, q, h, drc, m, pv) {
 	let start = clock();
 	let url = proxy_target(u);
 	if (!url)
@@ -1378,7 +1382,7 @@ function proxy(name, u, q, h, drc, m) {
 	if (m != null && !valid_media(m))
 		fail(400, 'bad media');
 	let e = ext(name), err = ERR + clock()[1];
-	let pipe = popen(fetch_cmd(url, h, err, m));
+	let pipe = popen(fetch_cmd(url, h, err, m, pv));
 	if (!pipe) {
 		unlink(err);
 		fail(502, 'popen failed');
@@ -1416,7 +1420,7 @@ function proxy(name, u, q, h, drc, m) {
 	}
 	pipe.close();
 	// The media's segments, as the player counts the fragments it loaded.
-	if (valid_media(m) && !(e in ['vtt', 'webvtt', 'key']))
+	if (valid_media(m) && !pv && !(e in ['vtt', 'webvtt', 'key']))
 		count_bytes(m, n, start);
 	exit(0);
 }
@@ -1830,7 +1834,7 @@ if (pm) {
 	if (getenv('REQUEST_METHOD') != 'GET')
 		fail(405, 'method not allowed');
 	let qs = parse_form(getenv('QUERY_STRING'), {});
-	proxy(pm[1], qs.u, qs.q, qs.h, qs.drc == '1', qs.m);
+	proxy(pm[1], qs.u, qs.q, qs.h, qs.drc == '1', qs.m, qs.pv == '1');
 }
 // Leveled audio segments (see drc_playlist).
 let am = match(path, /^\/a\/([0-9a-f]{8})\/([0-9]{1,6})\.ts$/);
