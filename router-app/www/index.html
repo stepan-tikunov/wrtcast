@@ -380,6 +380,7 @@ let season = null;
 let pollError = '';
 const titles = {};      // /title answers by id
 const layers = [];      // open overlays; the back button closes the last one
+let plOpen = false;     // the player is open; not an overlay, history leaves it be
 let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF default
 let devices = null;     // last /devices answer
 let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null = receiver default
@@ -464,7 +465,7 @@ const note = text => $('msg').lastChild.textContent = text;
 
 // Every overlay is a history entry; the entry knows how many are open, so
 // back and forward can tell which to close. url: the address of the
-// overlay, if it has its own.
+// overlay, if it has its own. The player opens and folds outside of it.
 function openLayer(name, url) {
   if (backs) return afterBack.push(() => openLayer(name, url));
   if (layers.includes(name)) return;
@@ -479,15 +480,24 @@ function showLayer(name, on) {
     e.hidden = false;
   };
   const e = $(name == 'det' ? 'det' : 'shade');
-  // The shade is shared by the player and the device picker.
+  // The shade is shared by the player and the sheets.
   if (on) show(e);
-  else if (name == 'det' || !layers.some(l => l == 'pl' || l in SHEETS)) animateOut(e);
+  else if (name == 'det' || !plOpen && !layers.some(l => l in SHEETS)) animateOut(e);
   if (name in SHEETS) on ? show($(SHEETS[name])) : animateOut($(SHEETS[name]));
   $('shade').classList.toggle('top', layers.some(l => l in SHEETS));
-  if (name == 'pl') {
-    foldPlayer(on);
-    $('full').inert = !on || !!pending;
-  }
+}
+
+// Opens the player or folds it into the mini player.
+function setPlayer(open) {
+  if (plOpen == open) return;
+  plOpen = open;
+  const shade = $('shade');
+  if (open) {
+    shade.classList.remove('out');
+    shade.hidden = false;
+  } else if (!layers.some(l => l in SHEETS)) animateOut(shade);
+  foldPlayer(open);
+  $('full').inert = !open || !!pending;
 }
 
 // Opens the mini player into the full one and back. The panel slides
@@ -566,10 +576,11 @@ const closeTop = () => new Promise(r => {
   history.back();
 });
 
-// Closes the player along with the sheets opened over it.
+// Folds the player and closes the sheets over the page.
 let closingPlayer = null;
 const closePlayer = () => closingPlayer ||= (async () => {
-  while (layers.includes('pl')) await closeTop();
+  while (layers.at(-1) in SHEETS) await closeTop();
+  setPlayer(false);
   closingPlayer = null;
 })();
 
@@ -904,7 +915,7 @@ function renderEpisodes(force) {
 }
 
 $('dplay').onclick = () => {
-  if (st?.media && st.now?.id == item.id) return openLayer('pl');
+  if (st?.media && st.now?.id == item.id) return setPlayer(true);
   start(playTarget(item)); // without start the router resumes where it was left off
 };
 $('dfrom0').onclick = () => start({ ...playTarget(item), start: 0 });
@@ -1071,13 +1082,13 @@ function renderBar() {
   const m = st?.media;
   $('pl').hidden = !pending && !m;
   if ($('pl').hidden) {
-    if (['pl', 'opt'].includes(layers.at(-1))) closePlayer();
+    if (plOpen || ['opt', 'sty'].includes(layers.at(-1))) closePlayer();
     return;
   }
   $('title').textContent = n?.title || 'Chromecast';
   $('thumb').hidden = !n?.poster;
   if (n?.poster && $('thumb').getAttribute('src') != n.poster) $('thumb').src = n.poster;
-  $('full').inert = !layers.includes('pl') || !!pending;
+  $('full').inert = !plOpen || !!pending;
   $('pl').classList.toggle('pending', !!pending);
   // Settings switched there replay the stream; they wait for it as well.
   $('optbody').inert = !!pending;
@@ -1375,7 +1386,7 @@ function renderDevices() {
     b.style.setProperty('--i', i);
     b.onclick = async () => {
       // The player may belong to the previous TV, so close it as well.
-      while (layers.some(l => l == 'pl' || l in SHEETS)) await closeTop();
+      await closePlayer();
       selectDevice(d.id);
     };
     return b;
@@ -1475,17 +1486,17 @@ document.querySelectorAll('[data-c]').forEach(b => b.onclick = e => {
   if (c == 'rew' || c == 'ff') skip(c == 'ff' ? +b.dataset.a : -b.dataset.a);
   else cmd(c, b.dataset.a);
 });
-$('bar').onclick = () => layers.at(-1) == 'pl' ? closeTop() : openLayer('pl');
+$('bar').onclick = () => setPlayer(!plOpen);
 $('collapse').onclick = e => {
   e.stopPropagation();
-  closeTop();
+  setPlayer(false);
 };
 $('more').onclick = e => {
   e.stopPropagation();
   openLayer('opt');
 };
 $('optcollapse').onclick = closeTop;
-$('shade').onclick = closeTop;
+$('shade').onclick = () => layers.at(-1) in SHEETS ? closeTop() : setPlayer(false);
 
 // Playback speed: the button shows it, the browser's picker over it picks
 // another. The Default Media Receiver refuses anything outside 0.5..2
@@ -1631,7 +1642,7 @@ $('eplist').onclick = openNow;
 // In the open player the poster leads to the title; in the mini player the
 // whole bar opens the player.
 $('thumb').onclick = e => {
-  if (layers.at(-1) != 'pl' || pending) return;
+  if (!plOpen || layers.at(-1) in SHEETS || pending) return;
   e.stopPropagation();
   openNow();
 };
