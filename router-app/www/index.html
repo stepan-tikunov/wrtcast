@@ -124,12 +124,13 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 /* The buttons on the right of the open player sit close together, leaving
    the line under the title room. */
 #more,#collapse{width:40px;margin-left:-8px}
-/* On a phone the handle folds the player, pulled down; on a desktop the
-   button does. The handle is hit well around it. */
+/* On a phone the player folds pulled down by its top (see pull); on a
+   desktop the button folds it. The handle is hit well around it. */
 #collapse{display:none}
 #handle{display:none;position:relative;width:40px;height:5px;margin:8px auto 0;border-radius:3px;background:var(--s3);touch-action:none}
 #handle::before{content:'';position:absolute;inset:-12px -60px -10px}
 #pl.open #handle{display:block}
+#pl.open #bar{touch-action:none}
 #pl.open #thumb{margin-right:0;transform:none;cursor:pointer}
 /* Sliders: a thin dim track that, held, grows thicker and wider and lights up. */
 .sl{position:relative;flex:1;height:32px;touch-action:none;cursor:pointer}
@@ -588,28 +589,56 @@ function foldPlayer(open, held) {
 }
 const FOLD_MS = 320;
 
-// The handle pulled down folds the player along with the finger; let go
-// past a third of the way, or flicked down, it folds the rest, else opens
-// back.
-$('handle').onpointerdown = e => {
-  if (!plOpen || slide.length) return;
-  const h = $('handle'), dist = foldPlayer(false, true);
-  if (!(dist > 0)) return foldPlayer(true);
-  h.setPointerCapture(e.pointerId);
-  let k = 0, y = e.clientY, t = e.timeStamp, v = 0;
-  h.onpointermove = e => {
+// The top of the open player (the handle and the bar) pulled down folds it
+// along with the finger; let go past a third of the way, or flicked down,
+// it folds the rest, else opens back. The pull starts once the finger has
+// gone a little way down, so taps on the buttons stay taps; after a pull
+// the click it ends with is dropped.
+function pull(e) {
+  if (!plOpen || slide.length || !e.isPrimary || e.button) return;
+  const x0 = e.clientX, y0 = e.clientY;
+  let dist = 0, k = 0, y = y0, t = e.timeStamp, v = 0;
+  const off = () => {
+    removeEventListener('pointermove', move);
+    removeEventListener('pointerup', up);
+    removeEventListener('pointercancel', up);
+  };
+  const move = e => {
+    if (!dist) {
+      const dx = Math.abs(e.clientX - x0), dy = e.clientY - y0;
+      if (dy < -10 || dx > 10 && dx > dy) return off();
+      if (dy < 8) return;
+      dist = foldPlayer(false, true);
+      if (!(dist > 0)) {
+        off();
+        return foldPlayer(true);
+      }
+    }
     k = Math.min(Math.max(k + (e.clientY - y) / dist, 0), .999);
     v = (e.clientY - y) / Math.max(e.timeStamp - t, 1);
     y = e.clientY;
     t = e.timeStamp;
     slide.forEach(a => a.currentTime = k * FOLD_MS);
   };
-  h.onpointerup = h.onpointercancel = e => {
-    h.onpointermove = h.onpointerup = h.onpointercancel = null;
+  const up = e => {
+    off();
+    if (!dist) return;
+    const drop = e => {
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    addEventListener('click', drop, { capture: true, once: true });
+    // iOS may send it a moment later.
+    setTimeout(() => removeEventListener('click', drop, { capture: true }), 350);
     if (e.type == 'pointerup' && (k > 1 / 3 || v > .5)) setPlayer(false);
     else foldPlayer(true);
   };
-};
+  addEventListener('pointermove', move);
+  addEventListener('pointerup', up);
+  addEventListener('pointercancel', up);
+}
+$('handle').addEventListener('pointerdown', pull);
+$('bar').addEventListener('pointerdown', pull);
 
 // Closes the topmost overlay, and steps back in history so the back button
 // stays in sync. The overlay goes at once: browsers report the step back
