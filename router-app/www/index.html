@@ -124,13 +124,14 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 /* The buttons on the right of the open player sit close together, leaving
    the line under the title room. */
 #more,#collapse{width:40px;margin-left:-8px}
-/* On a phone the player folds pulled down by its top (see pull); on a
-   desktop the button folds it. The handle is hit well around it. */
+/* On a phone the player folds pulled down by its top and opens pulled up
+   (see pull); on a desktop the button folds it. The handle is hit well
+   around it. */
 #collapse{display:none}
 #handle{display:none;position:relative;width:40px;height:5px;margin:8px auto 0;border-radius:3px;background:var(--s3);touch-action:none}
 #handle::before{content:'';position:absolute;inset:-12px -60px -10px}
 #pl.open #handle{display:block}
-#pl.open #bar{touch-action:none}
+#bar{touch-action:none}
 #pl.open #thumb{margin-right:0;transform:none;cursor:pointer}
 /* Sliders: a thin dim track that, held, grows thicker and wider and lights up. */
 .sl{position:relative;flex:1;height:32px;touch-action:none;cursor:pointer}
@@ -525,7 +526,7 @@ function setPlayer(open) {
 // slide lags it on iOS, the slide running apart from the page, and the edge
 // rose off the bottom showing the page under it.
 let slide = [];
-// held: the slide waits paused for the handle to move it (see the handle),
+// held: the slide waits paused for the finger to move it (see pull),
 // and the distance it covers is returned.
 function foldPlayer(open, held) {
   const p = $('pl'), t = $('title').parentNode, box = e => e.getBoundingClientRect();
@@ -590,12 +591,13 @@ function foldPlayer(open, held) {
 const FOLD_MS = 320;
 
 // The top of the open player (the handle and the bar) pulled down folds it
-// along with the finger; let go past a third of the way, or flicked down,
-// it folds the rest, else opens back. The pull starts once the finger has
-// gone a little way down, so taps on the buttons stay taps; after a pull
-// the click it ends with is dropped.
+// along with the finger, and the mini player pulled up opens it; let go
+// past a third of the way, or flicked, it goes the rest, else back. The
+// pull starts once the finger has gone a little way, so taps on the
+// buttons stay taps; after a pull the click it ends with is dropped.
 function pull(e) {
-  if (!plOpen || slide.length || !e.isPrimary || e.button) return;
+  if (slide.length || !e.isPrimary || e.button) return;
+  const opening = !plOpen, dir = opening ? -1 : 1; // the way the finger goes
   const x0 = e.clientX, y0 = e.clientY;
   let dist = 0, k = 0, y = y0, t = e.timeStamp, v = 0;
   const off = () => {
@@ -605,17 +607,17 @@ function pull(e) {
   };
   const move = e => {
     if (!dist) {
-      const dx = Math.abs(e.clientX - x0), dy = e.clientY - y0;
+      const dx = Math.abs(e.clientX - x0), dy = dir * (e.clientY - y0);
       if (dy < -10 || dx > 10 && dx > dy) return off();
       if (dy < 8) return;
-      dist = foldPlayer(false, true);
+      dist = foldPlayer(opening, true);
       if (!(dist > 0)) {
         off();
-        return foldPlayer(true);
+        return foldPlayer(!opening);
       }
     }
-    k = Math.min(Math.max(k + (e.clientY - y) / dist, 0), .999);
-    v = (e.clientY - y) / Math.max(e.timeStamp - t, 1);
+    k = Math.min(Math.max(k + dir * (e.clientY - y) / dist, 0), .999);
+    v = dir * (e.clientY - y) / Math.max(e.timeStamp - t, 1);
     y = e.clientY;
     t = e.timeStamp;
     slide.forEach(a => a.currentTime = k * FOLD_MS);
@@ -630,8 +632,8 @@ function pull(e) {
     addEventListener('click', drop, { capture: true, once: true });
     // iOS may send it a moment later.
     setTimeout(() => removeEventListener('click', drop, { capture: true }), 350);
-    if (e.type == 'pointerup' && (k > 1 / 3 || v > .5)) setPlayer(false);
-    else foldPlayer(true);
+    if (e.type == 'pointerup' && (k > 1 / 3 || v > .5)) setPlayer(opening);
+    else foldPlayer(!opening);
   };
   addEventListener('pointermove', move);
   addEventListener('pointerup', up);
