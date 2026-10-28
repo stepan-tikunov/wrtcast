@@ -142,12 +142,19 @@ func containsAll(value string, parts ...string) bool {
 
 func TestExternalTitleID(t *testing.T) {
 	t.Parallel()
-	client, err := NewClient(Config{BaseURL: "https://provider.example"})
+	// Every subdomain of the provider gives the same IDs.
+	for _, baseURL := range []string{"https://provider.example", "https://go.provider.example", "https://WWW.Provider.Example"} {
+		other, err := NewClient(Config{BaseURL: baseURL})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := other.ExternalTitleID("42185"), "2d1de35742185"; got != want {
+			t.Fatalf("%s: ExternalTitleID() = %q, want %q", baseURL, got, want)
+		}
+	}
+	client, err := NewClient(Config{BaseURL: "https://go.provider.example"})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if got, want := client.ExternalTitleID("42185"), "2d1de35742185"; got != want {
-		t.Fatalf("ExternalTitleID() = %q, want %q", got, want)
 	}
 	if got, err := client.parseExternalTitleID("2d1de35742185"); err != nil || got != "42185" {
 		t.Fatalf("parseExternalTitleID() = %q, %v", got, err)

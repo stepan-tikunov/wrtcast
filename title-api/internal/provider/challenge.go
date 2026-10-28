@@ -106,7 +106,8 @@ func NewClient(config Config) (*Client, error) {
 		return nil, fmt.Errorf("parse media base URL: %w", err)
 	}
 
-	digest := sha1.Sum([]byte(strings.ToLower(baseURL.Hostname())))
+	// The provider moves between subdomains; its IDs stay those of the site.
+	digest := sha1.Sum([]byte(registrableDomain(baseURL)))
 	client := &Client{
 		bootstrapURL:     baseURL,
 		domainPrefix:     hex.EncodeToString(digest[:])[:8],

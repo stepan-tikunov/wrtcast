@@ -65,14 +65,15 @@ docker compose pull && docker compose up -d     # обновление
 
 ## Идентификаторы
 
-`title_id` — первые восемь шестнадцатеричных символов SHA-1 от имени хоста
-из `MOVIE_PROVIDER_BASE_URL`, за которыми идёт десятичный ID тайтла на сайте.
-Автоматически найденный актуальный хост этот префикс не меняет, поэтому ранее
+`title_id` — первые восемь шестнадцатеричных символов SHA-1 от корневого
+домена (eTLD+1) из `MOVIE_PROVIDER_BASE_URL`, за которыми идёт десятичный ID
+тайтла на сайте. Ни смена поддомена в `MOVIE_PROVIDER_BASE_URL`, ни
+автоматически найденный актуальный хост этот префикс не меняют, поэтому ранее
 сохранённые ID остаются рабочими. Для провайдера по умолчанию и ID `42185`
 получается:
 
 ```text
-67c18f3642185
+64aee42642185
 ```
 
 ## Поиск
@@ -102,10 +103,10 @@ curl --get --data-urlencode 'query=Дюна' \
 каталог сезонов и серий, доступна через `GetTitleDetails`:
 
 ```sh
-curl 'http://localhost:8080/v1/titles/67c18f3643222'
+curl 'http://localhost:8080/v1/titles/64aee42643222'
 
 grpcurl -plaintext \
-  -d '{"title_id":"67c18f3643222"}' \
+  -d '{"title_id":"64aee42643222"}' \
   localhost:50051 \
   title.v1.TitleService/GetTitleDetails
 ```
@@ -121,15 +122,15 @@ grpcurl -plaintext \
 Для сериала передайте `season_number` и `episode_number`, чтобы выбрать серию:
 
 ```sh
-curl 'http://localhost:8080/v1/titles/67c18f3642185/playback-streams'
+curl 'http://localhost:8080/v1/titles/64aee42642185/playback-streams'
 
 curl --get \
   --data-urlencode 'season_number=1' \
   --data-urlencode 'episode_number=1' \
-  'http://localhost:8080/v1/titles/67c18f3654016/playback-streams'
+  'http://localhost:8080/v1/titles/64aee42654016/playback-streams'
 
 grpcurl -plaintext \
-  -d '{"title_id":"67c18f3654016","season_number":1,"episode_number":"1"}' \
+  -d '{"title_id":"64aee42654016","season_number":1,"episode_number":"1"}' \
   localhost:50051 \
   title.v1.TitleService/GetPlaybackStreams
 ```
