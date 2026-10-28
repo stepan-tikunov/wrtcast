@@ -539,12 +539,15 @@ function foldPlayer(open, held) {
   $('collapse').hidden = $('more').hidden = $('spd').hidden = false;
   $('collapse').inert = $('more').inert = $('spd').inert = !open;
   $('tg').inert = open;
-  // The shade, when no sheet has it, goes dark as far as the player is open.
+  // The shade, when no sheet has it, goes dark as far as the player is open;
+  // its own fade-in is off meanwhile, iOS played it over the slide's and the
+  // shade flashed dark as a pull began.
   const shade = $('shade'), own = !layers.some(l => l in SHEETS);
   const done = () => {
     if (own) {
       shade.classList.remove('out');
       shade.hidden = !open;
+      if (!open) shade.style.animation = '';
     }
     p.classList.toggle('open', open);
     for (const c of t.children) c.style.width = '';
@@ -556,6 +559,7 @@ function foldPlayer(open, held) {
   if (k == to && !held) return done();
   if (own) {
     shade.classList.remove('out');
+    shade.style.animation = 'none';
     shade.hidden = false;
   }
   const gap = (f.y - f.edge) - (m.y - m.edge), s = f.w ? m.w / f.w : 1;
