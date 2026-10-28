@@ -585,6 +585,7 @@ struct media {
 	char stream_type[16];
 	double time;
 	double duration;
+	double rate;
 	int ntracks;        /* -1 = track list not reported in this status */
 	struct track {
 		long id;
@@ -649,6 +650,7 @@ static void parse_media_status(const char *r, struct media *md)
 		  sizeof(md->idle_reason)))
 		*md->idle_reason = 0;
 	jnum(r, "status.0.currentTime", &md->time);
+	jnum(r, "status.0.playbackRate", &md->rate);
 	jstr(r, "status.0.media.contentId", md->url, sizeof(md->url));
 	jstr(r, "status.0.media.contentType", md->content_type,
 	     sizeof(md->content_type));
@@ -664,6 +666,7 @@ static void media_status(const char *transport, struct media *md)
 	check_reply_type(r, "media status");
 	memset(md, 0, sizeof(*md));
 	md->ntracks = md->nactive = -1;
+	md->rate = 1;
 	parse_media_status(r, md);
 }
 
@@ -686,8 +689,8 @@ static void print_status(const struct app *a, const struct media *md)
 	if (md && md->session_id) {
 		jescape(esc, sizeof(esc), md->url);
 		printf(",\"media\":{\"state\":\"%s\",\"time\":%.1f,"
-		       "\"duration\":%.1f,\"live\":%s,\"url\":%s",
-		       md->state, md->time, md->duration,
+		       "\"duration\":%.1f,\"rate\":%.2f,\"live\":%s,\"url\":%s",
+		       md->state, md->time, md->duration, md->rate,
 		       !strcmp(md->stream_type, "LIVE") ? "true" : "false", esc);
 		if (*md->idle_reason)
 			printf(",\"idleReason\":\"%s\"", md->idle_reason);
@@ -1063,6 +1066,8 @@ static void usage(void)
 "  quit                                close the app on the device\n"
 "  seek <seconds>                      seek to absolute position\n"
 "  ff <seconds> | rew <seconds>        seek forward / backward\n"
+"  speed <rate>                        playback speed, 1 = normal (the\n"
+"                                      Default Media Receiver takes 0.5..2)\n"
 "  audio <id|lang|name>                switch audio track (see \"tracks\"\n"
 "                                      in status; name matches substring)\n"
 "  subs <id|lang|name|off>             switch / disable subtitles\n"
@@ -1363,6 +1368,7 @@ static void cmd_play(int argc, char **argv)
 	r = request(a.transport_id, NS_MEDIA, body);
 	memset(&md, 0, sizeof(md));
 	md.ntracks = md.nactive = -1;
+	md.rate = 1;
 	wait_for_playback(a.transport_id, r, &md);
 	print_status(&a, &md);
 }
@@ -1537,6 +1543,22 @@ int main(int argc, char **argv)
 		else if (!strcmp(cmd, "rew"))
 			t = md.time - t;
 		cmd_seek(&a, &md, t);
+		print_status(&a, &md);
+	} else if (!strcmp(cmd, "speed")) {
+		char body[128], *end;
+		double rate;
+		if (argc != 2)
+			usage();
+		rate = strtod(argv[1], &end);
+		if (end == argv[1] || *end || !(rate > 0 && rate <= 16))
+			die("invalid speed: %s", argv[1]);
+		snprintf(body, sizeof(body),
+			 "\"type\":\"SET_PLAYBACK_RATE\",\"playbackRate\":%.2f",
+			 rate);
+		attach_media(&a, &md);
+		/* In case the reply leaves the rate out. */
+		md.rate = rate;
+		media_command(&a, &md, body);
 		print_status(&a, &md);
 	} else if (!strcmp(cmd, "audio") || !strcmp(cmd, "subs")) {
 		int is_audio = !strcmp(cmd, "audio");

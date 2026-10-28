@@ -109,6 +109,16 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #tg{background:var(--tx);color:#111;width:46px;height:46px}
 /* Out of the way where it stood in the mini player, to fade in on folding. */
 #pl.open #tg{position:absolute;right:0;top:13px;visibility:hidden}
+/* Playback speed: white at 1x, the accent otherwise; its menu drops under it,
+   or over it where the panel ends too soon. */
+#spd{position:relative;flex:none}
+#speed{width:auto;min-width:48px;padding:0 6px;border-radius:12px;color:var(--tx);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+#speed.alt{color:var(--ac)}
+#spdmenu{position:absolute;right:0;top:calc(100% + 4px);z-index:2;display:flex;flex-direction:column;width:96px;padding:6px;border-radius:14px;background:var(--s2);box-shadow:0 6px 24px #000c;transform-origin:top right;animation:drop .15s ease-out}
+#spdmenu.up{top:auto;bottom:calc(100% + 4px);transform-origin:bottom right}
+@keyframes drop{from{opacity:0;transform:scale(.9)}}
+#spdmenu button{height:36px;padding:0 12px;border:0;border-radius:9px;background:none;font-size:15px;font-variant-numeric:tabular-nums;text-align:left}
+#spdmenu button.on{color:var(--ac);font-weight:600}
 #handle{display:none;width:40px;height:5px;margin:8px auto 0;border-radius:3px;background:var(--s3)}
 #pl.open #handle{display:block}
 #pl.open #thumb{margin-right:0;transform:none;cursor:pointer}
@@ -217,7 +227,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .starting{display:none;flex-direction:column;align-items:center;gap:14px;padding:32px 0 40px;color:var(--mu);font-size:14px}
 .starting .spin{width:32px;height:32px;border-width:3px}
 #pl.pending .starting{display:flex}
-#pl.pending .live,#pl.pending #tg,#pl.pending #more{display:none}
+#pl.pending .live,#pl.pending #tg,#pl.pending #more,#pl.pending #spd,#spd.off{display:none}
 #optbody{transition:opacity .2s}
 #opts.pending #optbody{opacity:.45}
 #prog div{transition:width .3s linear}
@@ -302,6 +312,7 @@ svg.spring{animation:spring .3s ease-out}
     <img id="thumb" alt="">
     <div class="t"><b id="title"></b><span id="st"></span></div>
     <button class="ib" id="tg" data-c="toggle" aria-label="Пауза"><svg><use href="#i-play"/></svg></button>
+    <div id="spd" hidden><button class="ib" id="speed" aria-label="Скорость" aria-haspopup="menu" aria-expanded="false">1x</button><div id="spdmenu" role="menu" hidden></div></div>
     <button class="ib" id="more" aria-label="Настройки" hidden><svg><use href="#i-tune"/></svg></button>
     <button class="ib" id="collapse" aria-label="Свернуть" hidden><svg><use href="#i-down"/></svg></button>
   </div>
@@ -500,12 +511,13 @@ function foldPlayer(open) {
   };
   const m = lay(false), f = lay(true);
   // The buttons of the other state are on screen while fading, not to be hit.
-  $('collapse').hidden = $('more').hidden = false;
-  $('collapse').inert = $('more').inert = !open;
+  speedMenu(false);
+  $('collapse').hidden = $('more').hidden = $('spd').hidden = false;
+  $('collapse').inert = $('more').inert = $('spd').inert = !open;
   $('tg').inert = open;
   const done = () => {
     p.classList.toggle('open', open);
-    $('collapse').hidden = $('more').hidden = !open;
+    $('collapse').hidden = $('more').hidden = $('spd').hidden = !open;
     p.style.clipPath = '';
   };
   if (p.hidden || m.y == f.y || matchMedia('(prefers-reduced-motion:reduce)').matches) return done();
@@ -530,7 +542,7 @@ function foldPlayer(open) {
     go($('thumb'), k => ({ transform: `scale(${1 - k * (1 - s)})` })),
     go(t, k => ({ transform: `translateX(${k * (m.x - f.x)}px)` })),
     go($('tg'), k => ({ opacity: k, transform: `scale(${.6 + .4 * k})`, visibility: 'visible' })),
-    ...[$('more'), $('collapse')].map(e => go(e, k => ({ opacity: 1 - k, transform: `scale(${1 - .4 * k})` }))),
+    ...[$('spd'), $('more'), $('collapse')].map(e => go(e, k => ({ opacity: 1 - k, transform: `scale(${1 - .4 * k})` }))),
   ];
   const a = slide[0];
   a.onfinish = () => {
@@ -905,7 +917,7 @@ async function play(m) {
   const req = { id: m.id, title: m.title };
   if (m.poster) req.poster = m.poster;
   // Quality switches replay the same stream from the current position.
-  for (const k of ['stream', 'start', 'audio', 'subs', 'reuse'])
+  for (const k of ['stream', 'start', 'rate', 'audio', 'subs', 'reuse'])
     if (m[k] != null) req[k] = String(m[k]);
   const quality = m.quality ?? localStorage.quality;
   if (quality) req.quality = quality;
@@ -1033,7 +1045,7 @@ function showTime() {
   const m = st?.media;
   if (!m || pending) return;
   let t = m.time || 0;
-  if (m.state == 'PLAYING') t += (Date.now() - statusAt) / 1000;
+  if (m.state == 'PLAYING') t += (Date.now() - statusAt) / 1000 * (m.rate || 1);
   if (m.duration) t = Math.min(t, m.duration);
   const state = STATES[m.state] || m.state;
   // Only the text changes on every tick: a re-created spinner would restart
@@ -1115,6 +1127,7 @@ function render(s) {
   for (const b of document.querySelectorAll('.ep-nav')) b.hidden = !series;
   if (drag != 'vol' && s.volume != null) showVol(s.volume * 100);
   icon('mu', s.muted ? 'mute' : 'vol');
+  showSpeed(m);
   const tr = m.tracks || [];
   fill($('audio'), tr.filter(t => t.type == 'AUDIO'), false);
   fill($('subs'), tr.filter(t => t.type == 'TEXT'), true);
@@ -1138,7 +1151,7 @@ function render(s) {
 }
 
 // Where playback is now, extrapolated from the last status.
-const position = m => (m.time || 0) + (m.state == 'PLAYING' ? (Date.now() - statusAt) / 1000 : 0);
+const position = m => (m.time || 0) + (m.state == 'PLAYING' ? (Date.now() - statusAt) / 1000 * (m.rate || 1) : 0);
 
 // Repeated ±10 taps move the timer right away and add up into one seek sent
 // once the tapping stops; polled status would undo them until then.
@@ -1167,7 +1180,8 @@ async function cmd(c, arg) {
     c = m?.state == 'PAUSED' ? 'resume' : 'pause';
     // Flip the icon right away; the receiver takes a moment to answer.
     if (m) {
-      if (m.state == 'PLAYING') m.time += (Date.now() - statusAt) / 1000;
+      m.time = position(m);
+      statusAt = Date.now();
       m.state = c == 'pause' ? 'PAUSED' : 'PLAYING';
       render(st);
     }
@@ -1281,7 +1295,7 @@ function syncPosition() {
   const m = st?.media;
   if (!session || pending || !m?.duration) return;
   try {
-    navigator.mediaSession?.setPositionState({ duration: m.duration, position: Math.min(position(m), m.duration), playbackRate: 1 });
+    navigator.mediaSession?.setPositionState({ duration: m.duration, position: Math.min(position(m), m.duration), playbackRate: m.rate || 1 });
   } catch {}
 }
 // When the loop wraps, iOS briefly shows the loop's own position; putting
@@ -1455,6 +1469,60 @@ $('more').onclick = e => {
 $('optcollapse').onclick = closeTop;
 $('shade').onclick = closeTop;
 
+// Playback speed: the button shows it, its menu picks another. The Default
+// Media Receiver refuses anything outside 0.5..2 (INVALID_PARAMS).
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const speedLabel = r => +(+r).toFixed(2) + 'x';
+function showSpeed(m) {
+  const r = m.rate || 1;
+  $('spd').classList.toggle('off', !!m.live);
+  $('speed').textContent = speedLabel(r);
+  $('speed').classList.toggle('alt', r != 1);
+  for (const b of $('spdmenu').children) b.classList.toggle('on', +b.dataset.r == r);
+}
+function speedMenu(open) {
+  const menu = $('spdmenu');
+  if (open == !menu.hidden) return;
+  menu.hidden = !open;
+  $('speed').setAttribute('aria-expanded', open);
+  if (!open) return;
+  // Under the button if the panel has room for it there, else over it.
+  menu.classList.remove('up');
+  const b = menu.getBoundingClientRect();
+  menu.classList.toggle('up', b.bottom > Math.min(innerHeight, $('pl').getBoundingClientRect().bottom));
+  (menu.querySelector('.on') || menu.firstChild).focus({ preventScroll: true });
+}
+$('spdmenu').replaceChildren(...SPEEDS.map(r => {
+  const b = el('button', {}, speedLabel(r));
+  b.setAttribute('role', 'menuitem');
+  b.dataset.r = r;
+  return b;
+}));
+$('spd').onclick = e => e.stopPropagation();
+$('speed').onclick = () => speedMenu($('spdmenu').hidden);
+$('spdmenu').onclick = e => {
+  const r = +e.target.closest('[data-r]')?.dataset.r, m = st?.media;
+  if (!r) return;
+  speedMenu(false);
+  if (!m || r == (m.rate || 1)) return;
+  // The position so far went at the old speed.
+  m.time = position(m);
+  statusAt = Date.now();
+  m.rate = r;
+  showSpeed(m);
+  cmd('speed', r);
+};
+document.addEventListener('pointerdown', e => {
+  if (!$('spd').contains(e.target)) speedMenu(false);
+}, true);
+document.addEventListener('keydown', e => {
+  if (e.key == 'Escape' && !$('spdmenu').hidden) {
+    e.stopPropagation();
+    speedMenu(false);
+    $('speed').focus();
+  }
+}, true);
+
 // Sliders: a drag anywhere moves the value from where it was by as much as
 // the finger moves, not to under the finger; a mouse still jumps to the
 // click. A tap alone changes nothing. start() gives the value and its
@@ -1537,10 +1605,8 @@ $('subs').onchange = e => cmd('subs', e.target.value);
 function replay(changes) {
   const n = st?.now, m = st?.media;
   if (!n || !m) return;
-  let t = m.time || 0;
-  if (m.state == 'PLAYING') t += (Date.now() - statusAt) / 1000;
   play({ id: n.id, title: n.title, poster: n.poster, season: n.season, episode: n.episode,
-    source: n.source, quality: n.quality, start: t.toFixed(1), reuse: 1, ...changes });
+    source: n.source, quality: n.quality, start: position(m).toFixed(1), rate: m.rate, reuse: 1, ...changes });
 }
 const activeTrack = type => st?.media?.tracks?.find(t => t.type == type && t.active)?.name;
 $('quality').onchange = e => {

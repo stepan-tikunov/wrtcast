@@ -21,8 +21,8 @@ const DRC = '/tmp/wrtcast.drc/';             // audio segments of the leveler
 const ERR = '/tmp/wrtcast.err.';           // + ns; stderr of a proxied fetch
 const COMMANDS = {
 	pause: null, resume: null, stop: null, quit: null, mute: null, unmute: null,
-	seek: 'num', ff: 'num', rew: 'num', volume: 'num', audio: 'str', subs: 'str',
-	substyle: 'style',
+	seek: 'num', ff: 'num', rew: 'num', volume: 'num', speed: 'num', audio: 'str',
+	subs: 'str', substyle: 'style',
 };
 const REASONS = {
 	'200': 'OK', '400': 'Bad Request', '401': 'Unauthorized', '403': 'Forbidden',
@@ -403,7 +403,7 @@ function media_headers(m, q, t, force) {
 	if (now - (pos?.at ?? 0) > 180)
 		pos = null;
 	if (t == null && pos)
-		t = pos.pos + (pos.paused ? 0 : now - pos.at);
+		t = pos.pos + (pos.paused ? 0 : (now - pos.at) * (pos.rate ?? 1));
 	let all = sql_row('SELECT count(*) AS n, total(bytes) AS b FROM segments WHERE media = ?', m);
 	let last = sql_row('SELECT total(bytes) AS b, total(ms) AS ms FROM (SELECT bytes, ms ' +
 		'FROM segments WHERE media = ? ORDER BY rowid DESC LIMIT 5)', m);
@@ -818,7 +818,7 @@ function watch_end(now, st) {
 		if (valid_media(now.media))
 			media_set(now.media, 'pos', {
 				pos: +(m.time ?? 0), dur: +(m.duration ?? 0), paused: m.state == 'PAUSED',
-				buffering: m.state == 'BUFFERING', at: time(),
+				buffering: m.state == 'BUFFERING', rate: +(m.rate ?? 1), at: time(),
 			});
 		return;
 	}
@@ -1457,6 +1457,8 @@ function play(dev, p, keep) {
 			fail(400, `invalid ${k}`);
 	if (p.start != null && !match(p.start, /^[0-9]+(\.[0-9]+)?$/))
 		fail(400, 'invalid start');
+	if (p.rate != null && !match(p.rate, /^[0-9](\.[0-9]{1,2})?$/))
+		fail(400, 'invalid rate');
 	if (p.quality != null && !match(p.quality, /^(auto|[0-9]{3,4}p)$/))
 		fail(400, 'invalid quality');
 	if (p.style != null && !valid_style(p.style))
@@ -1620,6 +1622,9 @@ function play(dev, p, keep) {
 	for (let k in ['audio', 'subs'])
 		if (p[k] != null)
 			st = castctl_try(dev, k, p[k]) ?? st;
+	// A replay keeps the speed (see the page's replay).
+	if (p.rate != null && +p.rate != 1)
+		st = castctl_try(dev, 'speed', p.rate) ?? st;
 	st = with_now(st, dev);
 	// The TV plays: title-api learns the duration and the position now.
 	if (m)
