@@ -552,6 +552,7 @@ function foldPlayer(open, held) {
   };
   if (p.hidden || m.y == f.y || matchMedia('(prefers-reduced-motion:reduce)').matches) return done();
   const k = (from - f.y) / (m.y - f.y), to = open ? 0 : 1; // 0 open, 1 mini
+  if (k == to && !held) return done();
   const gap = (f.y - f.edge) - (m.y - m.edge), s = f.w ? m.w / f.w : 1;
   const r = getComputedStyle(p).borderBottomLeftRadius;
   const opt = { duration: FOLD_MS, easing: held ? 'linear' : 'cubic-bezier(.2,.8,.2,1)' };
@@ -592,14 +593,26 @@ const FOLD_MS = 320;
 
 // The top of the open player (the handle and the bar) pulled down folds it
 // along with the finger, and the mini player pulled up opens it; let go
-// past a third of the way, or flicked, it goes the rest, else back. The
-// pull starts once the finger has gone a little way, so taps on the
-// buttons stay taps; after a pull the click it ends with is dropped.
+// past a third of the way, or flicked, it goes the rest, else back. Pulled
+// up past open, the panel stretches, ever harder the further it goes, and
+// let go it springs back. The pull starts once the finger has gone a little
+// way, so taps on the buttons stay taps; after a pull the click it ends
+// with is dropped.
 function pull(e) {
   if (slide.length || !e.isPrimary || e.button) return;
-  const opening = !plOpen, dir = opening ? -1 : 1; // the way the finger goes
+  const p = $('pl'), opening = !plOpen;
   const x0 = e.clientX, y0 = e.clientY;
-  let dist = 0, k = 0, y = y0, t = e.timeStamp, v = 0;
+  // at: how far down from open the finger has taken the panel, in px.
+  let dist = 0, at = 0, y = y0, t = e.timeStamp, v = 0, over = 0;
+  const parts = () => [$('prog'), $('handle'), $('bar'), $('full')];
+  // Stretched by o px: what is in the panel goes up, its background grows.
+  const stretch = o => {
+    over = o;
+    for (const e of parts()) e.style.transform = o ? `translateY(${-o}px)` : '';
+    $('plbg').style.top = o ? -o + 'px' : '';
+    const r = getComputedStyle(p).borderBottomLeftRadius;
+    if (slide.length) p.style.clipPath = `inset(${-60 - o}px 0 0 round 0 0 ${r} ${r})`;
+  };
   const off = () => {
     removeEventListener('pointermove', move);
     removeEventListener('pointerup', up);
@@ -607,20 +620,24 @@ function pull(e) {
   };
   const move = e => {
     if (!dist) {
-      const dx = Math.abs(e.clientX - x0), dy = dir * (e.clientY - y0);
-      if (dy < -10 || dx > 10 && dx > dy) return off();
-      if (dy < 8) return;
+      const dx = Math.abs(e.clientX - x0), dy = e.clientY - y0;
+      // The mini player goes only up.
+      if (opening && dy > 10 || dx > 10 && dx > Math.abs(dy)) return off();
+      if (Math.abs(dy) < 8) return;
       dist = foldPlayer(opening, true);
       if (!(dist > 0)) {
         off();
         return foldPlayer(!opening);
       }
+      at = opening ? dist : 0;
     }
-    k = Math.min(Math.max(k + dir * (e.clientY - y) / dist, 0), .999);
-    v = dir * (e.clientY - y) / Math.max(e.timeStamp - t, 1);
+    v = (e.clientY - y) / Math.max(e.timeStamp - t, 1);
+    at = Math.min(at + e.clientY - y, dist);
     y = e.clientY;
     t = e.timeStamp;
-    slide.forEach(a => a.currentTime = k * FOLD_MS);
+    const f = Math.min(Math.max(at / dist, 0), .999); // 0 open, 1 mini
+    slide.forEach(a => a.currentTime = (opening ? 1 - f : f) * FOLD_MS);
+    stretch(at < 0 ? 120 * Math.log(1 - at / 120) : 0);
   };
   const up = e => {
     off();
@@ -632,8 +649,22 @@ function pull(e) {
     addEventListener('click', drop, { capture: true, once: true });
     // iOS may send it a moment later.
     setTimeout(() => removeEventListener('click', drop, { capture: true }), 350);
-    if (e.type == 'pointerup' && (k > 1 / 3 || v > .5)) setPlayer(opening);
-    else foldPlayer(!opening);
+    const f = at / dist, ok = e.type == 'pointerup';
+    const open = over > 0 || (opening ? ok && (f < 2 / 3 || v < -.5) : !ok || !(f > 1 / 3 || v > .5));
+    const o = over;
+    if (o) {
+      // Open with the slide done; then the stretch springs back.
+      slide.forEach(a => a.cancel());
+      slide = [];
+      stretch(0);
+    }
+    if (open != plOpen) setPlayer(open);
+    else foldPlayer(open);
+    if (o) {
+      const spring = { duration: 500, easing: 'cubic-bezier(.3,1.4,.5,1)' };
+      for (const e of parts()) e.animate([{ transform: `translateY(${-o}px)` }, { transform: 'none' }], spring);
+      $('plbg').animate([{ top: -o + 'px' }, { top: '0px' }], spring);
+    }
   };
   addEventListener('pointermove', move);
   addEventListener('pointerup', up);
