@@ -105,20 +105,26 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #thumb{width:48px;height:72px;margin-right:-8px;object-fit:cover;border-radius:6px;background:var(--s2);transform:scale(.8333);transform-origin:left center}
 #bar .t{flex:1;min-width:0}
 #title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
-#st{display:flex;align-items:center;gap:6px;color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums}
+#st{display:flex;align-items:center;gap:6px;min-height:18px;overflow:hidden;color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* The episode, then the time folded or a spinner while loading; open, the
+   time is under the slider. */
+#st>*{flex:none}
+#sttm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#st .spin,#st i{display:none}
+#st.busy .spin{display:block}
+#st.sr.tm i{display:inline;font-style:normal}
+#pl.open #st:not(.busy) i,#pl.open #st:not(.busy) #sttm{display:none}
 #tg{background:var(--tx);color:#111;width:46px;height:46px}
 /* Out of the way where it stood in the mini player, to fade in on folding. */
 #pl.open #tg{position:absolute;right:0;top:13px;visibility:hidden}
-/* Playback speed: white at 1x, the accent otherwise; its menu drops under it,
-   or over it where the panel ends too soon. */
-#spd{position:relative;flex:none}
-#speed{width:auto;min-width:48px;padding:0 6px;border-radius:12px;color:var(--tx);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
-#speed.alt{color:var(--ac)}
-#spdmenu{position:absolute;right:0;top:calc(100% + 4px);z-index:2;display:flex;flex-direction:column;width:96px;padding:6px;border-radius:14px;background:var(--s2);box-shadow:0 6px 24px #000c;transform-origin:top right;animation:drop .15s ease-out}
-#spdmenu.up{top:auto;bottom:calc(100% + 4px);transform-origin:bottom right}
-@keyframes drop{from{opacity:0;transform:scale(.9)}}
-#spdmenu button{height:36px;padding:0 12px;border:0;border-radius:9px;background:none;font-size:15px;font-variant-numeric:tabular-nums;text-align:left}
-#spdmenu button.on{color:var(--ac);font-weight:600}
+/* Playback speed: white at 1x, the accent otherwise. An invisible select
+   over it opens the browser's own picker. */
+#spd{position:relative;display:grid;place-items:center;flex:none;min-width:40px;height:48px;padding:0 2px;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+#spd.alt{color:var(--ac)}
+#spd select{position:absolute;inset:0;width:100%;height:100%;padding:0;opacity:0;font-size:16px;cursor:pointer}
+/* The buttons on the right of the open player sit close together, leaving
+   the line under the title room. */
+#more,#collapse{width:40px;margin-left:-8px}
 #handle{display:none;width:40px;height:5px;margin:8px auto 0;border-radius:3px;background:var(--s3)}
 #pl.open #handle{display:block}
 #pl.open #thumb{margin-right:0;transform:none;cursor:pointer}
@@ -224,10 +230,9 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 #shade.out{animation:fadeout .2s forwards}
 #pl.pending #thumb{animation:pulse 1.2s ease-in-out infinite}
 /* While switching, the controls would still describe the previous movie. */
-.starting{display:none;flex-direction:column;align-items:center;gap:14px;padding:32px 0 40px;color:var(--mu);font-size:14px}
-.starting .spin{width:32px;height:32px;border-width:3px}
-#pl.pending .starting{display:flex}
-#pl.pending .live,#pl.pending #tg,#pl.pending #more,#pl.pending #spd,#spd.off{display:none}
+/* While switching the controls are there, but dimmed and dead. */
+#pl.pending .live,#pl.pending #tg,#pl.pending #more,#pl.pending #spd{opacity:.4;pointer-events:none}
+#spd.off{display:none}
 #optbody{transition:opacity .2s}
 #opts.pending #optbody{opacity:.45}
 #prog div{transition:width .3s linear}
@@ -310,14 +315,13 @@ svg.spring{animation:spring .3s ease-out}
   <div id="handle"></div>
   <div id="bar">
     <img id="thumb" alt="">
-    <div class="t"><b id="title"></b><span id="st"></span></div>
+    <div class="t"><b id="title"></b><span id="st"><span id="stEp"></span><i>·</i><span class="spin"></span><span id="sttm"></span></span></div>
     <button class="ib" id="tg" data-c="toggle" aria-label="Пауза"><svg><use href="#i-play"/></svg></button>
-    <div id="spd" hidden><button class="ib" id="speed" aria-label="Скорость" aria-haspopup="menu" aria-expanded="false">1x</button><div id="spdmenu" role="menu" hidden></div></div>
+    <div id="spd" hidden><span id="speed">1x</span><select id="spdsel" aria-label="Скорость"></select></div>
     <button class="ib" id="more" aria-label="Настройки" hidden><svg><use href="#i-tune"/></svg></button>
     <button class="ib" id="collapse" aria-label="Свернуть" hidden><svg><use href="#i-down"/></svg></button>
   </div>
   <div id="full"><div>
-    <div class="starting"><span class="spin"></span>Управление появится после запуска</div>
     <div class="live">
     <div class="sl" id="pos" role="slider" aria-label="Позиция"><i><b></b></i></div>
     <div class="times"><span id="cur">0:00</span><span id="rem"></span></div>
@@ -368,7 +372,6 @@ svg.spring{animation:spring .3s ease-out}
 
 <script>
 const $ = id => document.getElementById(id);
-const STATES = { PLAYING: 'Играет', PAUSED: 'Пауза', BUFFERING: 'Загрузка…', IDLE: 'Остановлено' };
 let token = localStorage.token || '', st = null, statusAt = 0, drag = null, busy = false, toastTimer;
 let pending = null;     // play request in flight; status polls are ignored meanwhile
 let asking = null;      // the first start of a title, while its sources load
@@ -455,7 +458,6 @@ function animateOut(e) {
   e.addEventListener('animationend', end);
 }
 const epShort = n => `${n.season}s${n.episode}e`; // 7 сезон 17 серия -> 7s17e
-const epLabel = n => n?.season != null ? ' · ' + epShort(n) : '';
 const note = text => $('msg').lastChild.textContent = text;
 
 // ---- overlays and the back button ----------------------------------------
@@ -511,7 +513,6 @@ function foldPlayer(open) {
   };
   const m = lay(false), f = lay(true);
   // The buttons of the other state are on screen while fading, not to be hit.
-  speedMenu(false);
   $('collapse').hidden = $('more').hidden = $('spd').hidden = false;
   $('collapse').inert = $('more').inert = $('spd').inert = !open;
   $('tg').inert = open;
@@ -1047,15 +1048,21 @@ function showTime() {
   let t = m.time || 0;
   if (m.state == 'PLAYING') t += (Date.now() - statusAt) / 1000 * (m.rate || 1);
   if (m.duration) t = Math.min(t, m.duration);
-  const state = STATES[m.state] || m.state;
-  // Only the text changes on every tick: a re-created spinner would restart
-  // its animation four times a second and jerk instead of spinning.
-  const s = $('st'), busy = m.state == 'BUFFERING';
-  if (!!s.querySelector('.spin') != busy || s.lastChild?.nodeType != Node.TEXT_NODE)
-    s.replaceChildren(...(busy ? [el('span', { className: 'spin' })] : []), '');
-  s.lastChild.textContent = m.duration ? `${state} · ${fmt(t)} / ${fmt(m.duration)}` : state;
+  showStatus(st.now, m.state == 'BUFFERING', m.duration ? `${fmt(t)} / ${fmt(m.duration)}` : '');
   $('prog').firstChild.style.width = m.duration ? (100 * t / m.duration) + '%' : 0;
   if (drag != 'pos') showPos(t, m.duration);
+}
+
+// The line under the title: the episode of a series, and folded the time,
+// or loading. Only texts and classes change on every tick: a re-created
+// spinner would restart its animation and jerk instead of spinning.
+function showStatus(n, busy, time) {
+  const s = $('st'), ep = n?.season != null ? `${n.season} сез., ${n.episode} сер.` : '';
+  $('stEp').textContent = ep;
+  $('sttm').textContent = busy ? 'Загрузка…' : time;
+  s.classList.toggle('sr', !!ep);
+  s.classList.toggle('tm', busy || !!time);
+  s.classList.toggle('busy', busy);
 }
 
 // Mini player; while a play request is in flight it shows that movie.
@@ -1067,7 +1074,7 @@ function renderBar() {
     if (['pl', 'opt'].includes(layers.at(-1))) closePlayer();
     return;
   }
-  $('title').textContent = n?.title ? n.title + epLabel(n) : 'Chromecast';
+  $('title').textContent = n?.title || 'Chromecast';
   $('thumb').hidden = !n?.poster;
   if (n?.poster && $('thumb').getAttribute('src') != n.poster) $('thumb').src = n.poster;
   $('full').inert = !layers.includes('pl') || !!pending;
@@ -1076,8 +1083,14 @@ function renderBar() {
   $('optbody').inert = !!pending;
   $('opts').classList.toggle('pending', !!pending);
   if (pending) {
-    $('st').replaceChildren(el('span', { className: 'spin' }), 'Запускаю на ТВ…');
+    // The controls of what starts, not of what was on.
+    showStatus(pending, true, '');
     $('prog').firstChild.style.width = 0;
+    showPos(0, 0);
+    icon('tg', 'play');
+    icon('pp', 'play');
+    showSpeed({ rate: +pending.rate || 1 });
+    showSeries(pending.season != null);
     return;
   }
   const playing = m.state == 'PLAYING' || m.state == 'BUFFERING';
@@ -1102,6 +1115,12 @@ function otherEpisode(s) {
   return !!(was && n && n.id == was.id && (n.season != was.season || n.episode != was.episode));
 }
 
+// A series has the episode buttons around the play one.
+function showSeries(series) {
+  $('ctl').classList.toggle('series', series);
+  for (const b of document.querySelectorAll('.ep-nav')) b.hidden = !series;
+}
+
 let autoArmed = false;
 function render(s) {
   if (otherEpisode(s)) reloadProgress(s.now.id);
@@ -1123,8 +1142,7 @@ function render(s) {
   $('eprow').hidden = !series;
   $('nextrow').hidden = !series;
   $('autonext').checked = !!s.now?.autonext;
-  $('ctl').classList.toggle('series', series);
-  for (const b of document.querySelectorAll('.ep-nav')) b.hidden = !series;
+  showSeries(series);
   if (drag != 'vol' && s.volume != null) showVol(s.volume * 100);
   icon('mu', s.muted ? 'mute' : 'vol');
   showSpeed(m);
@@ -1469,41 +1487,22 @@ $('more').onclick = e => {
 $('optcollapse').onclick = closeTop;
 $('shade').onclick = closeTop;
 
-// Playback speed: the button shows it, its menu picks another. The Default
-// Media Receiver refuses anything outside 0.5..2 (INVALID_PARAMS).
+// Playback speed: the button shows it, the browser's picker over it picks
+// another. The Default Media Receiver refuses anything outside 0.5..2
+// (INVALID_PARAMS).
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const speedLabel = r => +(+r).toFixed(2) + 'x';
 function showSpeed(m) {
   const r = m.rate || 1;
   $('spd').classList.toggle('off', !!m.live);
+  $('spd').classList.toggle('alt', r != 1);
   $('speed').textContent = speedLabel(r);
-  $('speed').classList.toggle('alt', r != 1);
-  for (const b of $('spdmenu').children) b.classList.toggle('on', +b.dataset.r == r);
+  $('spdsel').value = String(r);
 }
-function speedMenu(open) {
-  const menu = $('spdmenu');
-  if (open == !menu.hidden) return;
-  menu.hidden = !open;
-  $('speed').setAttribute('aria-expanded', open);
-  if (!open) return;
-  // Under the button if the panel has room for it there, else over it.
-  menu.classList.remove('up');
-  const b = menu.getBoundingClientRect();
-  menu.classList.toggle('up', b.bottom > Math.min(innerHeight, $('pl').getBoundingClientRect().bottom));
-  (menu.querySelector('.on') || menu.firstChild).focus({ preventScroll: true });
-}
-$('spdmenu').replaceChildren(...SPEEDS.map(r => {
-  const b = el('button', {}, speedLabel(r));
-  b.setAttribute('role', 'menuitem');
-  b.dataset.r = r;
-  return b;
-}));
+$('spdsel').replaceChildren(...SPEEDS.map(r => el('option', { value: String(r) }, speedLabel(r))));
 $('spd').onclick = e => e.stopPropagation();
-$('speed').onclick = () => speedMenu($('spdmenu').hidden);
-$('spdmenu').onclick = e => {
-  const r = +e.target.closest('[data-r]')?.dataset.r, m = st?.media;
-  if (!r) return;
-  speedMenu(false);
+$('spdsel').onchange = e => {
+  const r = +e.target.value, m = st?.media;
   if (!m || r == (m.rate || 1)) return;
   // The position so far went at the old speed.
   m.time = position(m);
@@ -1512,16 +1511,6 @@ $('spdmenu').onclick = e => {
   showSpeed(m);
   cmd('speed', r);
 };
-document.addEventListener('pointerdown', e => {
-  if (!$('spd').contains(e.target)) speedMenu(false);
-}, true);
-document.addEventListener('keydown', e => {
-  if (e.key == 'Escape' && !$('spdmenu').hidden) {
-    e.stopPropagation();
-    speedMenu(false);
-    $('speed').focus();
-  }
-}, true);
 
 // Sliders: a drag anywhere moves the value from where it was by as much as
 // the finger moves, not to under the finger; a mouse still jumps to the
