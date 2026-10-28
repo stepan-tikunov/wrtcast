@@ -165,7 +165,13 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 
 /* device picker */
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:8;display:flex;flex-direction:column;max-height:calc(100dvh - 48px);padding:8px 16px max(16px,env(safe-area-inset-bottom));background:var(--s1);border-radius:20px 20px 0 0;box-shadow:0 -6px 30px #000c}
-.sheet .handle{width:40px;height:5px;margin:0 auto 8px;border-radius:3px;background:var(--s3)}
+.sheet .handle{position:relative;width:40px;height:5px;margin:0 auto 8px;border-radius:3px;background:var(--s3)}
+/* A sheet closes pulled down by its top (see pullSheet), on a desktop by
+   its button too; pulled up, the skirt under it shows as it stretches. */
+.sheet .handle,.sheet h2{touch-action:none}
+.sheet .handle::before{content:'';position:absolute;inset:-8px -60px -6px}
+.sheet::after{content:'';position:absolute;left:0;right:0;top:100%;height:50vh;background:var(--s1)}
+#optcollapse,#stycollapse{display:none}
 .sheet h2{display:flex;align-items:center;margin:0 0 4px;font-size:18px}
 .sheet h2 span{flex:1}
 /* A sheet over the player dims the player too. */
@@ -273,6 +279,8 @@ svg.spring{animation:spring .3s ease-out}
   #collapse{display:grid}
   #pl.open #handle{display:none}
   .sheet{width:min(480px,calc(100% - 32px));padding-bottom:16px}
+  .sheet::after,.sheet .handle{display:none}
+  #optcollapse,#stycollapse{display:grid}
   #toast{bottom:112px}
 }
 @media (hover:hover){
@@ -490,6 +498,7 @@ function openLayer(name, url) {
 function showLayer(name, on) {
   const show = e => {
     e.classList.remove('out');
+    e.style.transform = e.style.opacity = ''; // left by a pull (see pullSheet)
     e.hidden = false;
   };
   const e = $(name == 'det' ? 'det' : 'shade');
@@ -682,6 +691,64 @@ function pull(e) {
 }
 $('handle').addEventListener('pointerdown', pull);
 $('bar').addEventListener('pointerdown', pull);
+
+// The top sheet pulled down by its handle or heading goes along with the
+// finger, as the player folds (see pull): let go past a third of its
+// height, or flicked down, it closes, else springs back; pulled up it
+// stretches, ever harder. The shade goes with it when nothing else under
+// it is dark.
+function pullSheet(e) {
+  const sheet = e.currentTarget.closest('.sheet');
+  if (SHEETS[layers.at(-1)] != sheet.id || !e.isPrimary || e.button) return;
+  const shade = $('shade'), own = !plOpen && layers.filter(l => l in SHEETS).length == 1;
+  const x0 = e.clientX, y0 = e.clientY;
+  let on = false, d = 0, h = 0, y = y0, t = e.timeStamp, v = 0;
+  const off = () => {
+    removeEventListener('pointermove', move);
+    removeEventListener('pointerup', up);
+    removeEventListener('pointercancel', up);
+  };
+  const move = e => {
+    if (!on) {
+      const dx = Math.abs(e.clientX - x0), dy = e.clientY - y0;
+      if (dx > 10 && dx > Math.abs(dy)) return off();
+      if (Math.abs(dy) < 8) return;
+      on = true;
+      h = sheet.offsetHeight;
+    }
+    v = (e.clientY - y) / Math.max(e.timeStamp - t, 1);
+    d += e.clientY - y;
+    y = e.clientY;
+    t = e.timeStamp;
+    const o = d < 0 ? -120 * Math.log(1 - d / 120) : d;
+    sheet.style.transform = `translateY(${o}px)`;
+    if (own) shade.style.opacity = Math.max(0, 1 - Math.max(d, 0) / h);
+  };
+  const up = e => {
+    off();
+    if (!on) return;
+    const drop = e => {
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    addEventListener('click', drop, { capture: true, once: true });
+    setTimeout(() => removeEventListener('click', drop, { capture: true }), 350);
+    // Closing slides on from where the finger left it.
+    if (e.type == 'pointerup' && d > 0 && (d > h / 3 || v > .5)) return closeTop();
+    const at = sheet.style.transform, op = shade.style.opacity;
+    sheet.style.transform = '';
+    sheet.animate([{ transform: at }, { transform: 'none' }], { duration: 500, easing: 'cubic-bezier(.3,1.4,.5,1)' });
+    if (own && op) {
+      shade.style.opacity = '';
+      shade.animate([{ opacity: op }, { opacity: 1 }], { duration: 300, easing: 'ease-out' });
+    }
+  };
+  addEventListener('pointermove', move);
+  addEventListener('pointerup', up);
+  addEventListener('pointercancel', up);
+}
+for (const e of document.querySelectorAll('.sheet .handle, .sheet h2'))
+  e.addEventListener('pointerdown', pullSheet);
 
 // Closes the topmost overlay, and steps back in history so the back button
 // stays in sync. The overlay goes at once: browsers report the step back
