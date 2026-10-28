@@ -15,6 +15,7 @@ const LIST = '/tmp/wrtcast.list.';         // + host key; streams last asked for
 const WATCH = '/tmp/wrtcast.watch.';       // + host key; failed tick checks
 const SEEN = '/tmp/wrtcast.seen.';         // + host key; when what /play started last played
 const NEXT = '/tmp/wrtcast.next.';         // + host key; lock while the next episode starts
+const PLAYED = '/tmp/wrtcast.played.';     // + URL hash; what /play started with that URL
 const PROGRESS = '/tmp/wrtcast.progress.json'; // watch progress, copied to flash
 const MAX_TITLES = 200;                      // progress kept for this many titles
 const MAX_EPISODES = 50;                     // and this many episodes of each
@@ -92,6 +93,14 @@ function save(f, v) {
 	let s = sprintf('%J', v), tmp = `${f}.${clock()[1]}`;
 	if (writefile(tmp, s) != length(s) || !rename(tmp, f))
 		unlink(tmp);
+}
+
+// FNV-1a, for short file names.
+function hash(s) {
+	let h = 0x811c9dc5;
+	for (let i = 0; i < length(s); i++)
+		h = ((h ^ ord(s, i)) * 0x01000193) & 0xffffffff;
+	return sprintf('%08x', h);
 }
 
 function shq(s) {
@@ -391,6 +400,27 @@ function castctl_try(dev, ...args) {
 const state_key = dev => replace(host_of(dev), /[^0-9A-Za-z.]/g, '_');
 const state_file = dev => STATE + state_key(dev);
 
+// What /play started with a URL, kept apart from the state of its TV: a play
+// castctl gave up on may start on the TV all the same, and of two plays to
+// one TV at once the one that lost puts back the state from before both.
+const played_file = u => PLAYED + hash(u);
+
+// The state f of a TV (now, at host) when the TV plays media m of another
+// stream: what /play started with that URL, which becomes the state. Not
+// while a play is under way, the TV still plays the last stream then
+// (castctl waits for the receiver up to 20 s, again at a new address).
+function adopt(f, host, now, m) {
+	let u = m?.url;
+	if (!u || now?.url == u || time() - (now?.started ?? 0) < 90)
+		return now;
+	let p = load(played_file(u));
+	if (p?.url != u)
+		return now;
+	p.host = host;
+	save(f, p);
+	return p;
+}
+
 // Character count of a UTF-8 string (continuation bytes are skipped).
 function ulength(s) {
 	let n = 0;
@@ -664,6 +694,7 @@ function tick() {
 		if (misses >= 5)
 			continue;
 		let st = castctl_try({ host: now.host }, 'status'), m = st?.media;
+		now = adopt(STATE + k, now.host, now, m);
 		if (st)
 			watch_end(now, st);
 		if (m?.url == now.url)
@@ -684,7 +715,7 @@ function tick() {
 	// headers, bytes and positions of media not played for a day.
 	for (let name in lsdir('/tmp') ?? []) {
 		let age = match(name, /^wrtcast\.err\.[0-9]+$/) ? 60 :
-			match(name, /^wrtcast\.(hdr|bytes|pos)\./) ? 86400 : null;
+			match(name, /^wrtcast\.(hdr|bytes|pos|played)\./) ? 86400 : null;
 		let st = age ? stat('/tmp/' + name) : null;
 		if (st && st.mtime < time() - age)
 			unlink('/tmp/' + name);
@@ -855,7 +886,7 @@ function qualities(body) {
 // title-api track id.
 function with_now(st, dev) {
 	st.device = { id: dev.id ?? null, name: dev.name ?? host_of(dev) };
-	let now = load(state_file(dev));
+	let now = adopt(state_file(dev), host_of(dev), load(state_file(dev)), st.media);
 	if (now)
 		watch_end(now, st);
 	if (!now || !st.media || st.media.url != now.url)
@@ -1013,14 +1044,6 @@ function drc_supported(master, body, h, m) {
 		!match(pl, /#EXT-X-(MAP|DISCONTINUITY|BYTERANGE)/) &&
 		!match(pl, /#EXT-X-KEY:(.*,)?METHOD=(AES|SAMPLE)/) &&
 		ext(match(seg, /^[^?#]*/)[0]) == 'ts';
-}
-
-// FNV-1a, for short file names.
-function hash(s) {
-	let h = 0x811c9dc5;
-	for (let i = 0; i < length(s); i++)
-		h = ((h ^ ord(s, i)) * 0x01000193) & 0xffffffff;
-	return sprintf('%08x', h);
 }
 
 // Rewrites an audio media playlist so its segments point at /api/a/<key>/<n>.ts
@@ -1415,13 +1438,14 @@ function play(dev, p, keep) {
 		// keeps what was set.
 		autonext: p.autonext != null ? p.autonext == '1' : last?.id == id && !!last.autonext,
 		style: p.style ?? null,
-		streams: list, fetched,
+		streams: list, fetched, started: time(),
 		// Only our own proxy paths, so the UI never loads arbitrary URLs.
 		poster: length(p.poster ?? '') <= 4096 &&
 			match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
 	};
 	let put_back = () => last ? save(f, last) : unlink(f);
 	save(f, now);
+	save(played_file(url), now);
 	undo = put_back;
 	let st = castctl(dev, ...args);
 	undo = null;
