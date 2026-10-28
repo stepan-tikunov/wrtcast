@@ -1676,7 +1676,10 @@ const preview = (() => {
   const REST = 250; // ms the finger rests on a time before its segment is fetched
   const tip = $('frame'), video = tip.querySelector('video');
   let s = null;     // the stream: its playlist, MediaSource and segments loaded
-  let active = false, want = null, rest = 0, fresh = false, timer = null, seekTo = null;
+  let active = false, want = null, fresh = false, timer = null, seekTo = null;
+  // Since when the finger rests within a few pixels of restX: a finger held
+  // still trembles, if over the edge of a segment across it too.
+  let rest = 0, restX = null;
 
   const get = async (u, text) => {
     const r = await fetch(u + (u.includes('?') ? '&' : '?') + 'pv=1');
@@ -2002,7 +2005,7 @@ const preview = (() => {
     if (fresh) seek(Math.min(Math.max(want, seg.a), seg.b - .001));
     else {
       clearTimeout(timer);
-      timer = setTimeout(pump, REST);
+      timer = setTimeout(pump, Math.max(rest + REST - Date.now(), 0));
     }
     paint();
   }
@@ -2049,7 +2052,7 @@ const preview = (() => {
         }, () => my.dead = true);
       }
       active = true;
-      want = null;
+      want = restX = null;
       fresh = false;
     },
     // The finger at time t, f of the way along the bar; moved once it has.
@@ -2058,7 +2061,11 @@ const preview = (() => {
       tip.style.setProperty('--f', f);
       if (!moved) return;
       want = t;
-      rest = Date.now();
+      const x = f * tip.parentNode.clientWidth;
+      if (restX == null || Math.abs(x - restX) > 6) {
+        restX = x;
+        rest = Date.now();
+      }
       update();
     },
     end() {
