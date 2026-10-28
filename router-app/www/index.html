@@ -458,7 +458,7 @@ function animateOut(e) {
   };
   e.addEventListener('animationend', end);
 }
-const epShort = n => `${n.season}s${n.episode}e`; // 7 сезон 17 серия -> 7s17e
+const epShort = n => `${n.season} сез., ${n.episode} сер.`; // 7 сезон 17 серия -> 7 сез., 17 сер.
 const note = text => $('msg').lastChild.textContent = text;
 
 // ---- overlays and the back button ----------------------------------------
@@ -1078,7 +1078,7 @@ function showTime() {
 // or loading. Only texts and classes change on every tick: a re-created
 // spinner would restart its animation and jerk instead of spinning.
 function showStatus(n, busy, time) {
-  const s = $('st'), ep = n?.season != null ? `${n.season} сез., ${n.episode} сер.` : '';
+  const s = $('st'), ep = n?.season != null ? epShort(n) : '';
   $('stEp').textContent = ep;
   $('sttm').textContent = busy ? 'Загрузка…' : time;
   s.classList.toggle('sr', !!ep);
