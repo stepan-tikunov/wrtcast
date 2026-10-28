@@ -504,11 +504,6 @@ function showLayer(name, on) {
 function setPlayer(open) {
   if (plOpen == open) return;
   plOpen = open;
-  const shade = $('shade');
-  if (open) {
-    shade.classList.remove('out');
-    shade.hidden = false;
-  } else if (!layers.some(l => l in SHEETS)) animateOut(shade);
   foldPlayer(open);
   $('full').inert = !open || !!pending;
 }
@@ -544,7 +539,13 @@ function foldPlayer(open, held) {
   $('collapse').hidden = $('more').hidden = $('spd').hidden = false;
   $('collapse').inert = $('more').inert = $('spd').inert = !open;
   $('tg').inert = open;
+  // The shade, when no sheet has it, goes dark as far as the player is open.
+  const shade = $('shade'), own = !layers.some(l => l in SHEETS);
   const done = () => {
+    if (own) {
+      shade.classList.remove('out');
+      shade.hidden = !open;
+    }
     p.classList.toggle('open', open);
     for (const c of t.children) c.style.width = '';
     $('collapse').hidden = $('more').hidden = $('spd').hidden = !open;
@@ -553,6 +554,10 @@ function foldPlayer(open, held) {
   if (p.hidden || m.y == f.y || matchMedia('(prefers-reduced-motion:reduce)').matches) return done();
   const k = (from - f.y) / (m.y - f.y), to = open ? 0 : 1; // 0 open, 1 mini
   if (k == to && !held) return done();
+  if (own) {
+    shade.classList.remove('out');
+    shade.hidden = false;
+  }
   const gap = (f.y - f.edge) - (m.y - m.edge), s = f.w ? m.w / f.w : 1;
   const r = getComputedStyle(p).borderBottomLeftRadius;
   const opt = { duration: FOLD_MS, easing: held ? 'linear' : 'cubic-bezier(.2,.8,.2,1)' };
@@ -572,6 +577,7 @@ function foldPlayer(open, held) {
     ], opt),
     go($('plbg'), k => ({ transform: `translateY(${k * gap}px)` })),
     go($('handle'), k => ({ opacity: 1 - k })),
+    ...own ? [go(shade, k => ({ opacity: 1 - k }))] : [],
     go($('prog'), k => ({ opacity: k })),
     go($('thumb'), k => ({ transform: `scale(${1 - k * (1 - s)})` })),
     go(t, k => ({ transform: `translate(${k * (m.x - f.x)}px,${k * (m.ty - f.ty)}px)` })),
