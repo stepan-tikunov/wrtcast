@@ -53,7 +53,7 @@ makePlayer({source:{hls:"%s/master.m3u8?token=base",audio:{"names":["Dub"]},cc:[
 var lok = 1, challengeMarker = "marker";`, serverURL, serverURL)
 		case "/embed/movie/36037":
 			_, _ = fmt.Fprintf(response, `
-makePlayer({source:{hls:"%s/master-2.m3u8?token=base",audio:{names:["Original"]},cc:[]}});
+makePlayer({source:{hls:"%s/master-2.m3u8?token=base",audio:{names:["Original"]},cc:[],"duration":7200,"sections":[{"type":"titer","start":7000,"end":7200.5,"skip":true}]}});
 var lok = 1, challengeMarker = "marker";`, serverURL)
 		case "/master.m3u8":
 			if _, ok := request.URL.Query()["marker"]; !ok {
@@ -103,6 +103,13 @@ video-2.m3u8
 		len(streams[0].Subtitles) != 1 || streams[0].Subtitles[0].Language != "ru" ||
 		streams[1].AudioTracks[0].Language != "en" {
 		t.Fatalf("unexpected streams: %+v", streams)
+	}
+	// The second player's sections are the first one's as well.
+	for _, stream := range streams {
+		if len(stream.Sections) != 1 || stream.Sections[0] != (Section{Kind: SectionCredits, Start: 7000, End: 7200.5, Skippable: true}) ||
+			stream.SectionsDuration != 7200 {
+			t.Fatalf("stream %q sections = %+v of %v", stream.Name, stream.Sections, stream.SectionsDuration)
+		}
 	}
 
 	code.Store(161)

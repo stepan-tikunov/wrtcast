@@ -29,6 +29,11 @@ type MovieStream struct {
 	AudioTracks       []AudioTrack
 	Subtitles         []SubtitleTrack
 	ProxyHeaders      []ProxyHeader
+	// The sections of the movie or the episode (see Section), marked on a
+	// video of SectionsDuration, which this stream's may differ from by a
+	// little: another player's streams share the primary player's.
+	Sections         []Section
+	SectionsDuration float64
 }
 
 type ProxyHeader struct {
@@ -67,8 +72,13 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 	streams := make([]MovieStream, 0, len(embedURLs))
 	streamErrors := make([]error, 0)
 	seriesEmbeds := 0
+	var movieSections []Section
+	var sectionsDuration float64
 	for index, embedURL := range embedURLs {
 		stream, streamErr := c.streamFromEmbed(ctx, current, embedURL)
+		if movieSections == nil && len(stream.Sections) > 0 {
+			movieSections, sectionsDuration = stream.Sections, stream.SectionsDuration
+		}
 		if errors.Is(streamErr, ErrNotMovie) {
 			seriesEmbeds++
 			continue
@@ -94,6 +104,7 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 		}
 		return nil, fmt.Errorf("no playable embed found: %w", errors.Join(streamErrors...))
 	}
+	shareSections(streams, movieSections, sectionsDuration)
 	return streams, nil
 }
 
@@ -153,11 +164,13 @@ func (c *Client) streamFromEmbed(ctx context.Context, current *session, embedURL
 	if err != nil {
 		return MovieStream{}, fmt.Errorf("decode HLS URL: %w", err)
 	}
+	// The sections hold even when the stream fails (see Streams).
+	marked := MovieStream{Sections: movieSections(embedHTML), SectionsDuration: playerDurationSeconds(embedHTML)}
 	marker, err := parseDynamicMarker(embedHTML)
 	if err != nil {
-		return MovieStream{}, err
+		return marked, err
 	}
-	return c.streamFromHLS(
+	stream, err := c.streamFromHLS(
 		ctx,
 		current,
 		html.UnescapeString(hlsURL),
@@ -165,6 +178,11 @@ func (c *Client) streamFromEmbed(ctx context.Context, current *session, embedURL
 		parseAudioNames(embedHTML),
 		parseSubtitles(embedHTML),
 	)
+	if err != nil {
+		return marked, err
+	}
+	stream.Sections, stream.SectionsDuration = marked.Sections, marked.SectionsDuration
+	return stream, nil
 }
 
 func (c *Client) streamFromHLS(

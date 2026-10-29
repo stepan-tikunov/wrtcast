@@ -122,6 +122,7 @@ func (s *Server) GetTitleDetails(
 		Directors:       metadata.Directors,
 		Actors:          metadata.Actors,
 		DurationSeconds: metadata.DurationSeconds,
+		Sections:        sections(metadata.Sections),
 		Ratings: make(
 			[]*titlev1.GetTitleDetailsQueryResponse_Rating,
 			0,
@@ -179,6 +180,7 @@ func titleDetailsSeasons(seasons []provider.Season) []*titlev1.GetTitleDetailsQu
 					EpisodeNumber:   episode.Number,
 					Title:           episode.Title,
 					DurationSeconds: episode.DurationSeconds,
+					Sections:        sections(episode.Sections),
 				},
 			)
 		}
@@ -191,8 +193,10 @@ func mediaStreams(streams []provider.MovieStream) []*titlev1.MediaStream {
 	response := make([]*titlev1.MediaStream, 0, len(streams))
 	for _, stream := range streams {
 		mediaStream := &titlev1.MediaStream{
-			Name:              stream.Name,
-			MasterPlaylistUrl: stream.MasterPlaylistURL,
+			Name:                    stream.Name,
+			MasterPlaylistUrl:       stream.MasterPlaylistURL,
+			Sections:                sections(stream.Sections),
+			SectionsDurationSeconds: stream.SectionsDuration,
 			ProxyHeaders: make(
 				[]*titlev1.MediaStream_ProxyHeader,
 				0,
@@ -242,6 +246,32 @@ func mediaStreams(streams []provider.MovieStream) []*titlev1.MediaStream {
 		response = append(response, mediaStream)
 	}
 	return response
+}
+
+func sections(list []provider.Section) []*titlev1.Section {
+	response := make([]*titlev1.Section, 0, len(list))
+	for _, section := range list {
+		response = append(response, &titlev1.Section{
+			Kind:         sectionKind(section.Kind),
+			StartSeconds: section.Start,
+			EndSeconds:   section.End,
+			Skippable:    section.Skippable,
+		})
+	}
+	return response
+}
+
+func sectionKind(value provider.SectionKind) titlev1.Section_Kind {
+	switch value {
+	case provider.SectionRecap:
+		return titlev1.Section_KIND_RECAP
+	case provider.SectionIntro:
+		return titlev1.Section_KIND_INTRO
+	case provider.SectionCredits:
+		return titlev1.Section_KIND_CREDITS
+	default:
+		return titlev1.Section_KIND_UNSPECIFIED
+	}
 }
 
 func mediaType(value provider.MediaType) titlev1.MediaType {

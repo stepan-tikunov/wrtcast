@@ -71,6 +71,61 @@ func (MediaType) EnumDescriptor() ([]byte, []int) {
 	return file_api_title_v1_title_proto_rawDescGZIP(), []int{0}
 }
 
+type Section_Kind int32
+
+const (
+	Section_KIND_UNSPECIFIED Section_Kind = 0
+	// What happened in the earlier episodes.
+	Section_KIND_RECAP Section_Kind = 1
+	// The opening titles.
+	Section_KIND_INTRO Section_Kind = 2
+	// The end titles.
+	Section_KIND_CREDITS Section_Kind = 3
+)
+
+// Enum value maps for Section_Kind.
+var (
+	Section_Kind_name = map[int32]string{
+		0: "KIND_UNSPECIFIED",
+		1: "KIND_RECAP",
+		2: "KIND_INTRO",
+		3: "KIND_CREDITS",
+	}
+	Section_Kind_value = map[string]int32{
+		"KIND_UNSPECIFIED": 0,
+		"KIND_RECAP":       1,
+		"KIND_INTRO":       2,
+		"KIND_CREDITS":     3,
+	}
+)
+
+func (x Section_Kind) Enum() *Section_Kind {
+	p := new(Section_Kind)
+	*p = x
+	return p
+}
+
+func (x Section_Kind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Section_Kind) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_title_v1_title_proto_enumTypes[1].Descriptor()
+}
+
+func (Section_Kind) Type() protoreflect.EnumType {
+	return &file_api_title_v1_title_proto_enumTypes[1]
+}
+
+func (x Section_Kind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Section_Kind.Descriptor instead.
+func (Section_Kind) EnumDescriptor() ([]byte, []int) {
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{6, 0}
+}
+
 type SearchTitlesQuery struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
@@ -324,8 +379,11 @@ type GetTitleDetailsQueryResponse struct {
 	Ratings         []*GetTitleDetailsQueryResponse_Rating `protobuf:"bytes,13,rep,name=ratings,proto3" json:"ratings,omitempty"`
 	DurationSeconds uint64                                 `protobuf:"varint,14,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"`
 	Seasons         []*GetTitleDetailsQueryResponse_Season `protobuf:"bytes,15,rep,name=seasons,proto3" json:"seasons,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// A movie's, marked on a video of duration_seconds; an episode's are with
+	// the episode.
+	Sections      []*Section `protobuf:"bytes,16,rep,name=sections,proto3" json:"sections,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetTitleDetailsQueryResponse) Reset() {
@@ -463,6 +521,84 @@ func (x *GetTitleDetailsQueryResponse) GetSeasons() []*GetTitleDetailsQueryRespo
 	return nil
 }
 
+func (x *GetTitleDetailsQueryResponse) GetSections() []*Section {
+	if x != nil {
+		return x.Sections
+	}
+	return nil
+}
+
+// A part of a movie or an episode that viewers may skip, as the primary
+// player marks it, in seconds from the start of the video.
+type Section struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Kind         Section_Kind           `protobuf:"varint,1,opt,name=kind,proto3,enum=title.v1.Section_Kind" json:"kind,omitempty"`
+	StartSeconds float64                `protobuf:"fixed64,2,opt,name=start_seconds,json=startSeconds,proto3" json:"start_seconds,omitempty"`
+	EndSeconds   float64                `protobuf:"fixed64,3,opt,name=end_seconds,json=endSeconds,proto3" json:"end_seconds,omitempty"`
+	// False when there is more to see, such as a scene after the credits.
+	Skippable     bool `protobuf:"varint,4,opt,name=skippable,proto3" json:"skippable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Section) Reset() {
+	*x = Section{}
+	mi := &file_api_title_v1_title_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Section) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Section) ProtoMessage() {}
+
+func (x *Section) ProtoReflect() protoreflect.Message {
+	mi := &file_api_title_v1_title_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Section.ProtoReflect.Descriptor instead.
+func (*Section) Descriptor() ([]byte, []int) {
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Section) GetKind() Section_Kind {
+	if x != nil {
+		return x.Kind
+	}
+	return Section_KIND_UNSPECIFIED
+}
+
+func (x *Section) GetStartSeconds() float64 {
+	if x != nil {
+		return x.StartSeconds
+	}
+	return 0
+}
+
+func (x *Section) GetEndSeconds() float64 {
+	if x != nil {
+		return x.EndSeconds
+	}
+	return 0
+}
+
+func (x *Section) GetSkippable() bool {
+	if x != nil {
+		return x.Skippable
+	}
+	return false
+}
+
 type MediaStream struct {
 	state             protoimpl.MessageState       `protogen:"open.v1"`
 	MasterPlaylistUrl string                       `protobuf:"bytes,1,opt,name=master_playlist_url,json=masterPlaylistUrl,proto3" json:"master_playlist_url,omitempty"`
@@ -470,13 +606,18 @@ type MediaStream struct {
 	Subtitles         []*MediaStream_SubtitleTrack `protobuf:"bytes,3,rep,name=subtitles,proto3" json:"subtitles,omitempty"`
 	ProxyHeaders      []*MediaStream_ProxyHeader   `protobuf:"bytes,4,rep,name=proxy_headers,json=proxyHeaders,proto3" json:"proxy_headers,omitempty"`
 	Name              string                       `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// The sections of the movie or the episode, which all its streams share:
+	// the primary player's, marked on its video of sections_duration_seconds.
+	// Another stream's video may be a little longer or shorter.
+	Sections                []*Section `protobuf:"bytes,6,rep,name=sections,proto3" json:"sections,omitempty"`
+	SectionsDurationSeconds float64    `protobuf:"fixed64,7,opt,name=sections_duration_seconds,json=sectionsDurationSeconds,proto3" json:"sections_duration_seconds,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *MediaStream) Reset() {
 	*x = MediaStream{}
-	mi := &file_api_title_v1_title_proto_msgTypes[6]
+	mi := &file_api_title_v1_title_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -488,7 +629,7 @@ func (x *MediaStream) String() string {
 func (*MediaStream) ProtoMessage() {}
 
 func (x *MediaStream) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[6]
+	mi := &file_api_title_v1_title_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -501,7 +642,7 @@ func (x *MediaStream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream.ProtoReflect.Descriptor instead.
 func (*MediaStream) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{6}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *MediaStream) GetMasterPlaylistUrl() string {
@@ -539,6 +680,20 @@ func (x *MediaStream) GetName() string {
 	return ""
 }
 
+func (x *MediaStream) GetSections() []*Section {
+	if x != nil {
+		return x.Sections
+	}
+	return nil
+}
+
+func (x *MediaStream) GetSectionsDurationSeconds() float64 {
+	if x != nil {
+		return x.SectionsDurationSeconds
+	}
+	return 0
+}
+
 type SearchTitlesQueryResponse_SearchResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TitleId       string                 `protobuf:"bytes,1,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`
@@ -551,7 +706,7 @@ type SearchTitlesQueryResponse_SearchResult struct {
 
 func (x *SearchTitlesQueryResponse_SearchResult) Reset() {
 	*x = SearchTitlesQueryResponse_SearchResult{}
-	mi := &file_api_title_v1_title_proto_msgTypes[7]
+	mi := &file_api_title_v1_title_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -563,7 +718,7 @@ func (x *SearchTitlesQueryResponse_SearchResult) String() string {
 func (*SearchTitlesQueryResponse_SearchResult) ProtoMessage() {}
 
 func (x *SearchTitlesQueryResponse_SearchResult) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[7]
+	mi := &file_api_title_v1_title_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -617,7 +772,7 @@ type GetTitleDetailsQueryResponse_Rating struct {
 
 func (x *GetTitleDetailsQueryResponse_Rating) Reset() {
 	*x = GetTitleDetailsQueryResponse_Rating{}
-	mi := &file_api_title_v1_title_proto_msgTypes[8]
+	mi := &file_api_title_v1_title_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -629,7 +784,7 @@ func (x *GetTitleDetailsQueryResponse_Rating) String() string {
 func (*GetTitleDetailsQueryResponse_Rating) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Rating) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[8]
+	mi := &file_api_title_v1_title_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -669,7 +824,7 @@ type GetTitleDetailsQueryResponse_Season struct {
 
 func (x *GetTitleDetailsQueryResponse_Season) Reset() {
 	*x = GetTitleDetailsQueryResponse_Season{}
-	mi := &file_api_title_v1_title_proto_msgTypes[9]
+	mi := &file_api_title_v1_title_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -681,7 +836,7 @@ func (x *GetTitleDetailsQueryResponse_Season) String() string {
 func (*GetTitleDetailsQueryResponse_Season) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Season) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[9]
+	mi := &file_api_title_v1_title_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -716,13 +871,15 @@ type GetTitleDetailsQueryResponse_Season_Episode struct {
 	EpisodeNumber   string                 `protobuf:"bytes,1,opt,name=episode_number,json=episodeNumber,proto3" json:"episode_number,omitempty"`
 	Title           string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	DurationSeconds uint64                 `protobuf:"varint,3,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Marked on a video of duration_seconds.
+	Sections      []*Section `protobuf:"bytes,4,rep,name=sections,proto3" json:"sections,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetTitleDetailsQueryResponse_Season_Episode) Reset() {
 	*x = GetTitleDetailsQueryResponse_Season_Episode{}
-	mi := &file_api_title_v1_title_proto_msgTypes[10]
+	mi := &file_api_title_v1_title_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -734,7 +891,7 @@ func (x *GetTitleDetailsQueryResponse_Season_Episode) String() string {
 func (*GetTitleDetailsQueryResponse_Season_Episode) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Season_Episode) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[10]
+	mi := &file_api_title_v1_title_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -771,6 +928,13 @@ func (x *GetTitleDetailsQueryResponse_Season_Episode) GetDurationSeconds() uint6
 	return 0
 }
 
+func (x *GetTitleDetailsQueryResponse_Season_Episode) GetSections() []*Section {
+	if x != nil {
+		return x.Sections
+	}
+	return nil
+}
+
 type MediaStream_ProxyHeader struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -781,7 +945,7 @@ type MediaStream_ProxyHeader struct {
 
 func (x *MediaStream_ProxyHeader) Reset() {
 	*x = MediaStream_ProxyHeader{}
-	mi := &file_api_title_v1_title_proto_msgTypes[11]
+	mi := &file_api_title_v1_title_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -793,7 +957,7 @@ func (x *MediaStream_ProxyHeader) String() string {
 func (*MediaStream_ProxyHeader) ProtoMessage() {}
 
 func (x *MediaStream_ProxyHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[11]
+	mi := &file_api_title_v1_title_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -806,7 +970,7 @@ func (x *MediaStream_ProxyHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream_ProxyHeader.ProtoReflect.Descriptor instead.
 func (*MediaStream_ProxyHeader) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{6, 0}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{7, 0}
 }
 
 func (x *MediaStream_ProxyHeader) GetName() string {
@@ -836,7 +1000,7 @@ type MediaStream_AudioTrack struct {
 
 func (x *MediaStream_AudioTrack) Reset() {
 	*x = MediaStream_AudioTrack{}
-	mi := &file_api_title_v1_title_proto_msgTypes[12]
+	mi := &file_api_title_v1_title_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -848,7 +1012,7 @@ func (x *MediaStream_AudioTrack) String() string {
 func (*MediaStream_AudioTrack) ProtoMessage() {}
 
 func (x *MediaStream_AudioTrack) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[12]
+	mi := &file_api_title_v1_title_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -861,7 +1025,7 @@ func (x *MediaStream_AudioTrack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream_AudioTrack.ProtoReflect.Descriptor instead.
 func (*MediaStream_AudioTrack) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{6, 1}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{7, 1}
 }
 
 func (x *MediaStream_AudioTrack) GetId() string {
@@ -912,7 +1076,7 @@ type MediaStream_SubtitleTrack struct {
 
 func (x *MediaStream_SubtitleTrack) Reset() {
 	*x = MediaStream_SubtitleTrack{}
-	mi := &file_api_title_v1_title_proto_msgTypes[13]
+	mi := &file_api_title_v1_title_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -924,7 +1088,7 @@ func (x *MediaStream_SubtitleTrack) String() string {
 func (*MediaStream_SubtitleTrack) ProtoMessage() {}
 
 func (x *MediaStream_SubtitleTrack) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[13]
+	mi := &file_api_title_v1_title_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -937,7 +1101,7 @@ func (x *MediaStream_SubtitleTrack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream_SubtitleTrack.ProtoReflect.Descriptor instead.
 func (*MediaStream_SubtitleTrack) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{6, 2}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{7, 2}
 }
 
 func (x *MediaStream_SubtitleTrack) GetId() string {
@@ -999,7 +1163,7 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\x1fGetPlaybackStreamsQueryResponse\x12/\n" +
 	"\astreams\x18\x01 \x03(\v2\x15.title.v1.MediaStreamR\astreams\"1\n" +
 	"\x14GetTitleDetailsQuery\x12\x19\n" +
-	"\btitle_id\x18\x01 \x01(\tR\atitleId\"\xf2\x06\n" +
+	"\btitle_id\x18\x01 \x01(\tR\atitleId\"\xd1\a\n" +
 	"\x1cGetTitleDetailsQueryResponse\x12\x19\n" +
 	"\btitle_id\x18\x01 \x01(\tR\atitleId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12%\n" +
@@ -1018,23 +1182,40 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\x06actors\x18\f \x03(\tR\x06actors\x12G\n" +
 	"\aratings\x18\r \x03(\v2-.title.v1.GetTitleDetailsQueryResponse.RatingR\aratings\x12)\n" +
 	"\x10duration_seconds\x18\x0e \x01(\x04R\x0fdurationSeconds\x12G\n" +
-	"\aseasons\x18\x0f \x03(\v2-.title.v1.GetTitleDetailsQueryResponse.SeasonR\aseasons\x1a6\n" +
+	"\aseasons\x18\x0f \x03(\v2-.title.v1.GetTitleDetailsQueryResponse.SeasonR\aseasons\x12-\n" +
+	"\bsections\x18\x10 \x03(\v2\x11.title.v1.SectionR\bsections\x1a6\n" +
 	"\x06Rating\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x01R\x05value\x1a\xf3\x01\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value\x1a\xa3\x02\n" +
 	"\x06Season\x12#\n" +
 	"\rseason_number\x18\x01 \x01(\x05R\fseasonNumber\x12Q\n" +
-	"\bepisodes\x18\x02 \x03(\v25.title.v1.GetTitleDetailsQueryResponse.Season.EpisodeR\bepisodes\x1aq\n" +
+	"\bepisodes\x18\x02 \x03(\v25.title.v1.GetTitleDetailsQueryResponse.Season.EpisodeR\bepisodes\x1a\xa0\x01\n" +
 	"\aEpisode\x12%\n" +
 	"\x0eepisode_number\x18\x01 \x01(\tR\repisodeNumber\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12)\n" +
-	"\x10duration_seconds\x18\x03 \x01(\x04R\x0fdurationSeconds\"\xf3\x04\n" +
+	"\x10duration_seconds\x18\x03 \x01(\x04R\x0fdurationSeconds\x12-\n" +
+	"\bsections\x18\x04 \x03(\v2\x11.title.v1.SectionR\bsections\"\xe9\x01\n" +
+	"\aSection\x12*\n" +
+	"\x04kind\x18\x01 \x01(\x0e2\x16.title.v1.Section.KindR\x04kind\x12#\n" +
+	"\rstart_seconds\x18\x02 \x01(\x01R\fstartSeconds\x12\x1f\n" +
+	"\vend_seconds\x18\x03 \x01(\x01R\n" +
+	"endSeconds\x12\x1c\n" +
+	"\tskippable\x18\x04 \x01(\bR\tskippable\"N\n" +
+	"\x04Kind\x12\x14\n" +
+	"\x10KIND_UNSPECIFIED\x10\x00\x12\x0e\n" +
+	"\n" +
+	"KIND_RECAP\x10\x01\x12\x0e\n" +
+	"\n" +
+	"KIND_INTRO\x10\x02\x12\x10\n" +
+	"\fKIND_CREDITS\x10\x03\"\xde\x05\n" +
 	"\vMediaStream\x12.\n" +
 	"\x13master_playlist_url\x18\x01 \x01(\tR\x11masterPlaylistUrl\x12C\n" +
 	"\faudio_tracks\x18\x02 \x03(\v2 .title.v1.MediaStream.AudioTrackR\vaudioTracks\x12A\n" +
 	"\tsubtitles\x18\x03 \x03(\v2#.title.v1.MediaStream.SubtitleTrackR\tsubtitles\x12F\n" +
 	"\rproxy_headers\x18\x04 \x03(\v2!.title.v1.MediaStream.ProxyHeaderR\fproxyHeaders\x12\x12\n" +
-	"\x04name\x18\x05 \x01(\tR\x04name\x1a7\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\x12-\n" +
+	"\bsections\x18\x06 \x03(\v2\x11.title.v1.SectionR\bsections\x12:\n" +
+	"\x19sections_duration_seconds\x18\a \x01(\x01R\x17sectionsDurationSeconds\x1a7\n" +
 	"\vProxyHeader\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\x1a\x89\x01\n" +
@@ -1073,46 +1254,52 @@ func file_api_title_v1_title_proto_rawDescGZIP() []byte {
 	return file_api_title_v1_title_proto_rawDescData
 }
 
-var file_api_title_v1_title_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_title_v1_title_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_api_title_v1_title_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_api_title_v1_title_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_api_title_v1_title_proto_goTypes = []any{
 	(MediaType)(0),                                      // 0: title.v1.MediaType
-	(*SearchTitlesQuery)(nil),                           // 1: title.v1.SearchTitlesQuery
-	(*SearchTitlesQueryResponse)(nil),                   // 2: title.v1.SearchTitlesQueryResponse
-	(*GetPlaybackStreamsQuery)(nil),                     // 3: title.v1.GetPlaybackStreamsQuery
-	(*GetPlaybackStreamsQueryResponse)(nil),             // 4: title.v1.GetPlaybackStreamsQueryResponse
-	(*GetTitleDetailsQuery)(nil),                        // 5: title.v1.GetTitleDetailsQuery
-	(*GetTitleDetailsQueryResponse)(nil),                // 6: title.v1.GetTitleDetailsQueryResponse
-	(*MediaStream)(nil),                                 // 7: title.v1.MediaStream
-	(*SearchTitlesQueryResponse_SearchResult)(nil),      // 8: title.v1.SearchTitlesQueryResponse.SearchResult
-	(*GetTitleDetailsQueryResponse_Rating)(nil),         // 9: title.v1.GetTitleDetailsQueryResponse.Rating
-	(*GetTitleDetailsQueryResponse_Season)(nil),         // 10: title.v1.GetTitleDetailsQueryResponse.Season
-	(*GetTitleDetailsQueryResponse_Season_Episode)(nil), // 11: title.v1.GetTitleDetailsQueryResponse.Season.Episode
-	(*MediaStream_ProxyHeader)(nil),                     // 12: title.v1.MediaStream.ProxyHeader
-	(*MediaStream_AudioTrack)(nil),                      // 13: title.v1.MediaStream.AudioTrack
-	(*MediaStream_SubtitleTrack)(nil),                   // 14: title.v1.MediaStream.SubtitleTrack
+	(Section_Kind)(0),                                   // 1: title.v1.Section.Kind
+	(*SearchTitlesQuery)(nil),                           // 2: title.v1.SearchTitlesQuery
+	(*SearchTitlesQueryResponse)(nil),                   // 3: title.v1.SearchTitlesQueryResponse
+	(*GetPlaybackStreamsQuery)(nil),                     // 4: title.v1.GetPlaybackStreamsQuery
+	(*GetPlaybackStreamsQueryResponse)(nil),             // 5: title.v1.GetPlaybackStreamsQueryResponse
+	(*GetTitleDetailsQuery)(nil),                        // 6: title.v1.GetTitleDetailsQuery
+	(*GetTitleDetailsQueryResponse)(nil),                // 7: title.v1.GetTitleDetailsQueryResponse
+	(*Section)(nil),                                     // 8: title.v1.Section
+	(*MediaStream)(nil),                                 // 9: title.v1.MediaStream
+	(*SearchTitlesQueryResponse_SearchResult)(nil),      // 10: title.v1.SearchTitlesQueryResponse.SearchResult
+	(*GetTitleDetailsQueryResponse_Rating)(nil),         // 11: title.v1.GetTitleDetailsQueryResponse.Rating
+	(*GetTitleDetailsQueryResponse_Season)(nil),         // 12: title.v1.GetTitleDetailsQueryResponse.Season
+	(*GetTitleDetailsQueryResponse_Season_Episode)(nil), // 13: title.v1.GetTitleDetailsQueryResponse.Season.Episode
+	(*MediaStream_ProxyHeader)(nil),                     // 14: title.v1.MediaStream.ProxyHeader
+	(*MediaStream_AudioTrack)(nil),                      // 15: title.v1.MediaStream.AudioTrack
+	(*MediaStream_SubtitleTrack)(nil),                   // 16: title.v1.MediaStream.SubtitleTrack
 }
 var file_api_title_v1_title_proto_depIdxs = []int32{
-	8,  // 0: title.v1.SearchTitlesQueryResponse.results:type_name -> title.v1.SearchTitlesQueryResponse.SearchResult
-	7,  // 1: title.v1.GetPlaybackStreamsQueryResponse.streams:type_name -> title.v1.MediaStream
+	10, // 0: title.v1.SearchTitlesQueryResponse.results:type_name -> title.v1.SearchTitlesQueryResponse.SearchResult
+	9,  // 1: title.v1.GetPlaybackStreamsQueryResponse.streams:type_name -> title.v1.MediaStream
 	0,  // 2: title.v1.GetTitleDetailsQueryResponse.media_type:type_name -> title.v1.MediaType
-	9,  // 3: title.v1.GetTitleDetailsQueryResponse.ratings:type_name -> title.v1.GetTitleDetailsQueryResponse.Rating
-	10, // 4: title.v1.GetTitleDetailsQueryResponse.seasons:type_name -> title.v1.GetTitleDetailsQueryResponse.Season
-	13, // 5: title.v1.MediaStream.audio_tracks:type_name -> title.v1.MediaStream.AudioTrack
-	14, // 6: title.v1.MediaStream.subtitles:type_name -> title.v1.MediaStream.SubtitleTrack
-	12, // 7: title.v1.MediaStream.proxy_headers:type_name -> title.v1.MediaStream.ProxyHeader
-	11, // 8: title.v1.GetTitleDetailsQueryResponse.Season.episodes:type_name -> title.v1.GetTitleDetailsQueryResponse.Season.Episode
-	1,  // 9: title.v1.TitleService.SearchTitles:input_type -> title.v1.SearchTitlesQuery
-	3,  // 10: title.v1.TitleService.GetPlaybackStreams:input_type -> title.v1.GetPlaybackStreamsQuery
-	5,  // 11: title.v1.TitleService.GetTitleDetails:input_type -> title.v1.GetTitleDetailsQuery
-	2,  // 12: title.v1.TitleService.SearchTitles:output_type -> title.v1.SearchTitlesQueryResponse
-	4,  // 13: title.v1.TitleService.GetPlaybackStreams:output_type -> title.v1.GetPlaybackStreamsQueryResponse
-	6,  // 14: title.v1.TitleService.GetTitleDetails:output_type -> title.v1.GetTitleDetailsQueryResponse
-	12, // [12:15] is the sub-list for method output_type
-	9,  // [9:12] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	11, // 3: title.v1.GetTitleDetailsQueryResponse.ratings:type_name -> title.v1.GetTitleDetailsQueryResponse.Rating
+	12, // 4: title.v1.GetTitleDetailsQueryResponse.seasons:type_name -> title.v1.GetTitleDetailsQueryResponse.Season
+	8,  // 5: title.v1.GetTitleDetailsQueryResponse.sections:type_name -> title.v1.Section
+	1,  // 6: title.v1.Section.kind:type_name -> title.v1.Section.Kind
+	15, // 7: title.v1.MediaStream.audio_tracks:type_name -> title.v1.MediaStream.AudioTrack
+	16, // 8: title.v1.MediaStream.subtitles:type_name -> title.v1.MediaStream.SubtitleTrack
+	14, // 9: title.v1.MediaStream.proxy_headers:type_name -> title.v1.MediaStream.ProxyHeader
+	8,  // 10: title.v1.MediaStream.sections:type_name -> title.v1.Section
+	13, // 11: title.v1.GetTitleDetailsQueryResponse.Season.episodes:type_name -> title.v1.GetTitleDetailsQueryResponse.Season.Episode
+	8,  // 12: title.v1.GetTitleDetailsQueryResponse.Season.Episode.sections:type_name -> title.v1.Section
+	2,  // 13: title.v1.TitleService.SearchTitles:input_type -> title.v1.SearchTitlesQuery
+	4,  // 14: title.v1.TitleService.GetPlaybackStreams:input_type -> title.v1.GetPlaybackStreamsQuery
+	6,  // 15: title.v1.TitleService.GetTitleDetails:input_type -> title.v1.GetTitleDetailsQuery
+	3,  // 16: title.v1.TitleService.SearchTitles:output_type -> title.v1.SearchTitlesQueryResponse
+	5,  // 17: title.v1.TitleService.GetPlaybackStreams:output_type -> title.v1.GetPlaybackStreamsQueryResponse
+	7,  // 18: title.v1.TitleService.GetTitleDetails:output_type -> title.v1.GetTitleDetailsQueryResponse
+	16, // [16:19] is the sub-list for method output_type
+	13, // [13:16] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_api_title_v1_title_proto_init() }
@@ -1126,8 +1313,8 @@ func file_api_title_v1_title_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_title_v1_title_proto_rawDesc), len(file_api_title_v1_title_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   14,
+			NumEnums:      2,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

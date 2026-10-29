@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ func TestClientSeriesAndEpisodeStreams(t *testing.T) {
 makePlayer({playlist:{seasons:[
   {"season":8,"blocked":false,"episodes":[
     {"episode":"10","hls":"%s/s8e10/master.m3u8?token=base","audio":{"names":["Dub"]},"duration":2600,"title":"Episode 10"},
-    {"episode":"1","hls":"%s/s8e1/master.m3u8?token=base","audio":{"names":["LostFilm","Eng.Original"]},"cc":[{"url":"%s/subtitles/ru.vtt","name":"Рус. полные"}],"duration":2594,"title":"House \"]\""},
+    {"episode":"1","hls":"%s/s8e1/master.m3u8?token=base","audio":{"names":["LostFilm","Eng.Original"]},"cc":[{"url":"%s/subtitles/ru.vtt","name":"Рус. полные"}],"duration":2594,"title":"House \"]\"","sections":[{"type":"screen","start":96.5,"end":208.25,"skip":true,"title":""},{"type":"repeat","start":0,"end":96.5,"skip":true},{"type":"titer","start":"2530.1","end":2594.4,"skip":false},{"type":"ads","start":10,"end":20,"skip":true},{"type":"repeat","start":5,"end":5,"skip":true}]},
     {"episode":"2","hls":"%s/s8e2/master.m3u8?token=base","audio":{"names":["Dub"]},"duration":2580,"title":"Episode 2"}
   ]},
   {"season":"1","blocked":false,"episodes":[
@@ -92,6 +93,17 @@ video.m3u8
 		episodes[0].DurationSeconds != 2594 || episodes[0].Title != `House "]"` {
 		t.Fatalf("unexpected episodes: %+v", episodes)
 	}
+	wantSections := []Section{
+		{Kind: SectionRecap, Start: 0, End: 96.5, Skippable: true},
+		{Kind: SectionIntro, Start: 96.5, End: 208.25, Skippable: true},
+		{Kind: SectionCredits, Start: 2530.1, End: 2594.4},
+	}
+	if got := seasons[1].Episodes[0].Sections; !reflect.DeepEqual(got, wantSections) {
+		t.Fatalf("episode sections = %+v, want %+v", got, wantSections)
+	}
+	if got := seasons[1].Episodes[1].Sections; got != nil {
+		t.Fatalf("unmarked episode sections = %+v, want none", got)
+	}
 
 	streams, err := client.EpisodeStreams(ctx, seriesID, 8, "1")
 	if err != nil {
@@ -101,6 +113,10 @@ video.m3u8
 		len(streams[0].AudioTracks) != 2 || streams[0].AudioTracks[0].Name != "LostFilm" ||
 		len(streams[0].Subtitles) != 1 || streams[0].Subtitles[0].Language != "ru" {
 		t.Fatalf("unexpected streams: %+v", streams)
+	}
+	if !reflect.DeepEqual(streams[0].Sections, wantSections) || streams[0].SectionsDuration != 2594 {
+		t.Fatalf("stream sections = %+v of %v, want %+v of 2594",
+			streams[0].Sections, streams[0].SectionsDuration, wantSections)
 	}
 
 	if _, err := client.EpisodeStreams(ctx, seriesID, 8, "404"); !errors.Is(err, ErrEpisodeNotFound) {

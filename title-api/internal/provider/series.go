@@ -38,6 +38,8 @@ type Episode struct {
 	Number          string
 	Title           string
 	DurationSeconds uint64
+	// Marked on a video of DurationSeconds.
+	Sections []Section
 }
 
 type seriesSeason struct {
@@ -53,6 +55,7 @@ type seriesEpisode struct {
 	CC       []embedSubtitleEntry `json:"cc"`
 	Duration uint64               `json:"duration"`
 	Title    string               `json:"title"`
+	Sections []playerSection      `json:"sections"`
 }
 
 type seriesEpisodeAudio struct {
@@ -151,6 +154,10 @@ func (c *Client) EpisodeStreams(
 	streamErrors := make([]error, 0)
 	seriesEmbeds := 0
 	episodeFound := false
+	// The first primary player that marks the episode's sections; all its
+	// streams get them, also when that player's own stream fails.
+	var episodeSections []Section
+	var sectionsDuration float64
 	for index, embedURL := range embedURLs {
 		embedHTML, _, fetchErr := c.get(ctx, current, embedURL, c.providerURL().String()+"/")
 		if fetchErr != nil {
@@ -171,6 +178,10 @@ func (c *Client) EpisodeStreams(
 			continue
 		}
 		episodeFound = true
+		marked := sections(episode.Sections)
+		if episodeSections == nil && len(marked) > 0 {
+			episodeSections, sectionsDuration = marked, float64(episode.Duration)
+		}
 		if strings.TrimSpace(episode.HLS) == "" {
 			streamErrors = append(streamErrors, fmt.Errorf("%s: episode has no HLS URL", embedURL))
 			continue
@@ -193,6 +204,9 @@ func (c *Client) EpisodeStreams(
 			continue
 		}
 		stream.Name = primaryStreamName(index, len(embedURLs))
+		if len(marked) > 0 {
+			stream.Sections, stream.SectionsDuration = marked, float64(episode.Duration)
+		}
 		streams = append(streams, stream)
 	}
 	for _, playerURL := range alternativePlayerURLs(movieHTML, c.providerURL().Scheme) {
@@ -209,6 +223,7 @@ func (c *Client) EpisodeStreams(
 		streams = append(streams, alternative...)
 	}
 	if len(streams) > 0 {
+		shareSections(streams, episodeSections, sectionsDuration)
 		return streams, nil
 	}
 	if seriesEmbeds == 0 {
@@ -311,13 +326,21 @@ func mergeSeasons(target map[int32]map[string]Episode, source []seriesSeason) {
 			if number == "" {
 				continue
 			}
-			if _, exists := target[key][number]; exists {
+			marked := sections(episode.Sections)
+			if existing, exists := target[key][number]; exists {
+				// Another player may mark what the first did not, on a
+				// video of its own duration.
+				if len(existing.Sections) == 0 && len(marked) > 0 {
+					existing.Sections, existing.DurationSeconds = marked, episode.Duration
+					target[key][number] = existing
+				}
 				continue
 			}
 			target[key][number] = Episode{
 				Number:          number,
 				Title:           html.UnescapeString(episode.Title),
 				DurationSeconds: episode.Duration,
+				Sections:        marked,
 			}
 		}
 	}

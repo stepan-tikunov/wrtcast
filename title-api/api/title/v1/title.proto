@@ -72,6 +72,8 @@ message GetTitleDetailsQueryResponse {
       string episode_number = 1;
       string title = 2;
       uint64 duration_seconds = 3;
+      // Marked on a video of duration_seconds.
+      repeated Section sections = 4;
     }
 
     int32 season_number = 1;
@@ -93,6 +95,29 @@ message GetTitleDetailsQueryResponse {
   repeated Rating ratings = 13;
   uint64 duration_seconds = 14;
   repeated Season seasons = 15;
+  // A movie's, marked on a video of duration_seconds; an episode's are with
+  // the episode.
+  repeated Section sections = 16;
+}
+
+// A part of a movie or an episode that viewers may skip, as the primary
+// player marks it, in seconds from the start of the video.
+message Section {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    // What happened in the earlier episodes.
+    KIND_RECAP = 1;
+    // The opening titles.
+    KIND_INTRO = 2;
+    // The end titles.
+    KIND_CREDITS = 3;
+  }
+
+  Kind kind = 1;
+  double start_seconds = 2;
+  double end_seconds = 3;
+  // False when there is more to see, such as a scene after the credits.
+  bool skippable = 4;
 }
 
 message MediaStream {
@@ -122,4 +147,9 @@ message MediaStream {
   repeated SubtitleTrack subtitles = 3;
   repeated ProxyHeader proxy_headers = 4;
   string name = 5;
+  // The sections of the movie or the episode, which all its streams share:
+  // the primary player's, marked on its video of sections_duration_seconds.
+  // Another stream's video may be a little longer or shorter.
+  repeated Section sections = 6;
+  double sections_duration_seconds = 7;
 }

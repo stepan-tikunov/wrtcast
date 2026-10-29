@@ -33,6 +33,9 @@ type TitleMetadata struct {
 	Actors          []string
 	Ratings         []Rating
 	DurationSeconds uint64
+	// A movie's, marked on a video of DurationSeconds; an episode's are
+	// with the episode (see Series).
+	Sections []Section
 }
 
 type Rating struct {
@@ -51,7 +54,7 @@ func (c *Client) TitleMetadata(ctx context.Context, externalMovieID string) (Tit
 		return TitleMetadata{}, fmt.Errorf("parse title metadata: %w", err)
 	}
 	metadata.TitleID = externalMovieID
-	metadata.MediaType, metadata.DurationSeconds, err = c.mediaTypeFromEmbeds(ctx, current, embedURLs)
+	metadata.MediaType, metadata.DurationSeconds, metadata.Sections, err = c.mediaTypeFromEmbeds(ctx, current, embedURLs)
 	if err != nil {
 		// The primary players may be down while the alternative ones on the
 		// same page still work; their catalog tells movies from series.
@@ -87,9 +90,12 @@ func (c *Client) mediaTypeFromEmbeds(
 	ctx context.Context,
 	current *session,
 	embedURLs []string,
-) (MediaType, uint64, error) {
+) (MediaType, uint64, []Section, error) {
 	hasMovie := false
 	var durationSeconds uint64
+	// The first player that marks them, with its duration, as the one they
+	// were marked on.
+	var marked []Section
 	fetchErrors := make([]error, 0)
 	for _, embedURL := range embedURLs {
 		embedHTML, _, err := c.get(ctx, current, embedURL, c.providerURL().String()+"/")
@@ -98,7 +104,7 @@ func (c *Client) mediaTypeFromEmbeds(
 			continue
 		}
 		if containsSeriesPlaylist(embedHTML) {
-			return MediaTypeSeries, 0, nil
+			return MediaTypeSeries, 0, nil, nil
 		}
 		hlsMatch := hlsPattern.FindSubmatch(embedHTML)
 		if len(hlsMatch) == 2 {
@@ -107,21 +113,28 @@ func (c *Client) mediaTypeFromEmbeds(
 			if duration == 0 {
 				duration, _ = c.durationFromEmbedHLS(ctx, current, embedHTML, hlsMatch[1])
 			}
-			if duration > durationSeconds {
+			if list := movieSections(embedHTML); marked == nil && len(list) > 0 && duration > 0 {
+				marked, durationSeconds = list, duration
+			}
+			if marked == nil && duration > durationSeconds {
 				durationSeconds = duration
 			}
 		}
 	}
 	if hasMovie {
-		return MediaTypeMovie, durationSeconds, nil
+		return MediaTypeMovie, durationSeconds, marked, nil
 	}
 	if len(fetchErrors) > 0 {
-		return MediaTypeUnspecified, 0, fmt.Errorf("inspect player embeds: %w", errors.Join(fetchErrors...))
+		return MediaTypeUnspecified, 0, nil, fmt.Errorf("inspect player embeds: %w", errors.Join(fetchErrors...))
 	}
-	return MediaTypeUnspecified, 0, ErrMediaTypeUnknown
+	return MediaTypeUnspecified, 0, nil, ErrMediaTypeUnknown
 }
 
 func playerDuration(embedHTML []byte) uint64 {
+	return uint64(math.Round(playerDurationSeconds(embedHTML)))
+}
+
+func playerDurationSeconds(embedHTML []byte) float64 {
 	match := titleDurationPattern.FindSubmatch(embedHTML)
 	if len(match) != 2 {
 		return 0
@@ -130,7 +143,7 @@ func playerDuration(embedHTML []byte) uint64 {
 	if err != nil || duration <= 0 {
 		return 0
 	}
-	return uint64(math.Round(duration))
+	return duration
 }
 
 func (c *Client) durationFromEmbedHLS(
