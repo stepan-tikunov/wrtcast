@@ -105,6 +105,9 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #prog div{width:0;height:100%;background:var(--ac)}
 /* Faded out where the bar starts, under the handle, to fade in on folding. */
 #pl.open #prog{top:13px;opacity:0}
+/* Skips the recap or the intro playing now, over the panel's right edge. */
+#skipb{position:absolute;right:16px;bottom:calc(100% + 12px);height:44px;padding:0 18px;box-shadow:0 4px 20px #000a;animation:pop .25s cubic-bezier(.2,.8,.2,1)}
+#pl.pending #skipb{display:none}
 #bar{position:relative;display:flex;align-items:center;gap:12px;min-height:72px}
 /* The poster grows with a transform so it does not lay the bar out. While
    loading it dims. */
@@ -345,6 +348,7 @@ svg.spring{animation:spring .3s ease-out}
   <div id="plbg"></div>
   <div id="prog"><div></div></div>
   <div id="handle"></div>
+  <button class="pill ac" id="skipb" hidden></button>
   <div id="bar">
     <span id="thumb"><img alt=""></span>
     <div class="t"><b id="title"></b><span id="st"></span></div>
@@ -375,7 +379,8 @@ svg.spring{animation:spring .3s ease-out}
     <div class="row"><div class="sel"><label for="audio">Озвучка</label><select id="audio"></select></div><div class="sel"><label for="subs">Субтитры</label><div class="pick"><select id="subs"></select><button class="ib" id="styb" aria-label="Вид субтитров">Aa</button></div></div></div>
     <div class="row" id="qrow"><div class="sel" id="srcsel"><label for="source">Источник</label><select id="source"></select></div><div class="sel" id="qsel"><label for="quality">Качество</label><select id="quality"></select></div></div>
     <div class="row" id="drcrow" hidden><label class="sw"><span>Выравнивать громкость<small>Тише музыка и взрывы, громче речь</small></span><input type="checkbox" id="drc"></label></div>
-    <div class="row" id="nextrow" hidden><label class="sw"><span>Следующая серия<small>Включится сама, когда эта закончится</small></span><input type="checkbox" id="autonext"></label></div>
+    <div class="row"><label class="sw"><span>Пропускать повтор и заставку<small>Роутер перемотает их сам</small></span><input type="checkbox" id="autoskip"></label></div>
+    <div class="row" id="nextrow" hidden><label class="sw"><span>Следующая серия<small>Включится сама, как начнутся титры</small></span><input type="checkbox" id="autonext"></label></div>
     <div class="row" id="eprow"><button class="pill" id="eplist"><svg><use href="#i-list"/></svg>Серии</button></div>
     <button id="stop" data-c="stop">Остановить</button>
     <button id="devname"><svg><use href="#i-tv"/></svg><span></span></button>
@@ -1135,6 +1140,7 @@ async function play(m) {
   const drc = m.drc ?? localStorage.drc; // the router ignores it where it can't level
   if (drc) req.drc = String(drc);
   req.autonext = localStorage.autonext || '1'; // on unless turned off
+  req.autoskip = localStorage.autoskip || '0';
   req.style = styleSpec(subStyle || {}); // the receiver resets it on every load
   if (m.season != null) Object.assign(req, { season: String(m.season), episode: m.episode });
   pending = req;
@@ -1260,6 +1266,19 @@ function showTime() {
   $('st').textContent = epLine(st.now);
   $('prog').firstChild.style.width = m.duration ? (100 * t / m.duration) + '%' : 0;
   if (drag != 'pos') showPos(t, m.duration);
+  showSkip(t);
+}
+
+// The recap or the intro playing now gets a button that skips it, unless
+// the router skips it itself (autoskip), which it doesn't once rewound into.
+function showSkip(t) {
+  const n = st?.now, secs = n?.sections || [];
+  const i = secs.findIndex(x => x.kind != 'credits' && x.skip && t >= x.start && t < x.end - 1);
+  const b = $('skipb');
+  b.hidden = i < 0 || (n.autoskip && !n.skipped?.includes(i));
+  if (b.hidden) return;
+  b.textContent = secs[i].kind == 'recap' ? 'Пропустить повтор' : 'Пропустить заставку';
+  b.dataset.to = secs[i].end;
 }
 
 // The line under the title: the episode of a series.
@@ -1288,6 +1307,7 @@ function renderBar() {
   $('opts').classList.toggle('pending', !!pending);
   if (pending) {
     // The controls of what starts, not of what was on.
+    $('skipb').hidden = true;
     $('st').textContent = epLine(pending);
     $('prog').firstChild.style.width = 0;
     showPos(0, 0);
@@ -1347,6 +1367,7 @@ function render(s) {
   $('eprow').hidden = !series;
   $('nextrow').hidden = !series;
   $('autonext').checked = !!s.now?.autonext;
+  $('autoskip').checked = !!s.now?.autoskip;
   showSeries(series);
   if (drag != 'vol' && s.volume != null) showVol(s.volume * 100);
   icon('mu', s.muted ? 'mute' : 'vol');
@@ -2101,6 +2122,17 @@ document.querySelectorAll('[data-c]').forEach(b => b.onclick = e => {
   else cmd(c, b.dataset.a);
 });
 $('bar').onclick = () => setPlayer(!plOpen);
+// The timer moves to the end of the section right away, as with ±10.
+$('skipb').onclick = e => {
+  e.stopPropagation();
+  const m = st?.media, to = +$('skipb').dataset.to;
+  if (!m) return;
+  m.time = to;
+  statusAt = Date.now();
+  showTime();
+  syncSession();
+  cmd('seek', to.toFixed(1));
+};
 $('collapse').onclick = e => {
   e.stopPropagation();
   setPlayer(false);
@@ -2243,6 +2275,17 @@ $('autonext').onchange = async e => {
   localStorage.autonext = e.target.checked ? '1' : '0';
   try {
     render(await api(withDevice('autonext'), { on: localStorage.autonext }));
+  } catch (err) {
+    toast(err);
+  }
+};
+// The router skips them itself, also with the page closed.
+$('autoskip').onchange = async e => {
+  localStorage.autoskip = e.target.checked ? '1' : '0';
+  if (st?.now) st.now.autoskip = e.target.checked;
+  showTime();
+  try {
+    render(await api(withDevice('autoskip'), { on: localStorage.autoskip }));
   } catch (err) {
     toast(err);
   }

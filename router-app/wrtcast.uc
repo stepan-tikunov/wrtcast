@@ -17,6 +17,7 @@ const FLUSH = 300;                           // seconds between flash writes
 const DONE = 0.85;                           // an episode left this far in is watched
 const TTL = 30 * 86400;                      // progress older than this is forgotten
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
+const HORIZON = 75;                          // seconds ahead a section is waited for (see plan)
 const DRC = '/tmp/wrtcast.drc/';             // audio segments of the leveler
 const ERR = '/tmp/wrtcast.err.';           // + ns; stderr of a proxied fetch
 const COMMANDS = {
@@ -615,6 +616,20 @@ function title_id(p) {
 	return p.id;
 }
 
+const SECTION_KINDS = { KIND_RECAP: 'recap', KIND_INTRO: 'intro', KIND_CREDITS: 'credits' };
+
+// title-api's sections of a movie or an episode: [{ kind: recap, intro or
+// credits, start, end, skip }], skip false when there is more to see after
+// them, such as a scene after the credits.
+function sections(list) {
+	let r = [];
+	for (let x in list ?? [])
+		if (SECTION_KINDS[x?.kind] && +x.endSeconds > +x.startSeconds)
+			push(r, { kind: SECTION_KINDS[x.kind], start: +x.startSeconds,
+				end: +x.endSeconds, skip: !!x.skippable });
+	return sort(r, (a, b) => a.start - b.start);
+}
+
 // Streams of a movie, or of an episode when season is given.
 function streams(id, season, episode) {
 	let r = api(`/v1/titles/${id}/playback-streams` + (season == null ? '' :
@@ -633,6 +648,8 @@ function streams(id, season, episode) {
 			id: t.id, name: replace(t.name ?? '', / +- +[0-9]+$/, ''),
 			lang: t.language, forced: !!t.forced, url: t.playlistUrl,
 		})),
+		// Marked on a video of sdur seconds (see sections_of).
+		sections: sections(s.sections), sdur: +(s.sectionsDurationSeconds ?? 0),
 	}));
 }
 
@@ -647,6 +664,121 @@ function title_streams(dev, id, season, episode, force) {
 	c = { id, season, episode, streams: streams(id, season, episode), fetched: time() };
 	tv_set(key, 'list', c);
 	return c;
+}
+
+// ---- sections --------------------------------------------------------------
+//
+// title-api tells the recap, the intro and the credits of a movie or an
+// episode (see sections). With autoskip the router skips the recap and the
+// intro, and with autonext it starts the next episode once the credits
+// start, also with the page closed. A CGI has no timer, so the status
+// requests and the tick (see watch_end) plan what is due next and leave a
+// process (wrtcast due) that sleeps until then, checks the TV and does it.
+
+// The time now, in seconds with a fraction.
+function clock_now() {
+	let c = clock();
+	return c[0] + c[1] / 1e9;
+}
+
+// The sections of now on the video the TV plays, of dur seconds. The
+// sections are marked on the primary player's video, which another
+// source's may differ from by a logo or a few seconds at either end: the
+// ones at the start move back by what a shorter video lacks and the credits
+// on by what a longer one has, so a skip never cuts into the episode and the
+// next one never starts before the credits do. A video off by more than a
+// minute is another cut, and gets none.
+function sections_of(now, dur) {
+	let list = now?.sections ?? [], ref = +(now?.sdur ?? 0), r = [];
+	let d = ref > 0 ? dur - ref : 0;
+	if (!length(list) || !(dur > 0) || d > 60 || d < -60)
+		return r;
+	for (let x in list) {
+		let shift = x.kind == 'credits' ? max(0, d) : min(0, d);
+		let start = max(0, x.start + shift), end = min(dur, x.end + shift);
+		if (end - start >= 1)
+			push(r, { ...x, start, end });
+	}
+	return r;
+}
+
+// The plan of the TV of key: { url, done: { <index>: true } of the sections
+// skipped, and of the waiting process token, i and act of what it waits
+// for, at when }.
+const plan_get = key => json(kv_get('due:' + key) ?? 'null');
+const plan_set = (key, p) => kv_set('due:' + key, p);
+
+// The indexes of the sections of now skipped (see plan_get).
+function skipped(key, now) {
+	let p = plan_get(key);
+	return p?.url == now.url ? map(keys(p.done ?? {}), i => +i) : [];
+}
+
+// What is due next while now plays as media status m tells: { in, the
+// seconds until it, i, its section, act: skip, to where, idx, the
+// sections skipped, or next }, the nearest one; null for none. done are the
+// sections skipped already: rewound into, they are not skipped again. A
+// recap and the intro right after it are skipped at once.
+function due(now, m, done) {
+	if (m?.url != now.url || m.state != 'PLAYING')
+		return null;
+	let pos = +(m.time ?? 0), rate = +(m.rate ?? 1) || 1;
+	let list = sections_of(now, +(m.duration ?? 0)), best = null;
+	for (let i, x in list) {
+		let d = null;
+		if (x.kind != 'credits' && x.skip && now.autoskip && !done?.[i]) {
+			d = { act: 'skip', to: x.end, idx: [i] };
+			for (let j = i + 1; j < length(list); j++) {
+				let y = list[j];
+				if (y.kind == 'credits' || !y.skip || y.start - d.to > 1)
+					break;
+				d.to = y.end;
+				push(d.idx, j);
+			}
+			// A second short of the end is not worth a seek.
+			if (pos >= d.to - 1)
+				continue;
+		} else if (x.kind == 'credits' && x.skip && now.autonext && now.season != null &&
+		           !now.next_at) {
+			if (pos >= x.end - 1)
+				continue;
+			d = { act: 'next' };
+		} else {
+			continue;
+		}
+		d.in = max(0, (x.start - pos) / rate);
+		d.i = i;
+		if (!best || d.in < best.in)
+			best = d;
+	}
+	return best;
+}
+
+// Whether the credits of now have started on the TV (st) and the next
+// episode is due (see play_next).
+function at_credits(now, st) {
+	let d = st.app?.id == 'CC1AD845' ? due(now, st.media, null) : null;
+	return d?.act == 'next' && d.in == 0;
+}
+
+// Leaves a process to do what is due within HORIZON seconds, the time to
+// the next tick, unless one already waits for it then.
+function plan(key, now, m) {
+	let p = plan_get(key);
+	if (p?.url != now.url)
+		p = { url: now.url, done: {} };
+	let d = due(now, m, p.done);
+	if (!d || d.in > HORIZON)
+		return;
+	let at = clock_now() + d.in;
+	if (p.token && p.i == d.i && p.act == d.act && p.at - at < 1.5 && at - p.at < 1.5)
+		return;
+	p.token = hash(`${clock_now()} ${key}`);
+	p.i = d.i;
+	p.act = d.act;
+	p.at = at;
+	plan_set(key, p);
+	system(`${shq(sourcepath())} due ${shq(key)} ${p.token} </dev/null >/dev/null 2>&1 &`);
 }
 
 // ---- watch progress --------------------------------------------------------
@@ -820,6 +952,7 @@ function watch_end(now, st) {
 				pos: +(m.time ?? 0), dur: +(m.duration ?? 0), paused: m.state == 'PAUSED',
 				buffering: m.state == 'BUFFERING', rate: +(m.rate ?? 1), at: time(),
 			});
+		plan(key, now, m);
 		return;
 	}
 	if (!ended(now, st, tv_get(key, 'seen')))
@@ -1076,8 +1209,15 @@ function with_now(st, dev) {
 		sources: map(now.streams ?? [], s => s.name),
 		// Whether the volume leveler is on, and whether the source allows it.
 		drc: !!now.drc, drc_ok: !!now.drc_ok,
-		// Whether the router starts the next episode once this one ends.
+		// Whether the router starts the next episode once this one ends
+		// (or its credits start).
 		autonext: !!now.autonext,
+		// Whether the router skips the recap and the intro, the sections on
+		// the video the TV plays (see sections_of), and the ones it skipped
+		// (by index), which it leaves be once they are rewound into.
+		autoskip: !!now.autoskip,
+		sections: sections_of(now, +(st.media.duration ?? 0)),
+		skipped: skipped(key, now),
 	};
 	for (let t in st.media.tracks ?? []) {
 		t.label = now.labels?.[t.name] ?? t.name;
@@ -1469,7 +1609,7 @@ function play(dev, p, keep) {
 		fail(400, 'invalid subtitle style');
 	if (p.source != null && (length(p.source) > 100 || match(p.source, /[[:cntrl:]]/)))
 		fail(400, 'invalid source');
-	for (let k in ['drc', 'autonext'])
+	for (let k in ['drc', 'autonext', 'autoskip'])
 		if (p[k] != null && !match(p[k], /^[01]$/))
 			fail(400, `invalid ${k}`);
 	// A title watched before starts again with what it was watched with
@@ -1601,6 +1741,10 @@ function play(dev, p, keep) {
 		// Without autonext a replay of the same title (an older page)
 		// keeps what was set.
 		autonext: p.autonext != null ? p.autonext == '1' : last?.id == id && !!last.autonext,
+		// The recap and the intro are skipped by the router (see plan),
+		// as the next episode is started.
+		autoskip: p.autoskip != null ? p.autoskip == '1' : !!last?.autoskip,
+		sections: s.sections ?? [], sdur: s.sdur ?? 0,
 		style: p.style ?? null,
 		streams: list, fetched, started: time(),
 		// Only our own proxy paths, so the UI never loads arbitrary URLs.
@@ -1642,7 +1786,7 @@ function play(dev, p, keep) {
 function play_next(key) {
 	let now = now_get(key), seen = tv_get(key, 'seen');
 	let dev = { host: now?.host }, st = now?.host ? castctl_try(dev, 'status') : null;
-	if (!st || !ended(now, st, seen)) {
+	if (!st || !ended(now, st, seen) && !at_credits(now, st)) {
 		// Not over after all: polls and ticks may start it later.
 		sql_do('UPDATE tvs SET next_lock = NULL WHERE key = ?', key);
 		return;
@@ -1673,8 +1817,58 @@ function play_next(key) {
 		id: now.id, title: now.title, poster: now.poster,
 		season: `${s.seasonNumber}`, episode: `${e.episodeNumber}`,
 		source: now.source, quality: now.quality, drc: now.drc ? '1' : '0',
-		autonext: '1', style: now.style,
-	}, { audio: seen.audio, subs: seen.subs });
+		autonext: '1', autoskip: now.autoskip ? '1' : '0', style: now.style,
+	}, { audio: seen?.audio, subs: seen?.subs });
+}
+
+// The process plan left (token): sleeps until what it waits for is due,
+// checks the TV and does it, and waits for the next thing within HORIZON
+// seconds. A newer plan (another token) or another stream on the TV ends
+// it.
+function wake(key, token) {
+	for (let n = 0; n < 10; n++) {
+		let p = plan_get(key);
+		if (p?.token != token)
+			return;
+		let wait = p.at - clock_now();
+		if (wait > 0)
+			sleep(int(min(wait, HORIZON) * 1000));
+		p = plan_get(key);
+		let now = now_get(key);
+		if (p?.token != token || !now?.host || now.url != p.url)
+			return;
+		let dev = { host: now.host }, st = castctl_try(dev, 'status'), m = st?.media;
+		let d = m?.url == now.url ? due(now, m, p.done) : null;
+		if (d && d.in > 0.5 && d.in <= HORIZON) {
+			p.i = d.i;
+			p.act = d.act;
+			p.at = clock_now() + d.in;
+			plan_set(key, p);
+			continue;
+		}
+		if (!d || d.in > 0.5) {
+			p.token = null;
+			plan_set(key, p);
+			return;
+		}
+		if (d.act == 'next') {
+			p.token = null;
+			plan_set(key, p);
+			let t = time();
+			if (sql_do('UPDATE tvs SET next_lock = ? WHERE key = ? AND coalesce(next_lock, 0) < ?',
+			           t, key, t - 120))
+				play_next(key);
+			return;
+		}
+		for (let i in d.idx)
+			p.done[i] = true;
+		p.at = clock_now();
+		plan_set(key, p);
+		castctl_try(dev, 'seek', sprintf('%.1f', d.to));
+		// A seek reaches title-api at once (see /cmd).
+		if (valid_media(now.media))
+			media_headers(now.media, quality_digits(now.quality), d.to, true);
+	}
 }
 
 const routes = {
@@ -1721,11 +1915,15 @@ const routes = {
 			actors: r.actors ?? [],
 			ratings: map(r.ratings ?? [], x => ({ source: x.source, value: x.value })),
 			duration: +(r.durationSeconds ?? 0),
+			// A movie's, marked on a video of duration; an episode's are
+			// with the episode.
+			sections: series ? null : sections(r.sections),
 			seasons: !series ? null : map(r.seasons ?? [], s => ({
 				season: s.seasonNumber,
 				episodes: map(s.episodes ?? [], e => ({
 					episode: e.episodeNumber, title: e.title,
 					duration: +(e.durationSeconds ?? 0),
+					sections: sections(e.sections),
 				})),
 			})),
 		};
@@ -1787,6 +1985,19 @@ const routes = {
 		return with_now(castctl(dev, 'status'), dev);
 	},
 
+	// Turns the skipping of the recap and the intro on or off for what is
+	// on (see plan).
+	'POST /autoskip': p => {
+		if (!match(p.on ?? '', /^[01]$/))
+			fail(400, 'invalid on');
+		let dev = device(p), key = state_key(dev), now = now_get(key);
+		if (now) {
+			now.autoskip = p.on == '1';
+			now_set(key, now);
+		}
+		return with_now(castctl(dev, 'status'), dev);
+	},
+
 	'POST /cmd': p => {
 		let c = p.c ?? '', kind = COMMANDS[c], arg = p.arg ?? '';
 		if (!exists(COMMANDS, c))
@@ -1821,6 +2032,10 @@ if (ARGV[0] == 'tick') {
 }
 if (ARGV[0] == 'next' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
 	play_next(ARGV[1]);
+	exit(0);
+}
+if (ARGV[0] == 'due' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
+	wake(ARGV[1], ARGV[2]);
 	exit(0);
 }
 
