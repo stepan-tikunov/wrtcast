@@ -386,8 +386,10 @@ function quality_digits(l) {
 // (see watch_end), w, whether it waits for data (BUFFERING), b, the bytes
 // of the media's segments streamed so far, and e, the bandwidth of the
 // last few (see count_bytes), when known. The relay title-api names, if
-// any, is kept with the headers (see fetch_cmd). One
-// request refreshes them while the others go on with what there is for a
+// any, is kept with the headers (see fetch_cmd), and so are the sections
+// on the media's video once title-api aligned it with the primary
+// player's, or whether it still does (see sections_of). One request
+// refreshes them while the others go on with what there is for a
 // few seconds (a few may still refresh at once); a failed refresh keeps
 // the stale ones too.
 function media_headers(m, q, t, force) {
@@ -426,7 +428,9 @@ function media_headers(m, q, t, force) {
 		type(x?.value) == 'string'), x => `${x.name}: ${x.value}`);
 	if (type(r?.headers) == 'array' && (!length(hl) || valid_headers(join('\n', hl)))) {
 		c = { headers: hl, fetched: time(), ttl: +r.ttl > 0 ? +r.ttl : 60,
-			proxy: match(r.proxy ?? '', /^\/v1\/media\/[0-9a-f]{32}\/cdn$/) ? r.proxy : null };
+			proxy: match(r.proxy ?? '', /^\/v1\/media\/[0-9a-f]{32}\/cdn$/) ? r.proxy : null,
+			sections: type(r.sections) == 'array' && length(r.sections) ? sections(r.sections) : null,
+			aligning: !!r.aligning };
 		media_set(m, 'hdr', c);
 	}
 	return c?.headers;
@@ -681,14 +685,32 @@ function clock_now() {
 	return c[0] + c[1] / 1e9;
 }
 
+// What title-api tells of the sections on the video of now, a title-api
+// media, as of its headers: { sections, aligning }; null for another
+// stream. With refresh, stale headers are asked for again (see
+// media_headers), which tells title-api the playback goes on, so only
+// while the TV plays the media.
+function aligned(now, refresh) {
+	if (!valid_media(now?.media))
+		return null;
+	if (refresh)
+		media_headers(now.media);
+	return media_get(now.media, 'hdr');
+}
+
 // The sections of now on the video the TV plays, of dur seconds. The
 // sections are marked on the primary player's video, which another
-// source's may differ from by a logo or a few seconds at either end: the
-// ones at the start move back by what a shorter video lacks and the credits
-// on by what a longer one has, so a skip never cuts into the episode and the
-// next one never starts before the credits do. A video off by more than a
-// minute is another cut, and gets none.
+// source's may differ from by a logo or a few seconds at either end. The
+// alternative player's video title-api aligns with it by their frames, and
+// then tells the sections on it (see aligned). Otherwise the ones at the
+// start move back by what a shorter video lacks and the credits on by what
+// a longer one has, so a skip never cuts into the episode and the next one
+// never starts before the credits do. A video off by more than a minute is
+// another cut, and gets none.
 function sections_of(now, dur) {
+	let a = aligned(now);
+	if (a?.sections)
+		return a.sections;
 	let list = now?.sections ?? [], ref = +(now?.sdur ?? 0), r = [];
 	let d = ref > 0 ? dur - ref : 0;
 	if (!length(list) || !(dur > 0) || d > 60 || d < -60)
@@ -718,11 +740,14 @@ function skipped(key, now) {
 // seconds until it, i, its section, act: skip, to where, idx, the
 // sections skipped, or next }, the nearest one; null for none. done are the
 // sections skipped already: rewound into, they are not skipped again. A
-// recap and the intro right after it are skipped at once.
+// recap and the intro right after it are skipped at once. While title-api
+// still aligns the video at the start of a playback (for 20 s at most), a
+// skip waits for it, a second at a time.
 function due(now, m, done) {
 	if (m?.url != now.url || m.state != 'PLAYING')
 		return null;
 	let pos = +(m.time ?? 0), rate = +(m.rate ?? 1) || 1;
+	let hold = !!aligned(now, true)?.aligning;
 	let list = sections_of(now, +(m.duration ?? 0)), best = null;
 	for (let i, x in list) {
 		let d = null;
@@ -747,6 +772,8 @@ function due(now, m, done) {
 			continue;
 		}
 		d.in = max(0, (x.start - pos) / rate);
+		if (hold && d.act == 'skip')
+			d.in = max(d.in, 1);
 		d.i = i;
 		if (!best || d.in < best.in)
 			best = d;
