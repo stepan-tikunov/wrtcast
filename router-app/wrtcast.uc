@@ -93,12 +93,13 @@ function load(f) {
 // flash every few minutes (see keep) and back on the first request after a
 // boot. Files are left for the leveler's segments and fetches' stderr.
 
-const SCHEMA = 1;
+const SCHEMA = 2;
 
 // The history tables in schema s: per title, when it was last watched, its
 // name and poster for the recently watched list, a series' last episode and
 // what it was watched with (see watched_with); the position in a movie (ep
-// '') or in each episode ("season:episode").
+// '') or in each episode ("season:episode"); and the settings (see
+// setting).
 const HISTORY = s => `
 	CREATE TABLE ${s}.titles (
 		id TEXT PRIMARY KEY, title TEXT, poster TEXT,
@@ -107,7 +108,8 @@ const HISTORY = s => `
 	CREATE TABLE ${s}.progress (
 		id TEXT NOT NULL, ep TEXT NOT NULL, pos REAL NOT NULL, dur REAL NOT NULL,
 		done INTEGER NOT NULL, t INTEGER NOT NULL, PRIMARY KEY (id, ep)
-	);`;
+	);
+	CREATE TABLE ${s}.settings (key TEXT PRIMARY KEY, value TEXT);`;
 const TITLE_COLS = 'id, title, poster, season, episode, prefs, t';
 const PROGRESS_COLS = 'id, ep, pos, dur, done, t';
 
@@ -158,7 +160,8 @@ function import_json(P) {
 // Creates the tables in a new database (after a boot) and fills the history
 // from flash, or from the JSON file of the wrtcast before the database.
 // Another request may be doing the same: the one that gets the write lock
-// first does it.
+// first does it. A database of schema 1 (before the settings) gets the
+// settings table; a copy on flash of then has none.
 function init() {
 	let exec = q => db.exec(q) ?? db_fail();
 	let version = () => (db.query('PRAGMA user_version') ?? db_fail())[0].user_version;
@@ -167,7 +170,8 @@ function init() {
 	if (keep)
 		db.run('ATTACH ? AS keep', `file:${keep}?mode=ro`) ?? db_fail();
 	exec('BEGIN IMMEDIATE');
-	if (version() != SCHEMA) {
+	let v = version();
+	if (v == 0) {
 		exec(HISTORY('main') + TABLES);
 		if (keep)
 			exec(`INSERT INTO titles (${TITLE_COLS}) SELECT ${TITLE_COLS} FROM keep.titles;
@@ -175,6 +179,11 @@ function init() {
 		else
 			import_json(load('/tmp/wrtcast.progress.json') ??
 				load(conf('progress_file', '/etc/wrtcast.progress.json')));
+	} else if (v == 1)
+		exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)');
+	if (v != SCHEMA) {
+		if (keep && length(db.query("SELECT 1 FROM keep.sqlite_master WHERE name = 'settings'") ?? []))
+			exec('INSERT OR REPLACE INTO settings (key, value) SELECT key, value FROM keep.settings');
 		exec(`PRAGMA user_version = ${SCHEMA}`);
 	}
 	exec('COMMIT');
@@ -724,6 +733,26 @@ function sections_of(now, dur) {
 	return r;
 }
 
+// The skippable recap and intro (and what runs on right after them) that
+// pos is within, among list: { to, their end, idx, their indexes }; null
+// for none. As due skips them.
+function skips_at(list, pos) {
+	for (let i, x in list) {
+		if (x.kind == 'credits' || !x.skip || pos < x.start - 0.5 || pos >= x.end - 1)
+			continue;
+		let d = { to: x.end, idx: [i] };
+		for (let j = i + 1; j < length(list); j++) {
+			let y = list[j];
+			if (y.kind == 'credits' || !y.skip || y.start - d.to > 1)
+				break;
+			d.to = y.end;
+			push(d.idx, j);
+		}
+		return d;
+	}
+	return null;
+}
+
 // The plan of the TV of key: { url, done: { <index>: true } of the sections
 // skipped, and of the waiting process token, i and act of what it waits
 // for, at when }.
@@ -845,6 +874,7 @@ function keep() {
 	ok = ok && d.exec(`PRAGMA keep.journal_mode = OFF; BEGIN; ${HISTORY('keep')}
 		INSERT INTO keep.titles (${TITLE_COLS}) SELECT ${TITLE_COLS} FROM titles;
 		INSERT INTO keep.progress (${PROGRESS_COLS}) SELECT ${PROGRESS_COLS} FROM progress;
+		INSERT INTO keep.settings (key, value) SELECT key, value FROM settings;
 		COMMIT`) != null;
 	if (!ok)
 		d.exec('ROLLBACK');
@@ -862,6 +892,27 @@ function changed(force) {
 	if (force || time() - (kv_get('flushed') ?? 0) >= FLUSH)
 		keep();
 }
+
+// A setting of the router, as the page last set it ('0' or '1'), kept on
+// flash with the history; null while never set. autonext: the next episode
+// starts by itself; autoskip: the recap and the intro are skipped.
+function setting(k) {
+	return sql_row('SELECT value FROM settings WHERE key = ?', k)?.value;
+}
+
+function set_setting(k, v) {
+	sql_do('INSERT INTO settings (key, value) VALUES (?, ?) ' +
+	       'ON CONFLICT (key) DO UPDATE SET value = excluded.value', k, v);
+	changed(true);
+}
+
+// The settings as the page shows them: autonext is on unless turned off.
+const settings = () => ({
+	autonext: (setting('autonext') ?? '1') == '1',
+	autoskip: setting('autoskip') == '1',
+	// Never set on the router: the page may still have them of before.
+	unset: setting('autonext') == null && setting('autoskip') == null,
+});
 
 // What a title is watched with, for its next start (see play): the source,
 // the quality, and the dub and subtitles by name, since track ids differ
@@ -1212,6 +1263,7 @@ function qualities(body) {
 // title-api track id.
 function with_now(st, dev) {
 	st.device = { id: dev.id ?? null, name: dev.name ?? host_of(dev) };
+	st.settings = settings();
 	let key = state_key(dev), now = adopt(key, host_of(dev), now_get(key), st.media);
 	if (now)
 		watch_end(now, st);
@@ -1718,12 +1770,27 @@ function play(dev, p, keep) {
 	// Without start (or reuse) the title resumes where it was left off;
 	// start=0 plays it from the beginning.
 	let start = p.start ?? (p.reuse == '1' ? null : resume_at(id, season, episode));
+	let autoskip = p.autoskip != null ? p.autoskip == '1' : setting('autoskip') == '1';
 	// Tells title-api the quality and the position before the CDN sees
 	// a request; what the TV told of an earlier play of the media doesn't
 	// count.
 	if (m) {
 		sql_do('UPDATE media SET pos = NULL WHERE id = ?', m);
 		media_headers(m, quality_digits(quality), start != null ? +start : null, true);
+	}
+	// With autoskip a start within the recap or the intro (an episode from
+	// its start) goes past them at once, by the sections on this video if
+	// title-api tells them (which tells it the new position too), else by
+	// the marked ones. A replay (reuse) stays where it was.
+	let lead = null;
+	if (autoskip && p.reuse != '1') {
+		let hs = m ? media_get(m, 'hdr')?.sections : null;
+		lead = skips_at(hs ?? s.sections ?? [], +(start ?? 0));
+		if (lead) {
+			start = lead.to;
+			if (m)
+				media_headers(m, quality_digits(quality), start, true);
+		}
 	}
 	// Probed once per source, on the variant this play picks.
 	if (body != null) {
@@ -1767,10 +1834,10 @@ function play(dev, p, keep) {
 		// Kept for the next episode the router starts itself (see play_next).
 		// Without autonext a replay of the same title (an older page)
 		// keeps what was set.
-		autonext: p.autonext != null ? p.autonext == '1' : last?.id == id && !!last.autonext,
+		autonext: p.autonext != null ? p.autonext == '1' : settings().autonext,
 		// The recap and the intro are skipped by the router (see plan),
 		// as the next episode is started.
-		autoskip: p.autoskip != null ? p.autoskip == '1' : !!last?.autoskip,
+		autoskip,
 		sections: s.sections ?? [], sdur: s.sdur ?? 0,
 		style: p.style ?? null,
 		streams: list, fetched, started: time(),
@@ -1780,6 +1847,13 @@ function play(dev, p, keep) {
 	};
 	let put_back = () => now_set(key, last);
 	now_set(key, now);
+	// What the start went past counts as skipped (see plan).
+	if (lead) {
+		let done = {};
+		for (let i in lead.idx)
+			done[i] = true;
+		plan_set(key, { url, done });
+	}
 	sql_do('INSERT OR REPLACE INTO played (url, now, t) VALUES (?, ?, ?)', url, now, time());
 	undo = put_back;
 	let st = castctl(dev, ...args);
@@ -2005,6 +2079,7 @@ const routes = {
 		if (!match(p.on ?? '', /^[01]$/))
 			fail(400, 'invalid on');
 		let dev = device(p), key = state_key(dev), now = now_get(key);
+		set_setting('autonext', p.on);
 		if (now) {
 			now.autonext = p.on == '1';
 			now_set(key, now);
@@ -2012,12 +2087,13 @@ const routes = {
 		return with_now(castctl(dev, 'status'), dev);
 	},
 
-	// Turns the skipping of the recap and the intro on or off for what is
-	// on (see plan).
+	// Turns the skipping of the recap and the intro on or off, for what is
+	// on (see plan) and what starts later.
 	'POST /autoskip': p => {
 		if (!match(p.on ?? '', /^[01]$/))
 			fail(400, 'invalid on');
 		let dev = device(p), key = state_key(dev), now = now_get(key);
+		set_setting('autoskip', p.on);
 		if (now) {
 			now.autoskip = p.on == '1';
 			now_set(key, now);

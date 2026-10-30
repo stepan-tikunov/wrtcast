@@ -1139,8 +1139,7 @@ async function play(m) {
   if (m.source) req.source = m.source; // without it the router takes the main player
   const drc = m.drc ?? localStorage.drc; // the router ignores it where it can't level
   if (drc) req.drc = String(drc);
-  req.autonext = localStorage.autonext || '1'; // on unless turned off
-  req.autoskip = localStorage.autoskip || '0';
+  // autonext and autoskip are the router's settings (see render).
   req.style = styleSpec(subStyle || {}); // the receiver resets it on every load
   if (m.season != null) Object.assign(req, { season: String(m.season), episode: m.episode });
   pending = req;
@@ -1347,7 +1346,19 @@ function showSeries(series) {
 }
 
 let autoArmed = false;
+// The router keeps autonext and autoskip; a page from before that kept
+// them in its storage hands them over once.
+let settingsMoved = false;
+function moveSettings(s) {
+  if (settingsMoved || !s.settings?.unset) return;
+  settingsMoved = true;
+  for (const k of ['autonext', 'autoskip'])
+    if (localStorage[k] != null)
+      api(withDevice(k), { on: localStorage[k] }).then(render, () => {});
+}
+
 function render(s) {
+  moveSettings(s);
   if (otherEpisode(s)) reloadProgress(s.now.id);
   if (s.now) lastNow = s.now;
   st = s;
@@ -1366,8 +1377,8 @@ function render(s) {
   const series = s.now?.season != null;
   $('eprow').hidden = !series;
   $('nextrow').hidden = !series;
-  $('autonext').checked = !!s.now?.autonext;
-  $('autoskip').checked = !!s.now?.autoskip;
+  $('autonext').checked = !!(s.now?.autonext ?? s.settings?.autonext);
+  $('autoskip').checked = !!(s.now?.autoskip ?? s.settings?.autoskip);
   showSeries(series);
   if (drag != 'vol' && s.volume != null) showVol(s.volume * 100);
   icon('mu', s.muted ? 'mute' : 'vol');
@@ -2272,20 +2283,18 @@ $('drc').onchange = e => {
 };
 // The router starts the next episode itself, also with the page closed.
 $('autonext').onchange = async e => {
-  localStorage.autonext = e.target.checked ? '1' : '0';
   try {
-    render(await api(withDevice('autonext'), { on: localStorage.autonext }));
+    render(await api(withDevice('autonext'), { on: e.target.checked ? '1' : '0' }));
   } catch (err) {
     toast(err);
   }
 };
 // The router skips them itself, also with the page closed.
 $('autoskip').onchange = async e => {
-  localStorage.autoskip = e.target.checked ? '1' : '0';
   if (st?.now) st.now.autoskip = e.target.checked;
   showTime();
   try {
-    render(await api(withDevice('autoskip'), { on: localStorage.autoskip }));
+    render(await api(withDevice('autoskip'), { on: e.target.checked ? '1' : '0' }));
   } catch (err) {
     toast(err);
   }
