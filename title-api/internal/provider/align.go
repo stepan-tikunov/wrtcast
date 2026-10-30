@@ -28,9 +28,13 @@ import (
 // as soon as the playback starts, more further on, apart from the others,
 // so that the credits are moved by an anchor near them should the encodes
 // drift or one be cut differently. The anchors are kept per episode and
-// dub, also across restarts (AlignmentStore). Once a playback found its
-// first anchor, the beginning of the next episode's primary video is
-// decoded ahead, so that one needs only its own frames.
+// dub, also across restarts (AlignmentStore). The encodes of one release
+// begin alike, so an episode of a series not aligned yet has its sections
+// moved by the offset its last episodes found in the meantime, kept as
+// long (see seriesPrior), and its own anchors replace that as its playback
+// finds them. Once a playback found its first anchor, the beginning of the
+// next episode's primary video is decoded ahead, so that one needs only
+// its own frames.
 
 const (
 	// Seconds of the alternative's video an anchor is matched from, at
@@ -72,6 +76,7 @@ var alignScales = []float64{1, 24.0 / 25, 25.0 / 24, 24000.0 / 1001 / 25, 25 / (
 // sectionsReference is the primary player's video the sections of a movie
 // or an episode are marked on.
 type sectionsReference struct {
+	title    string
 	key      string // the title, and the season and the episode of one
 	master   string
 	sections []Section
@@ -144,6 +149,61 @@ func (a alignment) sections(ref sectionsReference, duration float64) []Section {
 	return result
 }
 
+// seriesPrior is how the alternative player's videos of a dub of a title
+// relate to the primary's lately: the offsets the first anchors of its last
+// few episodes found, oldest first, and the ratio of their lengths.
+type seriesPrior struct {
+	Scale   float64         `json:"scale"`
+	Offsets []episodeOffset `json:"offsets"`
+}
+
+type episodeOffset struct {
+	Episode string  `json:"episode"`
+	Offset  float64 `json:"offset"`
+}
+
+const (
+	// The episodes a prior keeps, and how far apart their offsets may be
+	// for the latest to be trusted for another episode.
+	priorEpisodes = 3
+	priorSpread   = 1.0
+)
+
+func priorKey(ref sectionsReference, label string) string {
+	return "prior:" + ref.title + "|" + strings.TrimSpace(label)
+}
+
+// predicted is the alignment of an episode not aligned yet: the latest
+// episode's offset, if the episodes kept agree.
+func (p seriesPrior) predicted() (alignment, bool) {
+	if len(p.Offsets) == 0 || p.Scale <= 0 {
+		return alignment{}, false
+	}
+	low, high := math.Inf(1), math.Inf(-1)
+	for _, o := range p.Offsets {
+		low, high = math.Min(low, o.Offset), math.Max(high, o.Offset)
+	}
+	if high-low > priorSpread {
+		return alignment{}, false
+	}
+	return alignment{Scale: p.Scale, Anchors: []anchor{{Offset: p.Offsets[len(p.Offsets)-1].Offset}}}, true
+}
+
+// with is the prior with an episode's offset in place of any it had.
+func (p seriesPrior) with(episode string, scale, offset float64) seriesPrior {
+	var kept []episodeOffset
+	for _, o := range p.Offsets {
+		if o.Episode != episode {
+			kept = append(kept, o)
+		}
+	}
+	kept = append(kept, episodeOffset{Episode: episode, Offset: offset})
+	if len(kept) > priorEpisodes {
+		kept = kept[len(kept)-priorEpisodes:]
+	}
+	return seriesPrior{Scale: scale, Offsets: kept}
+}
+
 // lengthScale is the ratio of the alternative video's length to the
 // primary's, as one of alignScales, the nearest within 2%; zero for none.
 func lengthScale(alternative, primary float64) float64 {
@@ -169,7 +229,8 @@ type videoAlignment struct {
 	mu         sync.Mutex
 	ref        sectionsReference
 	known      alignment
-	busy       bool // a match runs
+	prior      seriesPrior // the title's, for a video not aligned yet
+	busy       bool        // a match runs
 	failures   int
 	prefetched bool              // the next episode's primary video is decoded ahead
 	inits      map[string][]byte // the init segments relayed, by URL
@@ -205,14 +266,40 @@ func (c *Client) alignmentFor(ref sectionsReference, label string) *videoAlignme
 		v.prefetched = false
 	}
 	v.ref, v.used = ref, time.Now()
-	if fresh && c.alignmentStore != nil {
-		if text, err := c.alignmentStore.LoadAlignment(context.Background(), key); err != nil {
-			log.Printf("align %s: %v", key, err)
-		} else if text != "" && json.Unmarshal([]byte(text), &v.known) != nil {
+	if fresh {
+		if text := c.loadAligned(key); text != "" && json.Unmarshal([]byte(text), &v.known) != nil {
 			v.known = alignment{}
 		}
 	}
+	// Other episodes may have been aligned since.
+	if len(v.known.Anchors) == 0 {
+		v.prior = seriesPrior{}
+		if text := c.loadAligned(priorKey(ref, label)); text != "" && json.Unmarshal([]byte(text), &v.prior) != nil {
+			v.prior = seriesPrior{}
+		}
+	}
 	return v
+}
+
+func (c *Client) loadAligned(key string) string {
+	if c.alignmentStore == nil {
+		return ""
+	}
+	text, err := c.alignmentStore.LoadAlignment(context.Background(), key)
+	if err != nil {
+		log.Printf("align %s: %v", key, err)
+	}
+	return text
+}
+
+func (c *Client) saveAligned(key string, value any) {
+	if c.alignmentStore == nil {
+		return
+	}
+	text, _ := json.Marshal(value)
+	if err := c.alignmentStore.SaveAlignment(context.Background(), key, string(text)); err != nil {
+		log.Printf("align %s: %v", key, err)
+	}
 }
 
 func evictLeastUsed[V any](entries map[string]V, limit int, used func(V) time.Time) {
@@ -251,15 +338,19 @@ func (c *Client) alignStreams(streams []MovieStream, ref sectionsReference) {
 }
 
 // state is the sections on the alternative video, of duration seconds,
-// once there is an anchor; else whether one is still looked for within
-// alignPending of since, the playback's start. A playback of a video
-// aligned before decodes the next episode's ahead too.
+// once there is an anchor, else as the title's prior predicts them; else
+// whether an anchor is still looked for within alignPending of since, the
+// playback's start. A playback of a video aligned before decodes the next
+// episode's ahead too.
 func (v *videoAlignment) state(duration float64, since time.Time) ([]Section, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if len(v.known.Anchors) > 0 && v.known.Scale > 0 {
 		v.prefetchNext()
 		return v.known.sections(v.ref, duration), false
+	}
+	if predicted, ok := v.prior.predicted(); ok {
+		return predicted.sections(v.ref, duration), false
 	}
 	return nil, v.failures < alignAttempts && ffmpegPath() != "" && time.Since(since) < alignPending
 }
@@ -414,13 +505,15 @@ func (v *videoAlignment) match(run []tappedFragment, init []byte, duration float
 	v.known.Scale = known.Scale
 	v.known.Anchors = append(v.known.Anchors, found)
 	sort.Slice(v.known.Anchors, func(left, right int) bool { return v.known.Anchors[left].Primary < v.known.Anchors[right].Primary })
-	if c.alignmentStore != nil {
-		text, _ := json.Marshal(v.known)
-		if err := c.alignmentStore.SaveAlignment(context.Background(), v.key, string(text)); err != nil {
-			log.Printf("align %s: %v", v.key, err)
-		}
-	}
+	c.saveAligned(v.key, v.known)
 	if first {
+		// As it is now: another episode may have been aligned meanwhile.
+		key := priorKey(ref, strings.TrimPrefix(v.key, ref.key+"|"))
+		var prior seriesPrior
+		if text := c.loadAligned(key); text == "" || json.Unmarshal([]byte(text), &prior) != nil {
+			prior = seriesPrior{}
+		}
+		c.saveAligned(key, prior.with(ref.key, known.Scale, found.Offset))
 		v.prefetchNext()
 	}
 }

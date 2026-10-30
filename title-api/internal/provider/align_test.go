@@ -188,3 +188,24 @@ func TestFingerprintFlat(t *testing.T) {
 		t.Error("a black frame has a fingerprint")
 	}
 }
+
+func TestSeriesPrior(t *testing.T) {
+	var prior seriesPrior
+	if _, ok := prior.predicted(); ok {
+		t.Fatal("an empty prior predicts")
+	}
+	prior = prior.with("t|6|2", 1, -2.1).with("t|6|3", 1, -2.33)
+	predicted, ok := prior.predicted()
+	if !ok || predicted.Scale != 1 || len(predicted.Anchors) != 1 || predicted.Anchors[0].Offset != -2.33 {
+		t.Fatalf("predicted = %+v, %v", predicted, ok)
+	}
+	// An episode aligned again replaces its offset; the oldest go.
+	prior = prior.with("t|6|2", 1, -2.2).with("t|6|4", 1, -2.0).with("t|6|5", 1, -2.1)
+	if len(prior.Offsets) != priorEpisodes || prior.Offsets[0].Episode != "t|6|2" {
+		t.Fatalf("offsets = %+v", prior.Offsets)
+	}
+	// Episodes that disagree predict nothing.
+	if _, ok := prior.with("t|6|6", 1, 4).predicted(); ok {
+		t.Fatal("a prior of disagreeing episodes predicts")
+	}
+}

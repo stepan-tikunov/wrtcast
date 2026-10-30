@@ -213,12 +213,13 @@ func (c *Client) EpisodeStreams(
 		}
 		if marks {
 			reference = sectionsReference{
-				key: referenceKey(externalMovieID, seasonNumber, episodeNumber), master: stream.MasterPlaylistURL,
+				title: externalMovieID, key: referenceKey(externalMovieID, seasonNumber, episodeNumber), master: stream.MasterPlaylistURL,
 				sections: marked, duration: float64(episode.Duration),
 			}
 			if season, next, ok := nextEpisode(seasons, seasonNumber, episodeNumber); ok && strings.TrimSpace(next.HLS) != "" {
 				number := strings.TrimSpace(string(next.Episode))
 				reference.next = &sectionsReference{
+					title:    externalMovieID,
 					key:      referenceKey(externalMovieID, season, number),
 					master:   appendDynamicMarker(html.UnescapeString(next.HLS), marker),
 					sections: sections(next.Sections), duration: float64(next.Duration),

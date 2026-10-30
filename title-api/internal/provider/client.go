@@ -110,7 +110,7 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 	}
 	shareSections(streams, movieSections, sectionsDuration)
 	c.alignStreams(streams, sectionsReference{
-		key: referenceKey(externalMovieID, 0, ""), master: referenceMaster,
+		title: externalMovieID, key: referenceKey(externalMovieID, 0, ""), master: referenceMaster,
 		sections: movieSections, duration: sectionsDuration,
 	})
 	return streams, nil
