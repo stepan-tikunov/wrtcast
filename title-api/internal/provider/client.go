@@ -74,10 +74,14 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 	seriesEmbeds := 0
 	var movieSections []Section
 	var sectionsDuration float64
+	var referenceMaster string
 	for index, embedURL := range embedURLs {
 		stream, streamErr := c.streamFromEmbed(ctx, current, embedURL)
 		if movieSections == nil && len(stream.Sections) > 0 {
 			movieSections, sectionsDuration = stream.Sections, stream.SectionsDuration
+			if streamErr == nil {
+				referenceMaster = stream.MasterPlaylistURL
+			}
 		}
 		if errors.Is(streamErr, ErrNotMovie) {
 			seriesEmbeds++
@@ -105,6 +109,10 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 		return nil, fmt.Errorf("no playable embed found: %w", errors.Join(streamErrors...))
 	}
 	shareSections(streams, movieSections, sectionsDuration)
+	c.alignStreams(streams, sectionsReference{
+		key: referenceKey(externalMovieID, 0, ""), master: referenceMaster,
+		sections: movieSections, duration: sectionsDuration,
+	})
 	return streams, nil
 }
 

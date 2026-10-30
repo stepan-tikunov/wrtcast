@@ -158,6 +158,9 @@ func (c *Client) EpisodeStreams(
 	// streams get them, also when that player's own stream fails.
 	var episodeSections []Section
 	var sectionsDuration float64
+	// The video they are marked on, which the alternative player's is
+	// aligned with, and the next episode's.
+	var reference sectionsReference
 	for index, embedURL := range embedURLs {
 		embedHTML, _, fetchErr := c.get(ctx, current, embedURL, c.providerURL().String()+"/")
 		if fetchErr != nil {
@@ -179,7 +182,8 @@ func (c *Client) EpisodeStreams(
 		}
 		episodeFound = true
 		marked := sections(episode.Sections)
-		if episodeSections == nil && len(marked) > 0 {
+		marks := episodeSections == nil && len(marked) > 0
+		if marks {
 			episodeSections, sectionsDuration = marked, float64(episode.Duration)
 		}
 		if strings.TrimSpace(episode.HLS) == "" {
@@ -207,6 +211,20 @@ func (c *Client) EpisodeStreams(
 		if len(marked) > 0 {
 			stream.Sections, stream.SectionsDuration = marked, float64(episode.Duration)
 		}
+		if marks {
+			reference = sectionsReference{
+				key: referenceKey(externalMovieID, seasonNumber, episodeNumber), master: stream.MasterPlaylistURL,
+				sections: marked, duration: float64(episode.Duration),
+			}
+			if season, next, ok := nextEpisode(seasons, seasonNumber, episodeNumber); ok && strings.TrimSpace(next.HLS) != "" {
+				number := strings.TrimSpace(string(next.Episode))
+				reference.next = &sectionsReference{
+					key:      referenceKey(externalMovieID, season, number),
+					master:   appendDynamicMarker(html.UnescapeString(next.HLS), marker),
+					sections: sections(next.Sections), duration: float64(next.Duration),
+				}
+			}
+		}
 		streams = append(streams, stream)
 	}
 	for _, playerURL := range alternativePlayerURLs(movieHTML, c.providerURL().Scheme) {
@@ -224,6 +242,7 @@ func (c *Client) EpisodeStreams(
 	}
 	if len(streams) > 0 {
 		shareSections(streams, episodeSections, sectionsDuration)
+		c.alignStreams(streams, reference)
 		return streams, nil
 	}
 	if seriesEmbeds == 0 {
@@ -309,6 +328,39 @@ func findEpisode(seasons []seriesSeason, seasonNumber int32, episodeNumber strin
 		}
 	}
 	return seriesEpisode{}, false
+}
+
+// nextEpisode is the episode after one, in its season or first in the
+// next, with that season's number.
+func nextEpisode(seasons []seriesSeason, seasonNumber int32, episodeNumber string) (int32, seriesEpisode, bool) {
+	type numbered struct {
+		season  int32
+		episode seriesEpisode
+	}
+	var all []numbered
+	for _, season := range seasons {
+		number, err := strconv.ParseInt(string(season.Season), 10, 32)
+		if err != nil || season.Blocked {
+			continue
+		}
+		for _, episode := range season.Episodes {
+			if strings.TrimSpace(string(episode.Episode)) != "" {
+				all = append(all, numbered{season: int32(number), episode: episode})
+			}
+		}
+	}
+	sort.SliceStable(all, func(left, right int) bool {
+		if all[left].season != all[right].season {
+			return all[left].season < all[right].season
+		}
+		return episodeNumberLess(strings.TrimSpace(string(all[left].episode.Episode)), strings.TrimSpace(string(all[right].episode.Episode)))
+	})
+	for index, item := range all {
+		if item.season == seasonNumber && strings.TrimSpace(string(item.episode.Episode)) == episodeNumber && index+1 < len(all) {
+			return all[index+1].season, all[index+1].episode, true
+		}
+	}
+	return 0, seriesEpisode{}, false
 }
 
 func mergeSeasons(target map[int32]map[string]Episode, source []seriesSeason) {

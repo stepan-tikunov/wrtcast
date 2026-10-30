@@ -69,6 +69,10 @@ type alternativeSource struct {
 	pnr, pnk  string
 	session   *playbackSession
 	view      *viewSession
+	// Its video's alignment with the primary player's, if the sections
+	// are marked there, and since when it is asked for (see headers).
+	alignment  *videoAlignment
+	alignAsked time.Time
 }
 
 // qualityLevel is one quality of a source as hls.js has it once loaded:
@@ -78,11 +82,12 @@ type qualityLevel struct {
 	loaded     bool
 	attributes string
 	link, url  string // the master link that loaded, its media playlist
-	// The media playlist as last served (see levelPlaylistTTL) and its
-	// fragments.
+	// The media playlist as last served (see levelPlaylistTTL), its
+	// fragments and its length in seconds.
 	playlist  []byte
 	servedAt  time.Time
 	fragments []string
+	duration  float64
 }
 
 // cdnHeaders are the player's, with the edge_hash once the socket has one.
@@ -129,7 +134,54 @@ func (source *alternativeSource) headers(report PlaybackReport) MediaHeaders {
 		headers.TTL = activeHeadersTTL
 	}
 	headers.Proxy = "/v1/media/" + source.id + "/cdn"
+	headers.Sections, headers.Aligning = source.sections()
+	if headers.Aligning && headers.TTL > pendingAlignTTL {
+		headers.TTL = pendingAlignTTL
+	}
 	return headers
+}
+
+// sections are the sections on the source's video once it is aligned with
+// the primary's; until then, whether that is under way, which the router
+// waits for at the start of a playback (see alignPending).
+func (source *alternativeSource) sections() ([]Section, bool) {
+	source.mu.Lock()
+	v := source.alignment
+	if v != nil && source.alignAsked.IsZero() {
+		source.alignAsked = time.Now()
+	}
+	since := source.alignAsked
+	source.mu.Unlock()
+	if v == nil {
+		return nil, false
+	}
+	return v.state(source.duration(), since)
+}
+
+// duration is the length of the source's video, as its media playlist
+// loaded last tells; zero before one is.
+func (source *alternativeSource) duration() float64 {
+	source.mu.Lock()
+	levels := make([]*qualityLevel, 0, len(source.levels))
+	for _, level := range source.levels {
+		levels = append(levels, level)
+	}
+	source.mu.Unlock()
+	for _, level := range levels {
+		level.mu.Lock()
+		duration := level.duration
+		level.mu.Unlock()
+		if duration > 0 {
+			return duration
+		}
+	}
+	return 0
+}
+
+func (source *alternativeSource) alignmentOf() *videoAlignment {
+	source.mu.Lock()
+	defer source.mu.Unlock()
+	return source.alignment
 }
 
 // end ends the view and closes the socket, if any, saying the playback
@@ -475,8 +527,8 @@ func (source *alternativeSource) levelPlaylist(ctx context.Context, quality stri
 	if err != nil {
 		return nil, source.mediaErr(err)
 	}
-	playlist, fragments := source.media.absorbPlaylist(level.url, body)
-	level.playlist, level.servedAt, level.fragments = playlist, time.Now(), fragments
+	playlist, fragments, duration := source.media.absorbPlaylist(level.url, body)
+	level.playlist, level.servedAt, level.fragments, level.duration = playlist, time.Now(), fragments, duration
 	return playlist, nil
 }
 
@@ -549,7 +601,30 @@ func (c *Client) FetchMedia(ctx context.Context, id, rawURL string, preview bool
 			source.media.fragmentLoaded(rawURL, bytes, elapsed)
 		}}
 	}
+	source.tap(response, kind, rawURL)
 	return response, nil
+}
+
+// tap keeps a copy of what the relay passes on that the alignment of the
+// source's video wants: the init segments and the fragments of a stretch
+// to match (see videoAlignment.tapFragment), the seek preview's too.
+func (source *alternativeSource) tap(response *http.Response, kind, rawURL string) {
+	v := source.alignmentOf()
+	if v == nil || response.StatusCode != http.StatusOK {
+		return
+	}
+	switch kind {
+	case "init":
+		response.Body = &tapBody{ReadCloser: response.Body, done: func(data []byte) { v.tapInit(rawURL, data) }}
+	case "fragment":
+		place, ok := source.media.place(rawURL)
+		if !ok || !v.wants(place.start) {
+			return
+		}
+		response.Body = &tapBody{ReadCloser: response.Body, done: func(data []byte) {
+			v.tapFragment(tappedFragment{start: place.start, end: place.end, init: place.init, data: data}, source.duration())
+		}}
+	}
 }
 
 // loadFailed tells the view of a CDN request that failed: an hls.js error
@@ -598,11 +673,19 @@ type mediaState struct {
 	until     time.Time
 }
 
-// fragment is a fragment's place in its media playlist: its index and
-// times.
+// fragment is a fragment's place in its media playlist: its index, times
+// and init segment's URL (none for MPEG-TS).
 type fragment struct {
 	index      int
 	start, end float64
+	init       string
+}
+
+func (m *mediaState) place(rawURL string) (fragment, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	place, ok := m.fragments[rawURL]
+	return place, ok
 }
 
 func newMediaState() *mediaState {
@@ -700,8 +783,9 @@ func (m *mediaState) stats() (bandwidth float64, loadedEnd float64, loads int) {
 }
 
 // absorbPlaylist makes a media playlist's URIs absolute, allows their
-// hosts, and learns its fragments and their times and its init segments.
-func (m *mediaState) absorbPlaylist(base string, body []byte) ([]byte, []string) {
+// hosts, and learns its fragments and their times and its init segments;
+// it tells the fragments and their length in seconds.
+func (m *mediaState) absorbPlaylist(base string, body []byte) ([]byte, []string, float64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	absolute := func(reference string) string {
@@ -716,7 +800,7 @@ func (m *mediaState) absorbPlaylist(base string, body []byte) ([]byte, []string)
 	}
 	var out strings.Builder
 	var fragments []string
-	position, duration := 0.0, 0.0
+	position, duration, initURL := 0.0, 0.0, ""
 	for _, line := range strings.Split(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n") {
 		trimmed := strings.TrimSpace(line)
 		switch {
@@ -730,13 +814,13 @@ func (m *mediaState) absorbPlaylist(base string, body []byte) ([]byte, []string)
 			line = uriAttribute.ReplaceAllStringFunc(line, func(match string) string {
 				resolved := absolute(uriAttribute.FindStringSubmatch(match)[1])
 				if init {
-					m.inits[resolved] = true
+					m.inits[resolved], initURL = true, resolved
 				}
 				return `URI="` + resolved + `"`
 			})
 		default:
 			resolved := absolute(trimmed)
-			m.fragments[resolved] = fragment{index: len(fragments), start: position, end: position + duration}
+			m.fragments[resolved] = fragment{index: len(fragments), start: position, end: position + duration, init: initURL}
 			fragments = append(fragments, resolved)
 			position += duration
 			line = resolved
@@ -744,7 +828,7 @@ func (m *mediaState) absorbPlaylist(base string, body []byte) ([]byte, []string)
 		out.WriteString(line)
 		out.WriteByte('\n')
 	}
-	return []byte(strings.TrimSuffix(out.String(), "\n") + "\n"), fragments
+	return []byte(strings.TrimSuffix(out.String(), "\n") + "\n"), fragments, position
 }
 
 var uriAttribute = regexp.MustCompile(`URI="([^"]*)"`)

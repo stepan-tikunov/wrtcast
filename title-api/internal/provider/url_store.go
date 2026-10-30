@@ -13,6 +13,7 @@ import (
 const (
 	providerURLKey       = "provider_url"
 	playerFingerprintKey = "player_fingerprint"
+	alignmentKeyPrefix   = "alignment:"
 )
 
 type ProviderURLStore interface {
@@ -26,6 +27,13 @@ type ProviderURLStore interface {
 type PlayerFingerprintStore interface {
 	LoadPlayerFingerprint(context.Context) (string, error)
 	SavePlayerFingerprint(context.Context, string) error
+}
+
+// AlignmentStore keeps how the alternative player's video of an episode
+// and a dub relates to the primary player's (see alignment), as JSON.
+type AlignmentStore interface {
+	LoadAlignment(ctx context.Context, key string) (string, error)
+	SaveAlignment(ctx context.Context, key, value string) error
 }
 
 type SQLiteProviderURLStore struct {
@@ -86,6 +94,21 @@ func (s *SQLiteProviderURLStore) LoadPlayerFingerprint(ctx context.Context) (str
 func (s *SQLiteProviderURLStore) SavePlayerFingerprint(ctx context.Context, value string) error {
 	if err := s.save(ctx, playerFingerprintKey, value); err != nil {
 		return fmt.Errorf("save player fingerprint: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLiteProviderURLStore) LoadAlignment(ctx context.Context, key string) (string, error) {
+	value, err := s.load(ctx, alignmentKeyPrefix+key)
+	if err != nil {
+		return "", fmt.Errorf("load alignment: %w", err)
+	}
+	return value, nil
+}
+
+func (s *SQLiteProviderURLStore) SaveAlignment(ctx context.Context, key, value string) error {
+	if err := s.save(ctx, alignmentKeyPrefix+key, value); err != nil {
+		return fmt.Errorf("save alignment: %w", err)
 	}
 	return nil
 }

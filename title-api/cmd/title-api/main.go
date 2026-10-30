@@ -62,6 +62,7 @@ func run() error {
 		UserAgent:        providerUserAgent,
 		URLStore:         urlStore,
 		FingerprintStore: urlStore,
+		AlignmentStore:   urlStore,
 	})
 	if err != nil {
 		return err
@@ -292,12 +293,29 @@ type mediaHeader struct {
 	Value string `json:"value"`
 }
 
+// mediaSection is a section as the details have it (see the Section
+// message).
+type mediaSection struct {
+	Kind         string  `json:"kind"`
+	StartSeconds float64 `json:"startSeconds"`
+	EndSeconds   float64 `json:"endSeconds"`
+	Skippable    bool    `json:"skippable"`
+}
+
+var sectionKinds = map[provider.SectionKind]string{
+	provider.SectionRecap:   "KIND_RECAP",
+	provider.SectionIntro:   "KIND_INTRO",
+	provider.SectionCredits: "KIND_CREDITS",
+}
+
 // mediaHeadersHandler serves GET
 // /v1/media/{id}/headers?q=<720>&t=<seconds>&p=<1 paused>&w=<1 buffering>&d=<seconds>&b=<bytes>&e=<bits/s>:
 // the headers a media proxy sends with the media's CDN requests now, and for
 // how many seconds it may keep them, and, for the alternative player, the
 // path of title-api's relay of them (proxy), which a router that knows it
-// goes through instead. It keeps the playback socket and the view of the
+// goes through instead, and the sections on its video once that is aligned
+// with the primary player's (sections), or whether that is under way
+// (aligning). It keeps the playback socket and the view of the
 // media going and reports the quality, the position, the pause, whether the
 // receiver waits for data, the duration, the bytes of segments loaded and
 // their bandwidth, all optional.
@@ -346,12 +364,22 @@ func mediaHeadersHandler(source mediaHeadersSource) runtime.HandlerFunc {
 			return
 		}
 		body := struct {
-			Headers []mediaHeader `json:"headers"`
-			TTL     int64         `json:"ttl"`
-			Proxy   string        `json:"proxy,omitempty"`
-		}{Headers: make([]mediaHeader, 0, len(headers.Headers)), TTL: int64(headers.TTL / time.Second), Proxy: headers.Proxy}
+			Headers  []mediaHeader  `json:"headers"`
+			TTL      int64          `json:"ttl"`
+			Proxy    string         `json:"proxy,omitempty"`
+			Sections []mediaSection `json:"sections,omitempty"`
+			Aligning bool           `json:"aligning,omitempty"`
+		}{
+			Headers: make([]mediaHeader, 0, len(headers.Headers)), TTL: int64(headers.TTL / time.Second),
+			Proxy: headers.Proxy, Aligning: headers.Aligning,
+		}
 		for _, header := range headers.Headers {
 			body.Headers = append(body.Headers, mediaHeader{Name: header.Name, Value: header.Value})
+		}
+		for _, section := range headers.Sections {
+			body.Sections = append(body.Sections, mediaSection{
+				Kind: sectionKinds[section.Kind], StartSeconds: section.Start, EndSeconds: section.End, Skippable: section.Skippable,
+			})
 		}
 		response.Header().Set("Content-Type", "application/json")
 		response.Header().Set("Cache-Control", "no-store")

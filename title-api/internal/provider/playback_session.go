@@ -84,6 +84,11 @@ type MediaHeaders struct {
 	Headers []ProxyHeader
 	TTL     time.Duration
 	Proxy   string
+	// The sections on the alternative player's video, once it is aligned
+	// with the primary's; until then, whether that is still under way
+	// (see videoAlignment.state).
+	Sections []Section
+	Aligning bool
 }
 
 // playbackSession is the playback socket of one source. A headers request

@@ -34,6 +34,7 @@ type Config struct {
 	UserAgent        string
 	URLStore         ProviderURLStore
 	FingerprintStore PlayerFingerprintStore
+	AlignmentStore   AlignmentStore
 }
 
 type session struct {
@@ -73,6 +74,13 @@ type Client struct {
 	sessionsMu      sync.Mutex
 	sessionsClosed  bool
 	sessions        sync.WaitGroup
+
+	// The alternative videos aligned with the primary ones (see align.go).
+	alignmentStore AlignmentStore
+	alignMu        sync.Mutex
+	alignments     map[string]*videoAlignment
+	primaries      map[string]*primaryVideo
+	alignSlots     chan struct{}
 
 	mu             sync.RWMutex
 	session        *session
@@ -118,6 +126,10 @@ func NewClient(config Config) (*Client, error) {
 		masters:          newMasterStore(6*time.Hour, 4096),
 		urlStore:         config.URLStore,
 		fingerprintStore: config.FingerprintStore,
+		alignmentStore:   config.AlignmentStore,
+		alignments:       map[string]*videoAlignment{},
+		primaries:        map[string]*primaryVideo{},
+		alignSlots:       make(chan struct{}, alignJobs),
 		browser:          newBrowser(false),
 		pageTiming:       defaultPageTiming,
 		sessionTiming:    defaultSessionTiming,
