@@ -344,6 +344,20 @@ function api_try(path) {
 	}
 }
 
+const SECTION_KINDS = { KIND_RECAP: 'recap', KIND_INTRO: 'intro', KIND_CREDITS: 'credits' };
+
+// title-api's sections of a movie or an episode: [{ kind: recap, intro or
+// credits, start, end, skip }], skip false when there is more to see after
+// them, such as a scene after the credits.
+function sections(list) {
+	let r = [];
+	for (let x in list ?? [])
+		if (SECTION_KINDS[x?.kind] && +x.endSeconds > +x.startSeconds)
+			push(r, { kind: SECTION_KINDS[x.kind], start: +x.startSeconds,
+				end: +x.endSeconds, skip: !!x.skippable });
+	return sort(r, (a, b) => a.start - b.start);
+}
+
 // ---- title-api media headers -----------------------------------------------
 //
 // The alternative player's CDN wants headers that change during a playback:
@@ -618,20 +632,6 @@ function title_id(p) {
 	if (!match(p.id ?? '', /^[0-9A-Za-z]{1,64}$/))
 		fail(400, 'invalid id');
 	return p.id;
-}
-
-const SECTION_KINDS = { KIND_RECAP: 'recap', KIND_INTRO: 'intro', KIND_CREDITS: 'credits' };
-
-// title-api's sections of a movie or an episode: [{ kind: recap, intro or
-// credits, start, end, skip }], skip false when there is more to see after
-// them, such as a scene after the credits.
-function sections(list) {
-	let r = [];
-	for (let x in list ?? [])
-		if (SECTION_KINDS[x?.kind] && +x.endSeconds > +x.startSeconds)
-			push(r, { kind: SECTION_KINDS[x.kind], start: +x.startSeconds,
-				end: +x.endSeconds, skip: !!x.skippable });
-	return sort(r, (a, b) => a.start - b.start);
 }
 
 // Streams of a movie, or of an episode when season is given.
