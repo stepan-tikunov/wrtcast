@@ -209,3 +209,22 @@ func TestSeriesPrior(t *testing.T) {
 		t.Fatal("a prior of disagreeing episodes predicts")
 	}
 }
+
+func TestAheadStart(t *testing.T) {
+	v := &videoAlignment{ref: sectionsReference{sections: []Section{
+		{Kind: SectionRecap, Start: 0, End: 89.677, Skippable: true},
+		{Kind: SectionIntro, Start: 89.677, End: 200.829, Skippable: true},
+		{Kind: SectionCredits, Start: 2966, End: 3034, Skippable: true},
+	}}}
+	if got := v.aheadStart(); got != 200.829 {
+		t.Errorf("aheadStart = %v", got)
+	}
+	v.prior = seriesPrior{}.with("t|6|3", 1, -2.33)
+	if got := v.aheadStart(); !near(got, 198.499, 1e-9) {
+		t.Errorf("aheadStart with a prior = %v", got)
+	}
+	v.ref.sections = []Section{{Kind: SectionIntro, Start: 120, End: 170, Skippable: true}}
+	if got := v.aheadStart(); got != aheadStart {
+		t.Errorf("aheadStart of an episode with a cold open = %v", got)
+	}
+}

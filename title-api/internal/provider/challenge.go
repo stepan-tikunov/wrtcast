@@ -81,6 +81,8 @@ type Client struct {
 	alignments     map[string]*videoAlignment
 	primaries      map[string]*primaryVideo
 	alignSlots     chan struct{}
+	// No aligning ahead until then, after a refusal of the CDN.
+	aheadPausedUntil time.Time
 
 	mu             sync.RWMutex
 	session        *session

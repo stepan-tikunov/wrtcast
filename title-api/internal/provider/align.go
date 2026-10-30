@@ -77,6 +77,8 @@ var alignScales = []float64{1, 24.0 / 25, 25.0 / 24, 24000.0 / 1001 / 25, 25 / (
 // or an episode are marked on.
 type sectionsReference struct {
 	title    string
+	season   int32
+	episode  string // none for a movie
 	key      string // the title, and the season and the episode of one
 	master   string
 	sections []Section
@@ -232,7 +234,7 @@ type videoAlignment struct {
 	prior      seriesPrior // the title's, for a video not aligned yet
 	busy       bool        // a match runs
 	failures   int
-	prefetched bool              // the next episode's primary video is decoded ahead
+	prefetched bool              // the next episode is aligned ahead (see alignNext)
 	inits      map[string][]byte // the init segments relayed, by URL
 	lastInit   []byte
 	tapped     []tappedFragment
@@ -346,7 +348,7 @@ func (v *videoAlignment) state(duration float64, since time.Time) ([]Section, bo
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if len(v.known.Anchors) > 0 && v.known.Scale > 0 {
-		v.prefetchNext()
+		v.alignNext()
 		return v.known.sections(v.ref, duration), false
 	}
 	if predicted, ok := v.prior.predicted(); ok {
@@ -415,7 +417,7 @@ func (v *videoAlignment) tapFragment(fragment tappedFragment, duration float64) 
 		}
 	}
 	v.tapped, v.busy = nil, true
-	go v.match(run, init, duration)
+	go v.match(run, init, duration, false)
 }
 
 // fragmentRun is the run of fragments one after another, of one init
@@ -434,8 +436,9 @@ func fragmentRun(kept []tappedFragment, fragment tappedFragment) []tappedFragmen
 
 // match finds an anchor in a stretch of fragments: their frames against
 // the primary's around the same time, within alignSearch of no offset or
-// alignNear of the nearest anchor's.
-func (v *videoAlignment) match(run []tappedFragment, init []byte, duration float64) {
+// alignNear of the nearest anchor's. A playback's first one aligns the
+// next episode ahead (see alignNext), one found ahead does not.
+func (v *videoAlignment) match(run []tappedFragment, init []byte, duration float64, ahead bool) bool {
 	c := v.client
 	v.mu.Lock()
 	ref, known := v.ref, v.known
@@ -499,7 +502,7 @@ func (v *videoAlignment) match(run []tappedFragment, init []byte, duration float
 	if err != nil {
 		v.failures++
 		log.Printf("align %s: %v", v.key, err)
-		return
+		return false
 	}
 	first := len(v.known.Anchors) == 0
 	v.known.Scale = known.Scale
@@ -514,18 +517,21 @@ func (v *videoAlignment) match(run []tappedFragment, init []byte, duration float
 			prior = seriesPrior{}
 		}
 		c.saveAligned(key, prior.with(ref.key, known.Scale, found.Offset))
-		v.prefetchNext()
+		if !ahead {
+			v.alignNext()
+		}
 	}
+	return true
 }
 
-// prefetchNext decodes the beginning of the next episode's primary video,
-// once per reference; under v.mu.
-func (v *videoAlignment) prefetchNext() {
+// alignNext aligns the next episode's video of the dub ahead, once per
+// reference; under v.mu.
+func (v *videoAlignment) alignNext() {
 	if v.prefetched || v.ref.next == nil {
 		return
 	}
 	v.prefetched = true
-	go v.client.prefetchPrimary(*v.ref.next)
+	go v.client.alignAhead(*v.ref.next, strings.TrimPrefix(v.key, v.ref.key+"|"))
 }
 
 func (c *Client) acquireAlignSlot(ctx context.Context) error {
