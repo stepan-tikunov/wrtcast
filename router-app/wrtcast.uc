@@ -9,6 +9,7 @@
 import { popen, readfile, writefile, rename, unlink, lsdir, mkdir, stat, access, stdin, stdout } from 'fs';
 import { cursor } from 'uci';
 import * as sqlite from 'sqlite';
+import { abs } from 'math';
 
 const DB = '/tmp/wrtcast.db';                // all state, see "state" below
 const MAX_TITLES = 200;                      // progress kept for this many titles
@@ -581,12 +582,14 @@ const now_set = (key, v) => tv_set(key, 'now', v);
 // of two plays to one TV at once the one that lost puts back the state from
 // before both. Returns the state of the TV (key, at host) that plays media
 // m: now, or when m is another stream, what /play started with that URL,
-// which becomes the state. Not while a play is under way, the TV still
-// plays the last stream then (castctl waits for the receiver up to 20 s,
-// again at a new address).
+// which becomes the state. Not while a play is under way (see busy_set),
+// the TV still plays the last stream then (castctl waits for the receiver
+// up to 20 s, again at a new address). A play that failed and put the last
+// state back is over: the stream it started on the TV all the same is taken
+// at once, however recent the state put back.
 function adopt(key, host, now, m) {
-	let u = m?.url;
-	if (!u || now?.url == u || time() - (now?.started ?? 0) < 90)
+	let u = m?.url, busy = kv_get('busy:' + key);
+	if (!u || now?.url == u || busy != null && time() - busy < 90)
 		return now;
 	let p = sql_row('SELECT now FROM played WHERE url = ?', u);
 	if (!p)
@@ -595,6 +598,15 @@ function adopt(key, host, now, m) {
 	p.host = host;
 	now_set(key, p);
 	return p;
+}
+
+// Marks a play under way on the TV of key, or clears the mark. One the web
+// server killed leaves it, which counts for 90 s at most (see adopt).
+function busy_set(key, on) {
+	if (on)
+		kv_set('busy:' + key, time());
+	else
+		sql_do('DELETE FROM kv WHERE key = ?', 'busy:' + key);
 }
 
 // Character count of a UTF-8 string (continuation bytes are skipped).
@@ -919,9 +931,14 @@ const settings = () => ({
 // between sources and episodes; subs '' is off. A kind of track the TV
 // lists none of keeps what was there.
 function watched_with(now, m, was) {
+	// The tick's status (castctl's) has no labels: they are looked up as
+	// with_now does, or a tick took subtitles that were on for off.
 	let active = type => {
 		let all = filter(m.tracks ?? [], t => t.type == type);
-		return !length(all) ? null : filter(all, t => t.active)[0]?.label ?? '';
+		if (!length(all))
+			return null;
+		let t = filter(all, t => t.active)[0];
+		return t ? t.label ?? now.labels?.[t.name] ?? t.name : '';
 	};
 	let audio = active('AUDIO'), subs = active('TEXT');
 	return {
@@ -1009,6 +1026,26 @@ function ended(now, st, seen) {
 		left <= 90 && ago < 600 && (m?.idleReason == 'FINISHED' || ago >= left - 10);
 }
 
+// The volume (0..1) of the TV of key that what /play started was last played
+// at: set from the page, or seen in the TV's status. A TV switched off and on
+// again comes back at full volume.
+const volume_get = key => kv_get('vol:' + key);
+
+function volume_keep(key, v) {
+	let was = volume_get(key);
+	if (was == null || abs(was - v) >= 0.005)
+		kv_set('vol:' + key, v);
+}
+
+// Puts the volume the TV of dev was last played at back once a play has
+// started there, when its status st tells another; the status after that.
+function volume_back(dev, st) {
+	let v = volume_get(state_key(dev));
+	if (v == null || st?.volume == null || abs(+st.volume - v) < 0.01)
+		return st;
+	return castctl_try(dev, 'volume', sprintf('%.0f', v * 100)) ?? st;
+}
+
 // Records when now was last seen on the TV and, once it has ended, starts
 // the next episode. Another process does that, so the status request or
 // the tick neither waits for title-api and the TV nor fails with them; a
@@ -1030,6 +1067,10 @@ function watch_end(now, st) {
 				pos: +(m.time ?? 0), dur: +(m.duration ?? 0), paused: m.state == 'PAUSED',
 				buffering: m.state == 'BUFFERING', rate: +(m.rate ?? 1), at: time(),
 			});
+		// Set from the TV's remote or another app, past the start of a
+		// playback, which volume_back sees to.
+		if (st.volume != null && time() - (now.started ?? 0) > 60)
+			volume_keep(key, +st.volume);
 		plan(key, now, m);
 		return;
 	}
@@ -1845,7 +1886,11 @@ function play(dev, p, keep) {
 		poster: length(p.poster ?? '') <= 4096 &&
 			match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
 	};
-	let put_back = () => now_set(key, last);
+	let put_back = () => {
+		now_set(key, last);
+		busy_set(key, false);
+	};
+	busy_set(key, true);
 	now_set(key, now);
 	// What the start went past counts as skipped (see plan).
 	if (lead) {
@@ -1858,6 +1903,7 @@ function play(dev, p, keep) {
 	undo = put_back;
 	let st = castctl(dev, ...args);
 	undo = null;
+	busy_set(key, false);
 	// The socket of what this replaces says it ended.
 	if (last?.media != m)
 		media_end(last?.media);
@@ -1874,6 +1920,7 @@ function play(dev, p, keep) {
 	// A replay keeps the speed (see the page's replay).
 	if (p.rate != null && +p.rate != 1)
 		st = castctl_try(dev, 'speed', p.rate) ?? st;
+	st = volume_back(dev, st);
 	st = with_now(st, dev);
 	// The TV plays: title-api learns the duration and the position now.
 	if (m)
@@ -2119,6 +2166,8 @@ const routes = {
 		if (kind == 'style' && !valid_style(arg))
 			fail(400, 'invalid subtitle style');
 		let st = with_now(kind == null ? castctl(dev, c) : castctl(dev, c, arg), dev);
+		if (c == 'volume' && st.volume != null)
+			volume_keep(state_key(dev), +st.volume);
 		// A pause, a resume or a seek reaches title-api at once, not with
 		// the next refresh (which a paused TV may not ask for in a while).
 		let now = index(['pause', 'resume', 'seek', 'ff', 'rew'], c) >= 0 ?

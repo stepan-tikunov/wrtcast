@@ -1147,11 +1147,13 @@ async function play(m) {
   try {
     const s = await api(withDevice('play'), req);
     pending = null;
+    cmdAt = Date.now(); // a poll sent meanwhile tells what was on before
     const moved = otherEpisode(s); // then render reloads it
     render(s);
     if (!moved) reloadProgress(m.id);
   } catch (e) {
     pending = null;
+    cmdAt = Date.now();
     refresh();
     // Sources are resolved one at a time; when the chosen one is rejected,
     // offer the others instead of failing outright.
