@@ -6,7 +6,7 @@
 // Configured in /etc/config/wrtcast.
 'use strict';
 
-import { popen, readfile, writefile, rename, unlink, lsdir, mkdir, stat, access, stdin, stdout } from 'fs';
+import { popen, open, readfile, writefile, rename, unlink, lsdir, mkdir, stat, access, stdin, stdout } from 'fs';
 import { cursor } from 'uci';
 import * as sqlite from 'sqlite';
 import { abs } from 'math';
@@ -21,6 +21,7 @@ const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const HORIZON = 75;                          // seconds ahead a section is waited for (see plan)
 const DRC = '/tmp/wrtcast.drc/';             // audio segments of the leveler
 const ERR = '/tmp/wrtcast.err.';           // + ns; stderr of a proxied fetch
+const PAUSES = '/tmp/wrtcast.pauses';       // where pauses came from, see pause_note
 const COMMANDS = {
 	pause: null, resume: null, stop: null, quit: null, mute: null, unmute: null,
 	seek: 'num', ff: 'num', rew: 'num', volume: 'num', speed: 'num', audio: 'str',
@@ -235,6 +236,21 @@ function kv_get(k) {
 function kv_set(k, v) {
 	sql_do('INSERT INTO kv (key, value) VALUES (?, ?) ' +
 	       'ON CONFLICT (key) DO UPDATE SET value = excluded.value', k, v);
+}
+
+// Notes in PAUSES what paused the TV of key, or seeked it by itself: the
+// page, the lock screen widget (where headphones and watches send their
+// pause too), or the TV, its remote or another app on the network. The
+// last 64 KiB or so are kept.
+function pause_note(key, what) {
+	if (stat(PAUSES)?.size > 65536)
+		rename(PAUSES, PAUSES + '.old');
+	let t = localtime(), f = open(PAUSES, 'a');
+	if (!f)
+		return;
+	f.write(sprintf('%04d-%02d-%02d %02d:%02d:%02d %s %s\n', t.year, t.mon, t.mday,
+	                t.hour, t.min, t.sec, key, what));
+	f.close();
 }
 
 // A JSON document of the TV with state key (see TABLES); null without one.
@@ -1054,6 +1070,12 @@ function volume_back(dev, st) {
 function watch_end(now, st) {
 	let key = state_key({ host: now.host }), m = st.media;
 	if (m?.url == now.url && index(['PLAYING', 'BUFFERING', 'PAUSED'], m.state) >= 0) {
+		// A pause the router did not send (see /cmd).
+		let was = tv_get(key, 'seen'), sent = kv_get('pause:' + key);
+		if (m.state == 'PAUSED' && was?.url == now.url && was.playing &&
+		    (sent == null || +sent < was.t - 1))
+			pause_note(key, sprintf('paused on the TV, not by the router, at %.0f of %.0f s (playing at %.0f s %d s ago)',
+			                        +(m.time ?? 0), +(m.duration ?? 0), was.pos, time() - was.t));
 		let active = type => now.labels?.[filter(m.tracks ?? [], t => t.type == type && t.active)[0]?.name];
 		tv_set(key, 'seen', {
 			url: now.url, pos: +(m.time ?? 0), dur: +(m.duration ?? 0),
@@ -2012,6 +2034,7 @@ function wake(key, token) {
 			p.done[i] = true;
 		p.at = clock_now();
 		plan_set(key, p);
+		pause_note(key, sprintf('autoskip seek from %.0f to %.0f s (%s)', +(m.time ?? 0), d.to, m.state));
 		castctl_try(dev, 'seek', sprintf('%.1f', d.to));
 		// A seek reaches title-api at once (see /cmd).
 		if (valid_media(now.media))
@@ -2165,6 +2188,13 @@ const routes = {
 			fail(400, 'arg required');
 		if (kind == 'style' && !valid_style(arg))
 			fail(400, 'invalid subtitle style');
+		// Before the command: its status is seen by watch_end at once.
+		if (c == 'pause') {
+			let src = match(p.src ?? '', /^[a-z ]{1,24}$/) ? p.src : '?';
+			kv_set('pause:' + state_key(dev), time());
+			pause_note(state_key(dev), sprintf('pause from the %s, %s, %s', src,
+			           getenv('REMOTE_ADDR') ?? '?', substr(getenv('HTTP_USER_AGENT') ?? '?', 0, 160)));
+		}
 		let st = with_now(kind == null ? castctl(dev, c) : castctl(dev, c, arg), dev);
 		if (c == 'volume' && st.volume != null)
 			volume_keep(state_key(dev), +st.volume);

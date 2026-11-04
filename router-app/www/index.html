@@ -1429,7 +1429,9 @@ function skip(delta) {
 
 let cmdAt = 0; // polls sent before a command may report the old state
 let inflight = 0; // commands still on their way to the TV
-async function cmd(c, arg) {
+// src tells the router's note of a pause where it came from: the page or
+// the lock screen widget (see pause_note).
+async function cmd(c, arg, src = 'page') {
   cmdAt = Date.now();
   inflight++;
   const m = st?.media;
@@ -1445,7 +1447,9 @@ async function cmd(c, arg) {
   }
   if (c == 'mute' && st?.muted) c = 'unmute';
   try {
-    render(await api(withDevice('cmd'), arg == null ? { c } : { c, arg: String(arg) }));
+    const b = { c, src: src + (document.hidden ? ' hidden' : '') };
+    if (arg != null) b.arg = String(arg);
+    render(await api(withDevice('cmd'), b));
   } catch (e) {
     toast(e);
     poll();
@@ -1566,11 +1570,11 @@ if (navigator.mediaSession) {
   // then just brings the loop back.
   on('play', () => {
     arm();
-    if (st?.media?.state == 'PAUSED') cmd('toggle');
+    if (st?.media?.state == 'PAUSED') cmd('toggle', null, 'widget');
     else syncSession();
   });
   on('pause', () => {
-    if (playing()) cmd('toggle');
+    if (playing()) cmd('toggle', null, 'widget');
     else keep.pause(), syncSession();
   });
   on('seekbackward', d => skip(-(d.seekOffset || 10)));
