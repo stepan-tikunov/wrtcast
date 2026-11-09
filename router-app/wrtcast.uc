@@ -19,9 +19,13 @@ const DONE = 0.85;                           // an episode left this far in is w
 const TTL = 30 * 86400;                      // progress older than this is forgotten
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const HORIZON = 75;                          // seconds ahead a section is waited for (see plan)
+const AHEAD = 120;                           // and the next episode is prepared (see ahead)
 const DRC = '/tmp/wrtcast.drc/';             // audio segments of the leveler
 const ERR = '/tmp/wrtcast.err.';           // + ns; stderr of a proxied fetch
 const PAUSES = '/tmp/wrtcast.pauses';       // where pauses came from, see pause_note
+const CACHE = '/tmp/wrtcast.cache/';        // segments kept, see "segment cache"
+const CACHE_KEEP = 16;                       // seconds kept from where a playback would start
+const CACHE_DAYS = 7;                        // and for so long at most
 const COMMANDS = {
 	pause: null, resume: null, stop: null, quit: null, mute: null, unmute: null,
 	seek: 'num', ff: 'num', rew: 'num', volume: 'num', speed: 'num', audio: 'str',
@@ -55,6 +59,9 @@ const KEEP = conf('db_file', '/etc/wrtcast.db');
 // A minimal static ffmpeg (scripts/build-ffmpeg.sh); without it the volume
 // leveler is not offered.
 const FFMPEG = conf('ffmpeg', '/usr/bin/wrtcast-ffmpeg');
+// MiB of segments kept in /tmp, which is the router's memory (see "segment
+// cache"); 0 keeps none.
+const CACHE_MB = +conf('cache_mb', 40);
 
 function reply(code, body) {
 	printf('Status: %d %s\r\nContent-Type: application/json\r\n' +
@@ -95,7 +102,7 @@ function load(f) {
 // flash every few minutes (see keep) and back on the first request after a
 // boot. Files are left for the leveler's segments and fetches' stderr.
 
-const SCHEMA = 2;
+const SCHEMA = 3;
 
 // The history tables in schema s: per title, when it was last watched, its
 // name and poster for the recently watched list, a series' last episode and
@@ -115,6 +122,15 @@ const HISTORY = s => `
 const TITLE_COLS = 'id, title, poster, season, episode, prefs, t';
 const PROGRESS_COLS = 'id, ep, pos, dur, done, t';
 
+// The segment cache (see there): per file its key, its video (c), start and
+// stop in seconds (null for an init segment), bytes, the media it was
+// loaded with, when it was last used, and whether it is where a playback
+// would start (keep).
+const CACHE_TABLE = `
+	CREATE TABLE cache (key TEXT PRIMARY KEY, c TEXT NOT NULL, start REAL, stop REAL,
+		bytes INTEGER NOT NULL, media TEXT, t INTEGER NOT NULL, keep INTEGER NOT NULL);
+	CREATE INDEX cache_c ON cache (c);`;
+
 // Documents are JSON text: per TV (key, see state_key) now, what /play
 // started; subs, the subtitles it side-loaded (see /sub); list, the streams
 // last asked for (see title_streams); watch, the tick's failed checks; seen,
@@ -131,7 +147,7 @@ const TABLES = `
 		ms INTEGER NOT NULL, t INTEGER NOT NULL);
 	CREATE INDEX segments_media ON segments (media);
 	CREATE TABLE drc (key TEXT PRIMARY KEY, meta TEXT NOT NULL, t INTEGER NOT NULL);
-	CREATE TABLE kv (key TEXT PRIMARY KEY, value);`;
+	CREATE TABLE kv (key TEXT PRIMARY KEY, value);` + CACHE_TABLE;
 
 let db = null;
 
@@ -163,7 +179,8 @@ function import_json(P) {
 // from flash, or from the JSON file of the wrtcast before the database.
 // Another request may be doing the same: the one that gets the write lock
 // first does it. A database of schema 1 (before the settings) gets the
-// settings table; a copy on flash of then has none.
+// settings table, and one before the segment cache its table; a copy on
+// flash of schema 1 has no settings.
 function init() {
 	let exec = q => db.exec(q) ?? db_fail();
 	let version = () => (db.query('PRAGMA user_version') ?? db_fail())[0].user_version;
@@ -181,10 +198,14 @@ function init() {
 		else
 			import_json(load('/tmp/wrtcast.progress.json') ??
 				load(conf('progress_file', '/etc/wrtcast.progress.json')));
-	} else if (v == 1)
-		exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)');
+	} else {
+		if (v < 2)
+			exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)');
+		if (v < 3)
+			exec(CACHE_TABLE);
+	}
 	if (v != SCHEMA) {
-		if (keep && length(db.query("SELECT 1 FROM keep.sqlite_master WHERE name = 'settings'") ?? []))
+		if (v < 2 && keep && length(db.query("SELECT 1 FROM keep.sqlite_master WHERE name = 'settings'") ?? []))
 			exec('INSERT OR REPLACE INTO settings (key, value) SELECT key, value FROM keep.settings');
 		exec(`PRAGMA user_version = ${SCHEMA}`);
 	}
@@ -848,14 +869,14 @@ function at_credits(now, st) {
 
 // Leaves a process to do what is due within HORIZON seconds, the time to
 // the next tick, unless one already waits for it then. Returns what is due
-// (see due); null for nothing within HORIZON.
+// (see due), also later.
 function plan(key, now, m) {
 	let p = plan_get(key);
 	if (p?.url != now.url)
 		p = { url: now.url, done: {} };
 	let d = due(now, m, p.done);
 	if (!d || d.in > HORIZON)
-		return null;
+		return d;
 	let at = clock_now() + d.in;
 	if (p.token && p.i == d.i && p.act == d.act && p.at - at < 1.5 && at - p.at < 1.5)
 		return d;
@@ -866,6 +887,123 @@ function plan(key, now, m) {
 	plan_set(key, p);
 	system(`${shq(sourcepath())} due ${shq(key)} ${p.token} </dev/null >/dev/null 2>&1 &`);
 	return d;
+}
+
+// ---- segment cache ---------------------------------------------------------
+//
+// The segments of a playback's video pass through files in CACHE, and those
+// where a playback would start again stay: from where an episode or a movie
+// was left off (see cache_mark), and from where the next episode starts,
+// which the router loads ahead (see prefetch). A play started there gets
+// its first segments from the router at once, instead of a second and a
+// half each through title-api's relay; also days later, with other signed
+// links. A segment is known by the play's video (c: the title, the episode,
+// the source and the variant, see cache_id), the durations of its
+// playlist's segments (another cut gets other keys) and its times in it
+// (see seg_keys); the router adds the keys to the playlists it relays
+// (see rewrite_playlist). CACHE_MB bound the files (see cache_put), and
+// the tick leaves of the videos no TV plays only the segments where a
+// playback would start (see cache_trim). A boot empties it with the rest
+// of /tmp.
+
+const cache_id = (id, season, episode, source, width) =>
+	hash(`${id}|${season}:${episode}|${source}|${width}`);
+
+// <c>-<fingerprint of the durations>-i of an init segment, or -<start
+// ms>-<stop ms> of a segment.
+const CACHE_KEY = /^([0-9a-f]{8})-[0-9a-f]{8}-(i|([0-9]+)-([0-9]+))$/;
+
+// The cache keys of the lines of a media playlist of video c, by line
+// index: of its URI lines and of its init segment's #EXT-X-MAP. None for
+// byte ranges or encryption, which the cache leaves alone.
+function seg_keys(lines, c) {
+	let durs = [], keys = [];
+	for (let l in lines) {
+		if (match(l, /^#EXT-X-BYTERANGE/) || match(l, /^#EXT-X-MAP:.*BYTERANGE/) ||
+		    match(l, /^#EXT-X-KEY:(.*,)?METHOD=(AES|SAMPLE)/))
+			return keys;
+		let d = match(l, /^#EXTINF: *([0-9.]+)/);
+		if (d)
+			push(durs, d[1]);
+	}
+	let fp = hash(join(',', durs)), pos = 0, dur = null;
+	for (let i, l in lines) {
+		let d = match(l, /^#EXTINF: *([0-9.]+)/);
+		if (d) {
+			dur = +d[1];
+		} else if (match(l, /^#EXT-X-MAP:/)) {
+			keys[i] = `${c}-${fp}-i`;
+		} else if (l != '' && substr(l, 0, 1) != '#' && dur != null) {
+			keys[i] = sprintf('%s-%s-%d-%d', c, fp, int(pos * 1000 + 0.5), int((pos + dur) * 1000 + 0.5));
+			pos += dur;
+			dur = null;
+		}
+	}
+	return keys;
+}
+
+// The cached file of key k: { bytes, media it was loaded with }; null
+// without one.
+function cache_get(k) {
+	let r = sql_row('SELECT bytes, media FROM cache WHERE key = ?', k);
+	if (r && !access(CACHE + k)) {
+		sql_do('DELETE FROM cache WHERE key = ?', k);
+		return null;
+	}
+	if (r)
+		sql_do('UPDATE cache SET t = ? WHERE key = ?', time(), k);
+	return r;
+}
+
+function cache_drop(k) {
+	unlink(CACHE + k);
+	sql_do('DELETE FROM cache WHERE key = ?', k);
+}
+
+// Whether a segment may be written: /tmp takes the router's memory, of
+// which 32 MiB stay free.
+function cache_room() {
+	let a = match(readfile('/proc/meminfo') ?? '', /MemAvailable: *([0-9]+) kB/);
+	mkdir(CACHE);
+	return CACHE_MB > 0 && (!a || +a[1] > 32768);
+}
+
+// Keeps file f, a segment of n bytes loaded with media m, as key k; keep
+// marks it where a playback would start. Beyond CACHE_MB others go: those
+// behind what the TV plays, those of other videos, those furthest ahead of
+// it, and of those where a playback would start the oldest.
+function cache_put(k, f, n, m, keep) {
+	let x = match(k, CACHE_KEY);
+	if (!x || !rename(f, CACHE + k)) {
+		unlink(f);
+		return;
+	}
+	sql_do('INSERT OR REPLACE INTO cache (key, c, start, stop, bytes, media, t, keep) ' +
+	       'VALUES (?, ?, ?, ?, ?, ?, ?, ?)', k, x[1], x[3] != null ? +x[3] / 1000.0 : null,
+	       x[4] != null ? +x[4] / 1000.0 : null, n, m, time(), keep ? 1 : 0);
+	let over = sql_row('SELECT total(bytes) AS b FROM cache').b - CACHE_MB * 1048576;
+	if (over <= 0)
+		return;
+	let tv = sql_row('SELECT now, seen FROM tvs WHERE now IS NOT NULL ORDER BY ' +
+	                 "json_extract(seen, '$.t') DESC LIMIT 1");
+	let now = json(tv?.now ?? 'null'), seen = json(tv?.seen ?? 'null');
+	let c = now?.c ?? '', pos = seen?.url == now?.url ? +(seen?.pos ?? 0) : 0;
+	for (let r in sql_rows(`SELECT key, bytes FROM cache ORDER BY
+			CASE WHEN keep = 1 THEN 3 WHEN c = ? AND stop <= ? THEN 0 WHEN c != ? THEN 1 ELSE 2 END,
+			CASE WHEN keep = 0 AND c = ? AND stop > ? THEN -start ELSE t END`, c, pos - 10, c, c, pos - 10)) {
+		if (over <= 0)
+			break;
+		cache_drop(r.key);
+		over -= r.bytes;
+	}
+}
+
+// Marks the segments of video c where a playback from pos, where it was
+// left off, would start (see resume_at), and only those.
+function cache_mark(c, pos) {
+	if (c)
+		sql_do('UPDATE cache SET keep = (start IS NULL OR stop > ? AND start < ?) WHERE c = ?',
+		       pos - 5, pos - 5 + CACHE_KEEP, c);
 }
 
 // ---- watch progress --------------------------------------------------------
@@ -974,6 +1112,7 @@ function remember(now, m) {
 	let pos = +(m.time ?? 0), dur = +(m.duration ?? 0);
 	if (!finished && (pos < 1 || index(['PLAYING', 'PAUSED', 'BUFFERING'], m.state) < 0))
 		return;
+	cache_mark(now.c, pos);
 	let e = title_row(now.id), k = ep_key(now.season, now.episode);
 	let x = progress_row(now.id, k), t = time();
 	let important = !e || !x;
@@ -1087,36 +1226,28 @@ function episode_after(id, season, episode) {
 	return e ? { season: +s.seasonNumber, episode: `${e.episodeNumber}` } : null;
 }
 
-// The next episode is found and its streams are listed ahead (see
-// watch_end), so that at the credits play_next only has to start it, not
-// wait for title-api to load the provider's pages twice. Its master is not
-// asked for ahead: that opens the player's socket, as a playback start
-// does. { url, of the episode it follows, t, when the listing started,
-// fetched, when it ended, season and episode, null after the last one, and
-// streams } of the TV of key.
+// The next episode is prepared ahead (see watch_end), so that at the
+// credits play_next only has to tell the TV: found, its master asked for
+// (which opens the player's socket, as a playback start does), its format
+// probed and its first segments loaded into the cache (see list_ahead).
+// { url, of the episode it follows, t, when that started, fetched, when it
+// ended, season and episode, null after the last one, and ready, what
+// prepare made of it } of the TV of key. What is ready is good for ten
+// minutes, as title_streams keeps streams.
 const ahead_get = key => json(kv_get('next:' + key) ?? 'null');
+const ready = x => !!x?.fetched && time() - x.fetched < 600;
 
-// Leaves a process to list the episode after now ahead, unless one has or
-// is at it (for two minutes at most: a failed listing is tried again).
+// Leaves a process to prepare the episode after now ahead, unless one has
+// or is at it (for two minutes at most: a failed one is tried again).
 function ahead(key, now) {
 	let x = ahead_get(key);
-	if (x?.url == now.url && (x.fetched || time() - x.t < 120))
+	if (x?.url == now.url && (x.fetched ? ready(x) : time() - x.t < 120))
 		return;
+	// Gone stale: the socket of its media says it ended.
+	if (x?.ready?.m)
+		media_end(x.ready.m);
 	kv_set('next:' + key, { url: now.url, t: time() });
 	system(`${shq(sourcepath())} ahead ${shq(key)} </dev/null >/dev/null 2>&1 &`);
-}
-
-// The process ahead left. A failed title-api request ends it (see api).
-function list_ahead(key) {
-	let now = now_get(key), x = ahead_get(key);
-	if (!now?.url || now.season == null || x?.url != now.url || x.fetched)
-		return;
-	let e = episode_after(now.id, now.season, now.episode);
-	x = { url: now.url, t: x.t, season: e?.season, episode: e?.episode,
-		streams: e ? streams(now.id, e.season, e.episode) : null };
-	x.fetched = time();
-	if (now_get(key)?.url == now.url)
-		kv_set('next:' + key, x);
 }
 
 // Records when now was last seen on the TV and, once it has ended, starts
@@ -1151,10 +1282,10 @@ function watch_end(now, st) {
 		if (st.volume != null && time() - (now.started ?? 0) > 60)
 			volume_keep(key, +st.volume);
 		let d = plan(key, now, m);
-		// The episode after this one is listed ahead, from HORIZON before
+		// The episode after this one is prepared ahead, from AHEAD before
 		// the credits or the end it starts at.
-		if (d?.act == 'next' || now.autonext && now.season != null && !now.next_at &&
-		    +(m.duration ?? 0) > 0 && +m.duration - +(m.time ?? 0) <= HORIZON)
+		if (d?.act == 'next' && d.in <= AHEAD || now.autonext && now.season != null &&
+		    !now.next_at && +(m.duration ?? 0) > 0 && +m.duration - +(m.time ?? 0) <= AHEAD)
 			ahead(key, now);
 		return;
 	}
@@ -1170,6 +1301,40 @@ function watch_end(now, st) {
 function resume_at(id, season, episode) {
 	let x = progress_row(id, ep_key(season, episode));
 	return x && !x.done && x.pos > 10 ? x.pos - 5 : null;
+}
+
+// Of the videos no TV plays (seen within three minutes), only the
+// segments where a playback would start stay (see cache_mark): none of an
+// episode or a movie watched to the end, none of one forgotten, none older
+// than CACHE_DAYS. Files without a row, of fetches cut short, go too.
+function cache_trim() {
+	let playing = {}, t = time();
+	for (let r in sql_rows('SELECT now, seen FROM tvs WHERE now IS NOT NULL')) {
+		let now = json(r.now), seen = json(r.seen ?? 'null');
+		if (now?.c && seen?.url == now.url && t - seen.t < 180)
+			playing[now.c] = true;
+	}
+	for (let r in sql_rows('SELECT DISTINCT c FROM cache')) {
+		let v = json(kv_get('c:' + r.c) ?? 'null');
+		let x = v ? progress_row(v.id, ep_key(v.season, v.episode)) : null;
+		let all = !v || !!x?.done;
+		for (let y in sql_rows('SELECT key, keep, start, t FROM cache WHERE c = ?', r.c))
+			if (y.t < t - CACHE_DAYS * 86400 || !playing[r.c] && (all || !y.keep))
+				cache_drop(y.key);
+		// An init segment alone serves nothing.
+		if (!sql_row('SELECT 1 AS x FROM cache WHERE c = ? AND start IS NOT NULL', r.c))
+			for (let y in sql_rows('SELECT key FROM cache WHERE c = ?', r.c))
+				cache_drop(y.key);
+	}
+	for (let r in sql_rows("SELECT key FROM kv WHERE key LIKE 'c:%'"))
+		if (!sql_row('SELECT 1 AS x FROM cache WHERE c = ?', substr(r.key, 2)))
+			sql_do('DELETE FROM kv WHERE key = ?', r.key);
+	for (let name in lsdir(CACHE) ?? []) {
+		let st = stat(CACHE + name);
+		if (st && st.mtime < t - 300 &&
+		    !sql_row('SELECT 1 AS x FROM cache WHERE key = ?', name))
+			unlink(CACHE + name);
+	}
 }
 
 // Run by cron every minute: records the progress of what /play started
@@ -1214,6 +1379,7 @@ function tick() {
 	sql_do('DELETE FROM segments WHERE t < ?', t - 86400);
 	sql_do('DELETE FROM played WHERE t < ?', t - 86400);
 	sql_do('DELETE FROM drc WHERE t < ?', t - 86400);
+	cache_trim();
 	// Error files of proxied fetches the web server cut short.
 	for (let name in lsdir('/tmp') ?? []) {
 		let st = match(name, /^wrtcast\.err\.[0-9]+$/) ? stat('/tmp/' + name) : null;
@@ -1481,21 +1647,30 @@ function keep_variants(lines, keep) {
 }
 
 // With drc the audio renditions of a master are asked for leveled (see
-// drc_playlist).
-function rewrite_playlist(body, base, q, h, drc, m) {
+// drc_playlist). c, the video of a play (see cache_id), goes to the variant
+// of q, and in its media playlist the segments get their cache keys (see
+// seg_keys).
+function rewrite_playlist(body, base, q, h, drc, m, c) {
 	let fix = u => match(u, /^(data|skd):/) ? u : purl(resolve(base, u), null, null, h, m);
 	let lines = map(split(body, '\n'), line => rtrim(line, '\r'));
 	lines = keep_variants(lines, l => playable(match(l, /CODECS="([^"]*)"/)?.[1]));
 	if (q)
 		lines = keep_variants(lines, l => +(match(l, /RESOLUTION=([0-9]+)x/)?.[1] ?? 0) == q);
-	return join('\n', map(unique_audio_langs(lines), l => {
-		if (l == '')
-			return l;
-		if (substr(l, 0, 1) != '#')
-			return fix(trim(l));
-		let flag = drc && match(l, /^#EXT-X-MEDIA:(.*,)?TYPE=AUDIO(,|$)/) ? '&drc=1' : '';
-		return replace(l, /URI="([^"]*)"/g, (all, u) => `URI="${fix(u)}${flag}"`);
-	}));
+	lines = unique_audio_langs(lines);
+	let master = index(body, '#EXT-X-STREAM-INF') >= 0;
+	let keys = c && !master ? seg_keys(lines, c) : [], out = [];
+	for (let i, l in lines) {
+		let k = keys[i] ? `&k=${keys[i]}` : '';
+		if (l == '') {
+			push(out, l);
+		} else if (substr(l, 0, 1) != '#') {
+			push(out, fix(trim(l)) + k + (c && q && master ? `&c=${c}` : ''));
+		} else {
+			let flag = drc && match(l, /^#EXT-X-MEDIA:(.*,)?TYPE=AUDIO(,|$)/) ? '&drc=1' : '';
+			push(out, replace(l, /URI="([^"]*)"/g, (all, u) => `URI="${fix(u)}${flag}${k}"`));
+		}
+	}
+	return join('\n', out);
 }
 
 function media_head(code, mime) {
@@ -1715,8 +1890,11 @@ function count_bytes(m, n, start) {
 }
 
 // pv marks the fetches of the seek preview (the web UI's frames over the
-// seek bar): not the receiver's, they don't count as its segments.
-function proxy(name, u, q, h, drc, m, pv) {
+// seek bar): not the receiver's, they don't count as its segments. c is
+// the video of a play's playlists and k a segment's cache key (see
+// "segment cache"): a cached segment goes out from the cache, another one
+// is kept as it streams.
+function proxy(name, u, q, h, drc, m, pv, c, k) {
 	let start = clock();
 	let url = proxy_target(u);
 	if (!url)
@@ -1725,7 +1903,23 @@ function proxy(name, u, q, h, drc, m, pv) {
 		fail(400, 'bad headers');
 	if (m != null && !valid_media(m))
 		fail(400, 'bad media');
+	c = match(c ?? '', /^[0-9a-f]{8}$/) ? c : null;
+	k = match(k ?? '', CACHE_KEY) ? k : null;
 	let e = ext(name), err = ERR + clock()[1];
+	let hit = k ? cache_get(k) : null, f = hit ? open(CACHE + k) : null;
+	if (f) {
+		media_head(200, MIME[e] ?? 'application/octet-stream');
+		let n = 0;
+		for (let b = f.read(65536); b != null && b != ''; b = f.read(65536)) {
+			stdout.write(b);
+			n += length(b);
+		}
+		f.close();
+		// Loaded another day, or by another play: the player loads it now.
+		if (valid_media(m) && !pv && hit.media != m)
+			count_bytes(m, n, start);
+		exit(0);
+	}
 	let pipe = popen(fetch_cmd(url, h, err, m, pv));
 	if (!pipe) {
 		unlink(err);
@@ -1739,7 +1933,7 @@ function proxy(name, u, q, h, drc, m, pv) {
 		unlink(err);
 		let text = drc && index(body, '#EXTINF') >= 0 && access(FFMPEG, 'x') ?
 			drc_playlist(body, url, h, m) :
-			rewrite_playlist(body, url, match(q ?? '', /^[0-9]{1,5}$/) ? +q : null, h, drc, m);
+			rewrite_playlist(body, url, match(q ?? '', /^[0-9]{1,5}$/) ? +q : null, h, drc, m, c);
 		media_head(200, MIME[e]);
 		print(text, '\n');
 		exit(0);
@@ -1756,13 +1950,24 @@ function proxy(name, u, q, h, drc, m, pv) {
 	// Gone before the stream, which the receiver may cut short.
 	unlink(err);
 	media_head(200, MIME[e] ?? 'application/octet-stream');
+	let part = CACHE + k + '.' + clock()[1];
+	let tee = k && !pv && valid_media(m) && cache_room() ? open(part, 'w') : null;
 	let n = 0;
 	while (chunk != null && chunk != '') {
 		stdout.write(chunk);
+		if (tee)
+			tee.write(chunk);
 		n += length(chunk);
 		chunk = pipe.read(65536);
 	}
-	pipe.close();
+	let ok = pipe.close() == 0;
+	if (tee) {
+		tee.close();
+		if (ok)
+			cache_put(k, part, n, m, false);
+		else
+			unlink(part);
+	}
 	// The media's segments, as the player counts the fragments it loaded.
 	if (valid_media(m) && !pv && !(e in ['vtt', 'webvtt', 'key']))
 		count_bytes(m, n, start);
@@ -1787,13 +1992,11 @@ function poster(u) {
 	return PROXY ? purl(via_api, null, 'poster.jpg') : via_api;
 }
 
-// Starts a movie or an episode; play also switches the quality or the source
-// of what is on: with reuse=1 it takes the streams from the last play of the
-// same title if they are still fresh (title-api keeps synthetic masters for
-// 6 hours), and start/audio/subs restore the position and tracks. keep, from
-// play_next: { audio, subs } track names to pick when audio/subs are not
-// given.
-function play(dev, p, keep) {
+// What a play needs before the TV is told (see start): the stream, its
+// master and format, the quality, where it starts and castctl's arguments;
+// p as /play takes it, keep as play_next does. The next episode is
+// prepared a while before it starts (see list_ahead).
+function prepare(dev, p, keep) {
 	let id = title_id(p), season = null, episode = null;
 	if (p.season != null || p.episode != null) {
 		if (!match(p.season ?? '', /^[0-9]{1,4}$/) ||
@@ -1919,19 +2122,28 @@ function play(dev, p, keep) {
 				media_headers(m, quality_digits(quality), start, true);
 		}
 	}
-	// Probed once per source, on the variant this play picks.
+	// Probed once per source, on the variant this play picks; another
+	// episode of the source the last play was of is taken to be alike.
 	if (body != null) {
-		s.fmp4 = is_fmp4(s.url, body, h, width, m);
-		s.drc = PROXY && !s.fmp4 && drc_supported(s.url, body, h, m);
+		if (last?.id == id && last.source == s.name && last.fmp4 != null) {
+			s.fmp4 = last.fmp4;
+			s.drc = last.drc_ok;
+		} else {
+			s.fmp4 = is_fmp4(s.url, body, h, width, m);
+			s.drc = PROXY && !s.fmp4 && drc_supported(s.url, body, h, m);
+		}
 	}
 	let drc = p.drc == '1' && !!s.drc;
+	// The video's segments are cached (see "segment cache"), of a known
+	// variant: with auto quality the TV picks.
+	let c = PROXY && m && width ? cache_id(id, season, episode, s.name, width) : null;
+	if (c)
+		kv_set('c:' + c, { id, season, episode });
 	let url = PROXY ? purl(s.url, public_base(), null, h, m) +
-		(width ? `&q=${width}` : '') + (drc ? '&drc=1' : '') : s.url;
+		(width ? `&q=${width}` : '') + (drc ? '&drc=1' : '') + (c ? `&c=${c}` : '') : s.url;
 	// Subtitles are separate WebVTT files, not part of the HLS manifest,
 	// so they are side-loaded; the receiver names them "sub<id>".
 	let args = ['play', url], labels = {};
-	if (season != null)
-		next_episode(id, season, episode);
 	if (+(start ?? 0) > 0)
 		push(args, '-p', sprintf('%.1f', +start));
 	if (s.fmp4)
@@ -1940,7 +2152,6 @@ function play(dev, p, keep) {
 	// for the 64 KB LOAD message, so the receiver gets short /sub/<tv>/<n>
 	// links that look the real URL up in what is written beforehand.
 	let picked = pick_subs(s.subs);
-	tv_set(key, 'subs', { urls: map(picked, t => t.url), headers: h, media: m });
 	for (let i, t in picked) {
 		push(args, '-s', PROXY ? `${public_base()}/api/sub/${key}/${i}.vtt` : t.url,
 		     t.lang || 'und', 'sub' + t.id);
@@ -1950,24 +2161,40 @@ function play(dev, p, keep) {
 		labels[t.id] = t.name;
 	if (p.style != null)
 		push(args, '-y', p.style);
+	return {
+		key, id, season, episode, n, s, list, fetched, m, h, c, url, width, quality, quals,
+		start, lead, drc, autoskip, args, labels, subs: map(picked, t => t.url),
+		p: { title: p.title, poster: p.poster, style: p.style, autonext: p.autonext,
+			audio: p.audio, subs: p.subs, rate: p.rate },
+	};
+}
+
+// Tells the TV to play what prepare made ready (r) and makes it the state
+// of the TV.
+function start(dev, r) {
+	let key = r.key, last = now_get(key), p = r.p, url = r.url, m = r.m, lead = r.lead;
+	if (r.season != null)
+		next_episode(r.id, r.season, r.episode);
+	tv_set(key, 'subs', { urls: r.subs, headers: r.h, media: m });
 	// The state goes first: uhttpd may kill us (script_timeout, or the
 	// phone went away) while castctl waits for playback, and the TV then
 	// plays this stream all the same. A failed play puts the last one back.
 	let now = {
-		id, stream: n, source: s.name, url, host: host_of(dev), media: m,
-		title: p.title ?? null, season,
-		episode, labels, quality, qualities: map(quals, v => v.label),
-		drc, drc_ok: !!s.drc,
+		id: r.id, stream: r.n, source: r.s.name, url, host: host_of(dev), media: m, c: r.c,
+		title: p.title ?? null, season: r.season,
+		episode: r.episode, labels: r.labels, quality: r.quality,
+		qualities: map(r.quals, v => v.label),
+		drc: r.drc, drc_ok: !!r.s.drc, fmp4: !!r.s.fmp4,
 		// Kept for the next episode the router starts itself (see play_next).
 		// Without autonext a replay of the same title (an older page)
 		// keeps what was set.
 		autonext: p.autonext != null ? p.autonext == '1' : settings().autonext,
 		// The recap and the intro are skipped by the router (see plan),
 		// as the next episode is started.
-		autoskip,
-		sections: s.sections ?? [], sdur: s.sdur ?? 0,
+		autoskip: r.autoskip,
+		sections: r.s.sections ?? [], sdur: r.s.sdur ?? 0,
 		style: p.style ?? null,
-		streams: list, fetched, started: time(),
+		streams: r.list, fetched: r.fetched, started: time(),
 		// Only our own proxy paths, so the UI never loads arbitrary URLs.
 		poster: length(p.poster ?? '') <= 4096 &&
 			match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
@@ -1988,7 +2215,7 @@ function play(dev, p, keep) {
 	sql_do('INSERT OR REPLACE INTO played (url, now, t) VALUES (?, ?, ?)', url, now, time());
 	undo = put_back;
 	load_at = clock_now();
-	let st = castctl(dev, ...args);
+	let st = castctl(dev, ...r.args);
 	undo = null;
 	busy_set(key, false);
 	// The socket of what this replaces says it ended.
@@ -2011,8 +2238,103 @@ function play(dev, p, keep) {
 	st = with_now(st, dev);
 	// The TV plays: title-api learns the duration and the position now.
 	if (m)
-		media_headers(m, quality_digits(quality), null, true);
+		media_headers(m, quality_digits(r.quality), null, true);
 	return st;
+}
+
+// Starts a movie or an episode; play also switches the quality or the source
+// of what is on: with reuse=1 it takes the streams from the last play of the
+// same title if they are still fresh (title-api keeps synthetic masters for
+// 6 hours), and start/audio/subs restore the position and tracks. keep, from
+// play_next: { audio, subs } track names to pick when audio/subs are not
+// given.
+function play(dev, p, keep) {
+	return start(dev, prepare(dev, p, keep));
+}
+
+// What /play would be asked for the episode e after now: the source,
+// quality, leveler, subtitle style, dub and subtitles of now.
+const next_params = (now, e) => ({
+	id: now.id, title: now.title, poster: now.poster,
+	season: `${e.season}`, episode: e.episode,
+	source: now.source, quality: now.quality, drc: now.drc ? '1' : '0',
+	autonext: '1', autoskip: now.autoskip ? '1' : '0', style: now.style,
+});
+
+// Loads into the cache the segments of the first CACHE_KEEP seconds of
+// what prepare made ready (r) from where it starts, one at a time through
+// title-api as the TV would load them: the variant's media playlist, its
+// init segment and the segments. A failure ends it. Returns the segments
+// loaded.
+function prefetch(r) {
+	if (!r?.c || !valid_media(r.m) || !cache_room())
+		return 0;
+	let inf = null, uri = null;
+	for (let l in split(fetch_text(r.s.url, r.h, r.m) ?? '', '\n')) {
+		l = trim(l);
+		if (substr(l, 0, 18) == '#EXT-X-STREAM-INF:')
+			inf = l;
+		else if (inf != null && l != '' && substr(l, 0, 1) != '#') {
+			if (playable(match(inf, /CODECS="([^"]*)"/)?.[1]) &&
+			    +(match(inf, /RESOLUTION=([0-9]+)x/)?.[1] ?? 0) == r.width) {
+				uri = l;
+				break;
+			}
+			inf = null;
+		}
+	}
+	let url = uri ? resolve(r.s.url, uri) : null, pl = url ? fetch_text(url, r.h, r.m) : null;
+	if (substr(pl ?? '', 0, 7) != '#EXTM3U')
+		return 0;
+	let lines = map(split(pl, '\n'), l => rtrim(l, '\r'));
+	let keys = seg_keys(lines, r.c), from = +(r.start ?? 0), n = 0;
+	for (let i, l in lines) {
+		let k = keys[i], x = k ? match(k, CACHE_KEY) : null;
+		if (!x || x[2] != 'i' && (+x[4] / 1000.0 <= from || +x[3] / 1000.0 >= from + CACHE_KEEP))
+			continue;
+		if (cache_get(k)) {
+			sql_do('UPDATE cache SET keep = 1 WHERE key = ?', k);
+			continue;
+		}
+		let u = resolve(url, substr(l, 0, 1) == '#' ? match(l, /URI="([^"]*)"/)?.[1] ?? '' : trim(l));
+		let f = CACHE + k + '.' + clock()[1], t0 = clock();
+		let size = system(`${fetch_cmd(u, r.h, null, r.m)} >${shq(f)}`) == 0 ? stat(f)?.size : 0;
+		if (!(size > 0)) {
+			unlink(f);
+			break;
+		}
+		cache_put(k, f, size, r.m, true);
+		if (x[2] != 'i')
+			count_bytes(r.m, size, t0);
+		n++;
+	}
+	return n;
+}
+
+// The process ahead left: prepares the episode after now as play_next
+// would start it, and loads its first segments. A failure ends it (see
+// fail), and play_next does it all then.
+function list_ahead(key) {
+	let now = now_get(key), x = ahead_get(key), seen = tv_get(key, 'seen');
+	if (!now?.url || now.season == null || x?.url != now.url || x.fetched)
+		return;
+	let e = episode_after(now.id, now.season, now.episode);
+	x = { url: now.url, t: x.t, season: e?.season, episode: e?.episode };
+	if (e) {
+		next_base = match(now.url, /^(.*)\/api\/p\//)?.[1];
+		x.ready = prepare({ host: now.host }, next_params(now, e),
+		                  { audio: seen?.audio, subs: seen?.subs });
+	}
+	x.fetched = time();
+	if (now_get(key)?.url != now.url) {
+		if (x.ready?.m)
+			media_end(x.ready.m);
+		return;
+	}
+	kv_set('next:' + key, x);
+	if (x.ready)
+		pause_note(key, sprintf('next episode %d:%s prepared in %.0f s, %d segments loaded ahead',
+		                        e.season, e.episode, time() - x.t, prefetch(x.ready)));
 }
 
 // Plays the episode after the one that has just ended on the TV of key (see
@@ -2030,28 +2352,25 @@ function play_next(key) {
 	// failure here leaves it as well.
 	now.next_at = time();
 	now_set(key, now);
-	// Listed ahead within the last ten minutes, as title_streams keeps
-	// streams, it is started with those.
-	let x = ahead_get(key), e, listed = 'found ahead';
-	if (x?.url == now.url && x.fetched && time() - x.fetched < 600) {
+	// Prepared ahead (see list_ahead), it is only started.
+	let x = ahead_get(key), fresh = x?.url == now.url && ready(x), e;
+	if (fresh)
 		e = x.season != null ? { season: x.season, episode: x.episode } : null;
-		if (e && length(x.streams))
-			tv_set(key, 'list', { id: now.id, ...e, streams: x.streams, fetched: x.fetched });
-	} else {
+	else
 		e = episode_after(now.id, now.season, now.episode);
-		listed = sprintf('found now in %.1f s', clock_now() - t0);
-	}
 	if (!e)
 		return; // the last episode
 	next_base = match(now.url, /^(.*)\/api\/p\//)?.[1];
-	play(dev, {
-		id: now.id, title: now.title, poster: now.poster,
-		season: `${e.season}`, episode: e.episode,
-		source: now.source, quality: now.quality, drc: now.drc ? '1' : '0',
-		autonext: '1', autoskip: now.autoskip ? '1' : '0', style: now.style,
-	}, { audio: seen?.audio, subs: seen?.subs });
+	if (fresh && x.ready) {
+		start(dev, x.ready);
+	} else {
+		if (x?.ready?.m)
+			media_end(x.ready.m);
+		play(dev, next_params(now, e), { audio: seen?.audio, subs: seen?.subs });
+	}
 	pause_note(key, sprintf('next episode %d:%s, %s, sent to the TV after %.1f s, playing after %.1f s',
-	                        e.season, e.episode, listed, load_at - t0, clock_now() - t0));
+	                        e.season, e.episode, fresh && x.ready ? 'prepared ahead' : 'not prepared',
+	                        load_at - t0, clock_now() - t0));
 }
 
 // The process plan left (token): sleeps until what it waits for is due,
@@ -2298,7 +2617,7 @@ if (pm) {
 	if (getenv('REQUEST_METHOD') != 'GET')
 		fail(405, 'method not allowed');
 	let qs = parse_form(getenv('QUERY_STRING'), {});
-	proxy(pm[1], qs.u, qs.q, qs.h, qs.drc == '1', qs.m, qs.pv == '1');
+	proxy(pm[1], qs.u, qs.q, qs.h, qs.drc == '1', qs.m, qs.pv == '1', qs.c, qs.k);
 }
 // Leveled audio segments (see drc_playlist).
 let am = match(path, /^\/a\/([0-9a-f]{8})\/([0-9]{1,6})\.ts$/);
