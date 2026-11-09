@@ -145,6 +145,9 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .sl i b{display:block;width:0;height:100%;background:#ffb020a0;transition:background .2s}
 .sl.on i{left:-6px;right:-6px;top:10px;height:12px;border-radius:6px}
 .sl.on i b{background:var(--ac)}
+/* The recap, the intro and the credits on the seek bar, all alike. */
+#secs{position:absolute;inset:0;pointer-events:none}
+#secs span{position:absolute;top:0;bottom:0;background:#ffffff40}
 .times{display:flex;justify-content:space-between;margin:-4px 0 0;color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums;transition:.2s;transition-property:color,margin}
 /* The frame at the time dragged to, over the bar where it ends (see preview). */
 #frame{--w:min(44vw,240px);position:absolute;bottom:calc(100% - 2px);left:clamp(-6px,calc(var(--f,0) * 100% - var(--w) / 2),calc(100% + 6px - var(--w)));width:var(--w);aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#000;box-shadow:0 4px 24px #000c;pointer-events:none;opacity:0;transform:translateY(8px) scale(.94);transition:.15s;transition-property:opacity,transform}
@@ -359,7 +362,7 @@ svg.spring{animation:spring .3s ease-out}
   </div>
   <div id="full"><div>
     <div class="live">
-    <div class="sl" id="pos" role="slider" aria-label="Позиция"><i><b></b></i><div id="frame"><video muted playsinline></video><span class="spin"></span></div></div>
+    <div class="sl" id="pos" role="slider" aria-label="Позиция"><i><b></b><span id="secs"></span></i><div id="frame"><video muted playsinline></video><span class="spin"></span></div></div>
     <div class="times"><span id="cur">0:00</span><span id="rem"></span></div>
     <div class="ctl" id="ctl">
       <button class="ib ep-nav" id="prev" aria-label="Предыдущая серия"><svg><use href="#i-prev"/></svg></button>
@@ -1267,6 +1270,7 @@ function showTime() {
   $('st').textContent = epLine(st.now);
   $('prog').firstChild.style.width = m.duration ? (100 * t / m.duration) + '%' : 0;
   if (drag != 'pos') showPos(t, m.duration);
+  showSections(st.now?.sections || [], m.duration);
   showSkip(t);
 }
 
@@ -2223,10 +2227,25 @@ function slider(box, { start, show, end }) {
   box.onpointercancel = () => stop(false);
 }
 const showLevel = (id, f) => $(id).firstChild.firstChild.style.width = 100 * Math.min(Math.max(f || 0, 0), 1) + '%';
+// The time left counts down to the credits, if marked, until they start.
 function showPos(t, max) {
   showLevel('pos', max ? t / max : 0);
   $('cur').textContent = fmt(t);
-  $('rem').textContent = max ? '−' + fmt(max - t) : '';
+  const c = Math.max(...(st?.now?.sections || []).filter(x => x.kind == 'credits' && x.start < max).map(x => x.start));
+  $('rem').textContent = max ? '−' + fmt((t < c ? c : max) - t) : '';
+}
+// The sections of what is on over the seek bar, redrawn when they change.
+let secsShown = '';
+function showSections(secs, max) {
+  const key = max ? JSON.stringify([secs, max]) : '';
+  if (key == secsShown) return;
+  secsShown = key;
+  $('secs').replaceChildren(...(max ? secs : []).map(x => {
+    const e = document.createElement('span');
+    e.style.left = 100 * Math.max(x.start, 0) / max + '%';
+    e.style.width = 100 * (Math.min(x.end, max) - Math.max(x.start, 0)) / max + '%';
+    return e;
+  }));
 }
 let volume = null;
 const showVol = v => showLevel('vol', (volume = v) / 100);
