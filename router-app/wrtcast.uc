@@ -994,7 +994,10 @@ function cache_room() {
 // Keeps file f, a segment of n bytes loaded with media m, as key k; keep
 // marks it where a playback would start. Beyond CACHE_MB others go: those
 // behind what the TV plays, those of other videos, those furthest ahead of
-// it, and of those where a playback would start the oldest.
+// it, and of those where a playback would start the oldest. Where the TV
+// is runs on from where it was last seen playing: with the page closed
+// that is up to a minute ago (see tick), and the segments where it is now
+// are the ones the next mark wants (see cache_mark).
 function cache_put(k, f, n, m, keep) {
 	let x = match(k, CACHE_KEY);
 	if (!x || !rename(f, CACHE + k)) {
@@ -1010,7 +1013,9 @@ function cache_put(k, f, n, m, keep) {
 	let tv = sql_row('SELECT now, seen FROM tvs WHERE now IS NOT NULL ORDER BY ' +
 	                 "json_extract(seen, '$.t') DESC LIMIT 1");
 	let now = json(tv?.now ?? 'null'), seen = json(tv?.seen ?? 'null');
-	let c = now?.c ?? '', pos = seen?.url == now?.url ? +(seen?.pos ?? 0) : 0;
+	let c = now?.c ?? '', pos = 0;
+	if (now && seen?.url == now.url)
+		pos = +(seen.pos ?? 0) + (seen.playing ? min(max(time() - seen.t, 0), 300) : 0);
 	for (let r in sql_rows(`SELECT key, bytes FROM cache ORDER BY
 			CASE WHEN keep = 1 THEN 3 WHEN c = ? AND stop <= ? THEN 0 WHEN c != ? THEN 1 ELSE 2 END,
 			CASE WHEN keep = 0 AND c = ? AND stop > ? THEN -start ELSE t END`, c, pos - 10, c, c, pos - 10)) {
