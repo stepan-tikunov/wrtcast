@@ -846,23 +846,25 @@ function at_credits(now, st) {
 }
 
 // Leaves a process to do what is due within HORIZON seconds, the time to
-// the next tick, unless one already waits for it then.
+// the next tick, unless one already waits for it then. Returns what is due
+// (see due); null for nothing within HORIZON.
 function plan(key, now, m) {
 	let p = plan_get(key);
 	if (p?.url != now.url)
 		p = { url: now.url, done: {} };
 	let d = due(now, m, p.done);
 	if (!d || d.in > HORIZON)
-		return;
+		return null;
 	let at = clock_now() + d.in;
 	if (p.token && p.i == d.i && p.act == d.act && p.at - at < 1.5 && at - p.at < 1.5)
-		return;
+		return d;
 	p.token = hash(`${clock_now()} ${key}`);
 	p.i = d.i;
 	p.act = d.act;
 	p.at = at;
 	plan_set(key, p);
 	system(`${shq(sourcepath())} due ${shq(key)} ${p.token} </dev/null >/dev/null 2>&1 &`);
+	return d;
 }
 
 // ---- watch progress --------------------------------------------------------
@@ -1093,7 +1095,12 @@ function watch_end(now, st) {
 		// playback, which volume_back sees to.
 		if (st.volume != null && time() - (now.started ?? 0) > 60)
 			volume_keep(key, +st.volume);
-		plan(key, now, m);
+		let d = plan(key, now, m);
+		// The episode after this one is listed ahead, from HORIZON before
+		// the credits or the end it starts at.
+		if (d?.act == 'next' || now.autonext && now.season != null && !now.next_at &&
+		    +(m.duration ?? 0) > 0 && +m.duration - +(m.time ?? 0) <= HORIZON)
+			ahead(key, now);
 		return;
 	}
 	if (!ended(now, st, tv_get(key, 'seen')))
@@ -1950,6 +1957,60 @@ function play(dev, p, keep) {
 	return st;
 }
 
+// The episode after the one of season and episode of title id, crossing
+// into the next season: { season, episode }; null after the last one or
+// for one title-api does not list.
+function episode_after(id, season, episode) {
+	let S = api(`/v1/titles/${id}`).seasons ?? [], si = -1, ei = -1;
+	for (let i, x in S)
+		if (`${x.seasonNumber}` == `${season}`) {
+			si = i;
+			for (let j, e in x.episodes ?? [])
+				if (`${e.episodeNumber}` == `${episode}`)
+					ei = j;
+		}
+	if (si < 0 || ei < 0)
+		return null;
+	let s = S[si], e = s.episodes[ei + 1];
+	if (!e) {
+		s = S[si + 1];
+		e = s?.episodes?.[0];
+	}
+	return e ? { season: +s.seasonNumber, episode: `${e.episodeNumber}` } : null;
+}
+
+// The next episode is found and its streams are listed ahead (see
+// watch_end), so that at the credits play_next only has to start it, not
+// wait for title-api to load the provider's pages twice. Its master is not
+// asked for ahead: that opens the player's socket, as a playback start
+// does. { url, of the episode it follows, t, when the listing started,
+// fetched, when it ended, season and episode, null after the last one, and
+// streams } of the TV of key.
+const ahead_get = key => json(kv_get('next:' + key) ?? 'null');
+
+// Leaves a process to list the episode after now ahead, unless one has or
+// is at it (for two minutes at most: a failed listing is tried again).
+function ahead(key, now) {
+	let x = ahead_get(key);
+	if (x?.url == now.url && (x.fetched || time() - x.t < 120))
+		return;
+	kv_set('next:' + key, { url: now.url, t: time() });
+	system(`${shq(sourcepath())} ahead ${shq(key)} </dev/null >/dev/null 2>&1 &`);
+}
+
+// The process ahead left. A failed title-api request ends it (see api).
+function list_ahead(key) {
+	let now = now_get(key), x = ahead_get(key);
+	if (!now?.url || now.season == null || x?.url != now.url || x.fetched)
+		return;
+	let e = episode_after(now.id, now.season, now.episode);
+	x = { url: now.url, t: x.t, season: e?.season, episode: e?.episode,
+		streams: e ? streams(now.id, e.season, e.episode) : null };
+	x.fetched = time();
+	if (now_get(key)?.url == now.url)
+		kv_set('next:' + key, x);
+}
+
 // Plays the episode after the one that has just ended on the TV of key (see
 // ended), crossing into the next season, with the source, quality, leveler,
 // subtitle style, dub and subtitles of the last one.
@@ -1965,27 +2026,22 @@ function play_next(key) {
 	// failure here leaves it as well.
 	now.next_at = time();
 	now_set(key, now);
-	let S = api(`/v1/titles/${now.id}`).seasons ?? [], si = -1, ei = -1;
-	for (let i, x in S)
-		if (`${x.seasonNumber}` == `${now.season}`) {
-			si = i;
-			for (let j, e in x.episodes ?? [])
-				if (`${e.episodeNumber}` == `${now.episode}`)
-					ei = j;
-		}
-	if (si < 0 || ei < 0)
-		return;
-	let s = S[si], e = s.episodes[ei + 1];
-	if (!e) {
-		s = S[si + 1];
-		e = s?.episodes?.[0];
+	// Listed ahead within the last ten minutes, as title_streams keeps
+	// streams, it is started with those.
+	let x = ahead_get(key), e;
+	if (x?.url == now.url && x.fetched && time() - x.fetched < 600) {
+		e = x.season != null ? { season: x.season, episode: x.episode } : null;
+		if (e && length(x.streams))
+			tv_set(key, 'list', { id: now.id, ...e, streams: x.streams, fetched: x.fetched });
+	} else {
+		e = episode_after(now.id, now.season, now.episode);
 	}
 	if (!e)
 		return; // the last episode
 	next_base = match(now.url, /^(.*)\/api\/p\//)?.[1];
 	play(dev, {
 		id: now.id, title: now.title, poster: now.poster,
-		season: `${s.seasonNumber}`, episode: `${e.episodeNumber}`,
+		season: `${e.season}`, episode: e.episode,
 		source: now.source, quality: now.quality, drc: now.drc ? '1' : '0',
 		autonext: '1', autoskip: now.autoskip ? '1' : '0', style: now.style,
 	}, { audio: seen?.audio, subs: seen?.subs });
@@ -2214,6 +2270,10 @@ if (ARGV[0] == 'tick') {
 }
 if (ARGV[0] == 'next' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
 	play_next(ARGV[1]);
+	exit(0);
+}
+if (ARGV[0] == 'ahead' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
+	list_ahead(ARGV[1]);
 	exit(0);
 }
 if (ARGV[0] == 'due' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
