@@ -803,6 +803,28 @@ function skips_at(list, pos) {
 	return null;
 }
 
+// Where the skips of list after pos land (see skips_at): the ends of the
+// recaps and intros, one right after another counting as one, that start
+// after pos.
+function skip_ends(list, pos) {
+	let r = [];
+	for (let x in list) {
+		let d = x.kind != 'credits' && x.skip && x.start >= pos ? skips_at(list, x.start) : null;
+		if (d && r[-1] != d.to)
+			push(r, d.to);
+	}
+	return r;
+}
+
+// Where a playback of a video with sections list from pos plays without a
+// seek of its own: from pos, with autoskip past the recap and the intro pos
+// is within (as prepare starts it), and from where each skip ahead lands.
+// The windows of the segment cache start there (see cache_mark, prefetch).
+function starts_of(list, pos, autoskip) {
+	let d = autoskip ? skips_at(list, pos) : null, from = d ? d.to : pos;
+	return [from, ...(autoskip ? skip_ends(list, from) : [])];
+}
+
 // The plan of the TV of key: { url, done: { <index>: true } of the sections
 // skipped, and of the waiting process token, i and act of what it waits
 // for, at when }.
@@ -883,6 +905,7 @@ function plan(key, now, m) {
 	p.token = hash(`${clock_now()} ${key}`);
 	p.i = d.i;
 	p.act = d.act;
+	p.to = d.to;
 	p.at = at;
 	plan_set(key, p);
 	system(`${shq(sourcepath())} due ${shq(key)} ${p.token} </dev/null >/dev/null 2>&1 &`);
@@ -998,12 +1021,16 @@ function cache_put(k, f, n, m, keep) {
 	}
 }
 
-// Marks the segments of video c where a playback from pos, where it was
-// left off, would start (see resume_at), and only those.
-function cache_mark(c, pos) {
-	if (c)
-		sql_do('UPDATE cache SET keep = (start IS NULL OR stop > ? AND start < ?) WHERE c = ?',
-		       pos - 5, pos - 5 + CACHE_KEEP, c);
+// Marks the segments of video c within CACHE_KEEP seconds from each of
+// starts (see starts_of), and only those.
+function cache_mark(c, starts) {
+	if (!c || !length(starts))
+		return;
+	let a = [];
+	for (let w in starts)
+		push(a, w, w + CACHE_KEEP);
+	sql_do(`UPDATE cache SET keep = (start IS NULL OR ${join(' OR ',
+	       map(starts, w => '(stop > ? AND start < ?)'))}) WHERE c = ?`, ...a, c);
 }
 
 // ---- watch progress --------------------------------------------------------
@@ -1112,7 +1139,9 @@ function remember(now, m) {
 	let pos = +(m.time ?? 0), dur = +(m.duration ?? 0);
 	if (!finished && (pos < 1 || index(['PLAYING', 'PAUSED', 'BUFFERING'], m.state) < 0))
 		return;
-	cache_mark(now.c, pos);
+	// Where a play would start again (see resume_at, prepare) and land
+	// after its skips.
+	cache_mark(now.c, starts_of(sections_of(now, dur), pos > 10 ? pos - 5 : 0, !!now.autoskip));
 	let e = title_row(now.id), k = ep_key(now.season, now.episode);
 	let x = progress_row(now.id, k), t = time();
 	let important = !e || !x;
@@ -2112,10 +2141,9 @@ function prepare(dev, p, keep) {
 	// its start) goes past them at once, by the sections on this video if
 	// title-api tells them (which tells it the new position too), else by
 	// the marked ones. A replay (reuse) stays where it was.
-	let lead = null;
+	let lead = null, sections = (m ? media_get(m, 'hdr')?.sections : null) ?? s.sections ?? [];
 	if (autoskip && p.reuse != '1') {
-		let hs = m ? media_get(m, 'hdr')?.sections : null;
-		lead = skips_at(hs ?? s.sections ?? [], +(start ?? 0));
+		lead = skips_at(sections, +(start ?? 0));
 		if (lead) {
 			start = lead.to;
 			if (m)
@@ -2163,7 +2191,7 @@ function prepare(dev, p, keep) {
 		push(args, '-y', p.style);
 	return {
 		key, id, season, episode, n, s, list, fetched, m, h, c, url, width, quality, quals,
-		start, lead, drc, autoskip, args, labels, subs: map(picked, t => t.url),
+		start, lead, drc, autoskip, sections, args, labels, subs: map(picked, t => t.url),
 		p: { title: p.title, poster: p.poster, style: p.style, autonext: p.autonext,
 			audio: p.audio, subs: p.subs, rate: p.rate },
 	};
@@ -2261,13 +2289,19 @@ const next_params = (now, e) => ({
 	autonext: '1', autoskip: now.autoskip ? '1' : '0', style: now.style,
 });
 
-// Loads into the cache the segments of the first CACHE_KEEP seconds of
-// what prepare made ready (r) from where it starts, one at a time through
-// title-api as the TV would load them: the variant's media playlist, its
-// init segment and the segments. A failure ends it. Returns the segments
-// loaded.
-function prefetch(r) {
-	if (!r?.c || !valid_media(r.m) || !cache_room())
+// What prefetch needs of what the TV of now plays.
+function now_ready(now) {
+	let s = now.streams?.[now.stream];
+	return { c: now.c, m: now.media, s, h: s?.headers ?? '',
+		width: filter(s?.variants ?? [], v => v.label == now.quality)[0]?.width };
+}
+
+// Loads into the cache the segments of CACHE_KEEP seconds from each of
+// starts of what prepare made ready (r), one at a time through title-api as
+// the TV would load them: the variant's media playlist, its init segment and
+// the segments. A failure ends it. Returns the segments loaded.
+function prefetch(r, starts) {
+	if (!r?.c || !r.s?.url || !r.width || !valid_media(r.m) || !length(starts) || !cache_room())
 		return 0;
 	let inf = null, uri = null;
 	for (let l in split(fetch_text(r.s.url, r.h, r.m) ?? '', '\n')) {
@@ -2287,10 +2321,12 @@ function prefetch(r) {
 	if (substr(pl ?? '', 0, 7) != '#EXTM3U')
 		return 0;
 	let lines = map(split(pl, '\n'), l => rtrim(l, '\r'));
-	let keys = seg_keys(lines, r.c), from = +(r.start ?? 0), n = 0;
+	let keys = seg_keys(lines, r.c), n = 0;
+	let wanted = x => x[2] == 'i' || length(filter(starts, w =>
+		+x[4] / 1000.0 > w && +x[3] / 1000.0 < w + CACHE_KEEP));
 	for (let i, l in lines) {
 		let k = keys[i], x = k ? match(k, CACHE_KEY) : null;
-		if (!x || x[2] != 'i' && (+x[4] / 1000.0 <= from || +x[3] / 1000.0 >= from + CACHE_KEEP))
+		if (!x || !wanted(x))
 			continue;
 		if (cache_get(k)) {
 			sql_do('UPDATE cache SET keep = 1 WHERE key = ?', k);
@@ -2334,7 +2370,8 @@ function list_ahead(key) {
 	kv_set('next:' + key, x);
 	if (x.ready)
 		pause_note(key, sprintf('next episode %d:%s prepared in %.0f s, %d segments loaded ahead',
-		                        e.season, e.episode, time() - x.t, prefetch(x.ready)));
+		                        e.season, e.episode, time() - x.t, prefetch(x.ready,
+		                        starts_of(x.ready.sections, +(x.ready.start ?? 0), x.ready.autoskip))));
 }
 
 // Plays the episode after the one that has just ended on the TV of key (see
@@ -2382,6 +2419,17 @@ function wake(key, token) {
 		let p = plan_get(key);
 		if (p?.token != token)
 			return;
+		// The segments a skip lands on are loaded into the cache before
+		// it, once per skip with time for it, so that the TV has them at once.
+		if (p.act == 'skip' && p.to != null && !p.pre?.[p.i] && p.at - clock_now() > 10) {
+			p.pre ??= {};
+			p.pre[p.i] = true;
+			plan_set(key, p);
+			let now = now_get(key);
+			if (now?.url == p.url)
+				prefetch(now_ready(now), [p.to]);
+			continue;
+		}
 		let wait = p.at - clock_now();
 		if (wait > 0)
 			sleep(int(min(wait, HORIZON) * 1000));
@@ -2394,6 +2442,7 @@ function wake(key, token) {
 		if (d && d.in > 0.5 && d.in <= HORIZON) {
 			p.i = d.i;
 			p.act = d.act;
+			p.to = d.to;
 			p.at = clock_now() + d.in;
 			plan_set(key, p);
 			continue;
