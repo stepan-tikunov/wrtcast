@@ -839,10 +839,10 @@ function due(now, m, done) {
 }
 
 // Whether the credits of now have started on the TV (st) and the next
-// episode is due (see play_next).
+// episode is due (see play_next): within half a second, as wake acts.
 function at_credits(now, st) {
 	let d = st.app?.id == 'CC1AD845' ? due(now, st.media, null) : null;
-	return d?.act == 'next' && d.in == 0;
+	return d?.act == 'next' && d.in <= 0.5;
 }
 
 // Leaves a process to do what is due within HORIZON seconds, the time to
