@@ -1230,12 +1230,22 @@ function volume_keep(key, v) {
 }
 
 // Puts the volume the TV of dev was last played at back once a play has
-// started there, when its status st tells another; the status after that.
+// started there; the status after that. A restarted box may tell that
+// volume while it plays at full, and takes no level it already has, so
+// the same one goes by a step off it.
 function volume_back(dev, st) {
-	let v = volume_get(state_key(dev));
-	if (v == null || st?.volume == null || abs(+st.volume - v) < 0.01)
+	let key = state_key(dev), v = volume_get(key);
+	if (v == null || st?.volume == null)
 		return st;
-	return castctl_try(dev, 'volume', sprintf('%.0f', v * 100)) ?? st;
+	if (abs(+st.volume - v) < 0.01)
+		st = castctl_try(dev, 'volume', sprintf('%.0f', v * 100 + (v < 0.5 ? 1 : -1))) ?? st;
+	else
+		pause_note(key, sprintf('volume %.2f at the start, put back to %.2f', +st.volume, v));
+	let r = castctl_try(dev, 'volume', sprintf('%.0f', v * 100));
+	if (r?.volume == null || abs(+r.volume - v) >= 0.01)
+		pause_note(key, sprintf('volume %.2f not taken at the start: %s', v,
+		                        r ? sprintf('%.2f', +r.volume) : 'castctl failed'));
+	return r ?? st;
 }
 
 // The episode after the one of season and episode of title id, crossing
@@ -1312,9 +1322,16 @@ function watch_end(now, st) {
 				buffering: m.state == 'BUFFERING', rate: +(m.rate ?? 1), at: time(),
 			});
 		// Set from the TV's remote or another app, past the start of a
-		// playback, which volume_back sees to.
+		// playback, which volume_back sees to; within its first minute a
+		// box that went back to its own volume gets the kept one again.
+		let vol = volume_get(key);
 		if (st.volume != null && time() - (now.started ?? 0) > 60)
 			volume_keep(key, +st.volume);
+		else if (st.volume != null && vol != null && abs(+st.volume - vol) >= 0.01) {
+			pause_note(key, sprintf('volume %.2f %d s after the start, put back to %.2f',
+			                        +st.volume, time() - (now.started ?? 0), vol));
+			castctl_try({ host: now.host }, 'volume', sprintf('%.0f', vol * 100));
+		}
 		let d = plan(key, now, m);
 		// The episode after this one is prepared ahead, from AHEAD before
 		// the credits or the end it starts at.
