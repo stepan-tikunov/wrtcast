@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -28,7 +29,9 @@ const schema = `
 		title TEXT PRIMARY KEY, state TEXT NOT NULL, tmdb_id INTEGER, kind TEXT, how TEXT,
 		attempts INTEGER NOT NULL DEFAULT 0, retry_at INTEGER, error TEXT,
 		cost REAL, reason TEXT, updated INTEGER NOT NULL
-	);`
+	);
+	CREATE INDEX IF NOT EXISTS tmdb_titles_by_tmdb ON tmdb_titles (tmdb_id, kind);
+	CREATE TABLE IF NOT EXISTS tmdb_cache (key TEXT PRIMARY KEY, json TEXT NOT NULL, fetched INTEGER NOT NULL);`
 
 // store keeps the key and what became of each title, in title-api's state
 // database.
@@ -131,4 +134,32 @@ func (s *store) failed(ctx context.Context, title string, reason error, retryAt 
 			cost = coalesce(cost, 0) + excluded.cost, updated = excluded.updated`,
 		title, stateFailed, retry, reason.Error(), cost, time.Now().Unix())
 	return err
+}
+
+// titleIDs are title-api's titles of TMDB titles of a kind, those matched.
+func (s *store) titleIDs(ctx context.Context, kind string, ids []uint64) (map[uint64]string, error) {
+	result := map[uint64]string{}
+	if len(ids) == 0 {
+		return result, nil
+	}
+	args := []any{kind, stateMatched}
+	for _, id := range ids {
+		args = append(args, int64(id))
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT tmdb_id, title FROM tmdb_titles WHERE kind = ? AND state = ?
+		AND tmdb_id IN (?`+strings.Repeat(", ?", len(ids)-1)+`) ORDER BY updated`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var title string
+		if err := rows.Scan(&id, &title); err != nil {
+			return nil, err
+		}
+		result[uint64(id)] = title
+	}
+	return result, rows.Err()
 }

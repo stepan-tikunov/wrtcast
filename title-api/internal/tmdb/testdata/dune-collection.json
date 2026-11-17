@@ -1,0 +1,33 @@
+{
+ "id": 726871,
+ "name": "Дюна (Коллекция)",
+ "parts": [
+  {
+   "id": 438631,
+   "media_type": "movie",
+   "title": "Дюна",
+   "release_date": "2021-09-15",
+   "poster_path": "/3hbXNclcHaj5KiF6kK41GBMjyFr.jpg",
+   "backdrop_path": "/qVgZu5BTx6pu4owCvVOm4zjTfOi.jpg",
+   "adult": false
+  },
+  {
+   "id": 693134,
+   "media_type": "movie",
+   "title": "Дюна: Часть вторая",
+   "release_date": "2024-02-27",
+   "poster_path": "/3aLghRkuJc9cs770fxo4a6YWht3.jpg",
+   "backdrop_path": "/eZ239CUp1d6OryZEBPnO2n87gMG.jpg",
+   "adult": false
+  },
+  {
+   "id": 1170608,
+   "media_type": "movie",
+   "title": "Дюна: Часть третья",
+   "release_date": "2026-12-15",
+   "poster_path": "/zbMASwT2PKpudXBRc2LExAQHASw.jpg",
+   "backdrop_path": "/i5E9H7Ik0u61ylDDTbmUpTL3Yw.jpg",
+   "adult": false
+  }
+ ]
+}

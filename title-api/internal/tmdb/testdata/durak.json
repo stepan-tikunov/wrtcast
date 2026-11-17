@@ -1,0 +1,635 @@
+{
+ "backdrop_path": "/c4ewJ2mW1EDf12p8VYV0cZghW3V.jpg",
+ "belongs_to_collection": null,
+ "genres": [
+  {
+   "id": 18,
+   "name": "драма"
+  }
+ ],
+ "id": 285700,
+ "origin_country": [
+  "RU"
+ ],
+ "original_language": "ru",
+ "original_title": "Дурак",
+ "overview": "Жизни 800 человек общежития висят буквально на волоске из-за безразличия местных властей. В любую секунду здание может рухнуть. И кто бы мог подумать, что судьбы людей окажутся в руках простого сантехника. Но удастся ли ему что-то изменить и предотвратить катастрофу?",
+ "poster_path": "/3LesVrVsmWgHRF3FzTTtqkEWgz9.jpg",
+ "production_countries": [
+  {
+   "iso_3166_1": "RU",
+   "name": "Russia"
+  }
+ ],
+ "release_date": "2014-08-09",
+ "runtime": 116,
+ "softcore": false,
+ "status": "Released",
+ "tagline": "Успеет ли он спасти всех",
+ "title": "Дурак",
+ "vote_average": 7.765,
+ "vote_count": 351,
+ "images": {
+  "backdrops": [
+   {
+    "file_path": "/c4ewJ2mW1EDf12p8VYV0cZghW3V.jpg",
+    "iso_639_1": null,
+    "width": 1429,
+    "height": 804,
+    "aspect_ratio": 1.777,
+    "vote_average": 3.334,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/cqYzq2ZHBADy8LR14NPBRKhw8oj.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/ljqPmpU5KyN0XL43QsKHsD1zSpy.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/AruMn9x47fuXlUUFoCiXxxjIMlu.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/b6pSfp8KfwBhKqoHtnnBfAKiUAS.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/yjzrpz75XFv15KKovNMOnyxGeZK.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/yyE2gWRcROHVGEQmLmN8fASabTu.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/wiE07Eik5RTNCGongXbs3zm3MK1.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/emekkKBT5jf5kQVDp7G5YLFCtqz.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/soOVjd2dQwXOjjnvblETxZNzTMg.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/sfN1vAMnpZPLYcfMtSiqe1hSkUP.jpg",
+    "iso_639_1": null,
+    "width": 1600,
+    "height": 900,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/AtTLc7dX3DilXefDYnm0xYWDXyT.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/drYNoEW7fhXLVNOXCzWA4zleAPC.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/uXj3ZwFYBnBK3likzJse6wZu0uZ.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/aGnnq1YYc5GBxWjpwmx9mWsgoNq.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/69a9AzVPr25yzdVHRVVWhhvZq0m.jpg",
+    "iso_639_1": null,
+    "width": 1525,
+    "height": 858,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/ds6A4GF5ligm2NXu1U4OeU96Ad8.jpg",
+    "iso_639_1": null,
+    "width": 1429,
+    "height": 804,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/o7TGUH5x4HOw3ZgpMDGp0JoitAz.jpg",
+    "iso_639_1": null,
+    "width": 1429,
+    "height": 804,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/icoN1eRHn5hPLEd19gSSdq6CrBw.jpg",
+    "iso_639_1": null,
+    "width": 1429,
+    "height": 804,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/93xukZQPdm8WQCOrLIjqxiD8n9u.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/935nVSWvnmmvjhb0G1O7Gf5bHIo.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/rDALkgm5noXdXM8jKOJDpU8kmsz.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ],
+  "logos": [
+   {
+    "file_path": "/hVl7qP2ZzaMT1vL5MVshnA891kJ.png",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 471,
+    "aspect_ratio": 4.076,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ]
+ },
+ "videos": {
+  "results": [
+   {
+    "key": "m3DBhraNfHs",
+    "name": "трейлер драмы Юрия Быкова ДУРАК, снова в кино с 14 июля",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "ru",
+    "official": false,
+    "published_at": "2022-07-09T07:10:37.000Z"
+   },
+   {
+    "key": "tVXB-zQQA74",
+    "name": "Дурак | Трейлер",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "ru",
+    "official": false,
+    "published_at": "2018-04-27T16:04:48.000Z"
+   },
+   {
+    "key": "cy0CgeWWW1w",
+    "name": "THE FOOL (Durak) by Yury Bykov - TRAILER",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "en",
+    "official": false,
+    "published_at": "2015-02-04T22:38:07.000Z"
+   }
+  ]
+ },
+ "credits": {
+  "cast": [
+   {
+    "name": "Артём Быстров",
+    "profile_path": "/94CxhEWgiwzm8UpgvYarlEAHUD2.jpg",
+    "character": "Nikitin"
+   },
+   {
+    "name": "Наталья Суркова",
+    "profile_path": "/pkhhe4Tv7P6kqCwRHh3U8V1gn1F.jpg",
+    "character": "Galaganova"
+   },
+   {
+    "name": "Юрий Цурило",
+    "profile_path": "/yOwTf3BQqqMx7PwroYj9HOThifl.jpg",
+    "character": "Bogachev"
+   },
+   {
+    "name": "Борис Невзоров",
+    "profile_path": "/aOKTlPMKbrPu4UnaJ8TzHYAACmc.jpg",
+    "character": "Fedotov"
+   },
+   {
+    "name": "Кирилл Полухин",
+    "profile_path": "/pFkLWgeIbV3Rg50LMsIkLnx63jq.jpg",
+    "character": "Matyugin"
+   },
+   {
+    "name": "Александр Коршунов",
+    "profile_path": "/i9Ld2WMeG2mHKuTeye4uydYxRaw.jpg",
+    "character": "father"
+   },
+   {
+    "name": "Ольга Самошина",
+    "profile_path": "/qKHGFT7eVsrt5cQ8KOiFyZOPmOW.jpg",
+    "character": "mother"
+   },
+   {
+    "name": "Дарья Мороз",
+    "profile_path": "/aOI1SOdhvfxs4E6D0wW8lop8pqV.jpg",
+    "character": "Masha"
+   },
+   {
+    "name": "Сергей Арцибашев",
+    "profile_path": "/tH1oyYw53h0VStNqisOOlUCBKSK.jpg",
+    "character": "Tulsky"
+   },
+   {
+    "name": "Елена Панова",
+    "profile_path": "/i2NOsbmpjMyTkGOjIKSdUjQMVAm.jpg",
+    "character": "drunkard's wife"
+   },
+   {
+    "name": "Дмитрий Куличков",
+    "profile_path": "/fpzttqO2qzzR0uh2n3SpwG9yxbJ.jpg",
+    "character": "drunkard"
+   },
+   {
+    "name": "Илья Исаев",
+    "profile_path": "/u3lcnxRwHhHNHJFSbgIuGTzW7Xp.jpg",
+    "character": "Safronov"
+   },
+   {
+    "name": "Максим Пинскер",
+    "profile_path": "/6bMHDIvUCRc6xpmxQ7c6yTsYdxi.jpg",
+    "character": "Sayapin"
+   },
+   {
+    "name": "Любовь Руденко",
+    "profile_path": "/so9eo0tHJBlhDhvi4y53DW7ZHyH.jpg",
+    "character": "Razumikhina"
+   },
+   {
+    "name": "Ирина Низина",
+    "profile_path": "/zM9yMoc6Qo5tBmMHSipSNWBwAjp.jpg",
+    "character": "Chernenko"
+   },
+   {
+    "name": "Gordey Kobzev",
+    "profile_path": null,
+    "character": "Nikitin's son"
+   },
+   {
+    "name": "Пётр Баранчеев",
+    "profile_path": "/8kcfi6rsVd2HfmTWFb93QBOGza3.jpg",
+    "character": "Emelyanov"
+   },
+   {
+    "name": "Ангелина Римашевская",
+    "profile_path": "/bd8Uq8S4wHtz3KfMxrWNoBczm2E.jpg",
+    "character": ""
+   },
+   {
+    "name": "Андрей Сидоренко",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Нина Антюхова",
+    "profile_path": "/fcBxpzchYZtSvyFH1AwDkWu7C94.jpg",
+    "character": ""
+   },
+   {
+    "name": "Денис Казаков",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Артем Васюков",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Ринат Кондаев",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Виктория Олейникова",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Ярослав Беседин",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Юлия Вашкеба",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Светлана Быняева",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Дмитрий Клишин",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Nikolay Butenin",
+    "profile_path": "/9SBISbsRWKS905eAkqIOcCrKi3p.jpg",
+    "character": ""
+   },
+   {
+    "name": "Георгий Бакулин",
+    "profile_path": null,
+    "character": ""
+   }
+  ],
+  "crew": [
+   {
+    "name": "Юрий Быков",
+    "job": "Director"
+   }
+  ]
+ },
+ "release_dates": {
+  "results": [
+   {
+    "iso_3166_1": "RU",
+    "release_dates": [
+     {
+      "certification": ""
+     },
+     {
+      "certification": "16+"
+     }
+    ]
+   }
+  ]
+ },
+ "recommendations": {
+  "results": [
+   {
+    "id": 28023,
+    "media_type": "movie",
+    "title": "Riot in Cell Block 11",
+    "release_date": "1954-02-18",
+    "poster_path": "/7Odm3v1TZuH2JogmJhvQYvCD2Gl.jpg",
+    "backdrop_path": "/kZHzQIz6qoStgXtxjo5lMhrkDla.jpg",
+    "adult": false
+   },
+   {
+    "id": 46948,
+    "media_type": "movie",
+    "title": "Власть",
+    "release_date": "1986-01-31",
+    "poster_path": "/6sj8HFCODqHah4DTCWs8uPp4IyL.jpg",
+    "backdrop_path": "/8ekazzF0sUaC8pfKdk5hL2j0uWl.jpg",
+    "adult": false
+   },
+   {
+    "id": 38557,
+    "media_type": "movie",
+    "title": "Река",
+    "release_date": "1984-12-01",
+    "poster_path": "/bXIlE2QVIarVug9wpyPIz2xiWxf.jpg",
+    "backdrop_path": "/tEodwsC1kRFFbI4CJCZJopdX0D.jpg",
+    "adult": false
+   },
+   {
+    "id": 118911,
+    "media_type": "movie",
+    "title": "Поторопи закат",
+    "release_date": "1967-02-09",
+    "poster_path": "/lpZNG4WmNnKe451GR0wl8nRDqfn.jpg",
+    "backdrop_path": "/6mdGxp4IQsggl8E0goF2NXQPubR.jpg",
+    "adult": false
+   },
+   {
+    "id": 430446,
+    "media_type": "movie",
+    "title": "Еретик",
+    "release_date": "2018-01-21",
+    "poster_path": "/oucoXiLsc07YryywgjddmU3YoDV.jpg",
+    "backdrop_path": "/6EMqJu1wAKWtgO364odfkS3nzIP.jpg",
+    "adult": false
+   },
+   {
+    "id": 565341,
+    "media_type": "movie",
+    "title": "Звук тишины",
+    "release_date": "2019-09-13",
+    "poster_path": "/yDTNjmpqWSrwJzUYCLblOQug15v.jpg",
+    "backdrop_path": "/mrH2HxDl0p7evhNqSGN7SIYpVRG.jpg",
+    "adult": false
+   },
+   {
+    "id": 20362,
+    "media_type": "movie",
+    "title": "Плач большого города",
+    "release_date": "1948-09-29",
+    "poster_path": "/33GZQ5NmhygSf0TH0LVIFCNeUka.jpg",
+    "backdrop_path": "/lRBd0Fa0eRtOHZssIuNHehqM3V1.jpg",
+    "adult": false
+   },
+   {
+    "id": 10056,
+    "media_type": "movie",
+    "title": "Поцелуй убийцы",
+    "release_date": "1955-10-01",
+    "poster_path": "/llIdW8mXfxahPe3E31BaclFpCVf.jpg",
+    "backdrop_path": "/7ZbNuSp186oxSjdtz5npRLLjVSb.jpg",
+    "adult": false
+   },
+   {
+    "id": 1088166,
+    "media_type": "movie",
+    "title": "Диспетчер",
+    "release_date": "2025-08-20",
+    "poster_path": "/7vJjqzwqWIUeNyJEms7uMkcBBht.jpg",
+    "backdrop_path": "/1ZnEOaOUj2e2Fq6Y7wo9KeH5rS6.jpg",
+    "adult": false
+   },
+   {
+    "id": 88875,
+    "media_type": "movie",
+    "title": "Влияние гамма-лучей на бледно-желтые ноготки",
+    "release_date": "1972-12-20",
+    "poster_path": "/hFGpoV5hDewXyBvjd44ajO58Sxw.jpg",
+    "backdrop_path": "/oKBF72vHcsKDqGuC8rNyv5EVdCE.jpg",
+    "adult": false
+   },
+   {
+    "id": 159389,
+    "media_type": "movie",
+    "title": "TalHotBlond",
+    "release_date": "2012-06-23",
+    "poster_path": "/3FF9YFuVvh5t393NxfME47wxqrZ.jpg",
+    "backdrop_path": "/diF927vBIYi1uQxVpdx7W7wUuIr.jpg",
+    "adult": false
+   },
+   {
+    "id": 35006,
+    "media_type": "movie",
+    "title": "Маска Димитриоса",
+    "release_date": "1944-06-23",
+    "poster_path": "/wsf399maXMnhOWfQSjOxErURxzN.jpg",
+    "backdrop_path": "/tjfLCnhJOpEpgAu4Nf9iGLvtUfy.jpg",
+    "adult": false
+   },
+   {
+    "id": 339145,
+    "media_type": "movie",
+    "title": "Девушка в книге",
+    "release_date": "2015-06-13",
+    "poster_path": "/5bAsIy6jAK0XZd6JuoV9DEAtlpQ.jpg",
+    "backdrop_path": "/xw9B2Wsz1RiPQt9dWrG4tjJxEu7.jpg",
+    "adult": false
+   },
+   {
+    "id": 69557,
+    "media_type": "movie",
+    "title": "Пожиратель тыкв",
+    "release_date": "1964-07-16",
+    "poster_path": "/5llEDfwte6SnAd2grP065N95yeo.jpg",
+    "backdrop_path": "/jxyLXwFaccE8XzhF62HauyXJi14.jpg",
+    "adult": false
+   },
+   {
+    "id": 22477,
+    "media_type": "movie",
+    "title": "Сентябрь",
+    "release_date": "1987-12-18",
+    "poster_path": "/gTsFkvUt9wrGOZh6JNDSFd2LIBT.jpg",
+    "backdrop_path": "/XZociOva4LhCObUNEgqFfFPPHr.jpg",
+    "adult": false
+   },
+   {
+    "id": 1243381,
+    "media_type": "movie",
+    "title": "Дева Мария: Мать Христа",
+    "release_date": "2024-12-12",
+    "poster_path": "/4nGEGKhJuymcg5v5VQ20FoJcTOA.jpg",
+    "backdrop_path": "/vfbxysLCXrvcI8NdzeQTR1Kxfky.jpg",
+    "adult": false
+   },
+   {
+    "id": 426242,
+    "media_type": "movie",
+    "title": "Где Анна Франк",
+    "release_date": "2021-12-08",
+    "poster_path": "/1ucnDIrh5NJZAKqkAjCxEcrp7J8.jpg",
+    "backdrop_path": "/hvpr2cVsDOhUGXae1z070ap4QsQ.jpg",
+    "adult": false
+   },
+   {
+    "id": 75889,
+    "media_type": "movie",
+    "title": "Дом на Кэрролл-стрит",
+    "release_date": "1988-03-04",
+    "poster_path": "/9gIvaIbeJ3cWpOpaingPjRLEJOi.jpg",
+    "backdrop_path": "/2CvgTzE4ZGVH6yvL2YF1WumcHEi.jpg",
+    "adult": false
+   },
+   {
+    "id": 271736,
+    "media_type": "movie",
+    "title": "Допинг",
+    "release_date": "2015-09-16",
+    "poster_path": "/jPenwL1ovQcmu8llDWlRQMWqVAx.jpg",
+    "backdrop_path": "/jIyfHkH8QrwddgryGKD4zzlyus3.jpg",
+    "adult": false
+   },
+   {
+    "id": 44603,
+    "media_type": "movie",
+    "title": "Потустороннее",
+    "release_date": "2010-10-22",
+    "poster_path": "/pAxebY0NYUOZSrzGBiudNfdxObl.jpg",
+    "backdrop_path": "/f2z00VIPyrrfFabw0RnoY5M8uYt.jpg",
+    "adult": false
+   }
+  ]
+ }
+}

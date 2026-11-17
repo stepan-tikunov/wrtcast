@@ -1,0 +1,1390 @@
+{
+ "backdrop_path": "/puLaqdcTRwFxwv9S3PO6jA3ep7J.jpg",
+ "created_by": [
+  {
+   "id": 1625775,
+   "credit_id": "625b4192a127e500519a2910",
+   "name": "Mehmet Bozdağ",
+   "original_name": "Mehmet Bozdağ",
+   "gender": 2,
+   "profile_path": "/g5aoMRizfnmVdztzdPV3t7lKB7.jpg"
+  }
+ ],
+ "first_air_date": "2019-11-20",
+ "genres": [
+  {
+   "id": 10768,
+   "name": "Война и Политика"
+  },
+  {
+   "id": 10759,
+   "name": "Боевик и Приключения"
+  },
+  {
+   "id": 18,
+   "name": "драма"
+  }
+ ],
+ "id": 95603,
+ "last_episode_to_air": {
+  "id": 6288246,
+  "name": "Эпизод 30",
+  "overview": "",
+  "vote_average": 1.0,
+  "vote_count": 1,
+  "air_date": "2025-06-04",
+  "episode_number": 30,
+  "episode_type": "finale",
+  "production_code": "",
+  "runtime": 144,
+  "season_number": 6,
+  "show_id": 95603,
+  "still_path": "/k5h9gm948A5iIufKJLJjSP9H8Vz.jpg"
+ },
+ "name": "Основание: Осман",
+ "next_episode_to_air": null,
+ "number_of_episodes": 194,
+ "number_of_seasons": 6,
+ "origin_country": [
+  "TR"
+ ],
+ "original_language": "tr",
+ "original_name": "Kuruluş Osman",
+ "overview": "После смерти Эртугрула бразды правления турецкими землями перешли к его наследнику, 23-летнему Осману I Гази. Юноше досталась территория Фригии, однако это амбициозного вождя не устраивало: он мечтал, чтобы слава о могуществе родного государства гремела на весь мир. Несмотря на малый опыт, молодой правитель принялся успешно расширять границы своей страны: присоединил значительную часть Византии, обеспечив туркам выходы к Мраморному и Черному морям, объединился со сбежавшими от монголов мусульманами. Самым бесстрашным воином его армии был сам Осман: он всегда находился в гуще событий, подавая братьям по оружию достойный пример. Усилиями этого султана Турция станет великой империей, что будет носить его имя. Но это спустя годы, а пока впереди у него множество испытаний: предательство близких людей, новые завоевания и потери, козни завистников и главная любовь всей жизни.",
+ "poster_path": "/i8BlxTt8RLZPL3m0qUMrpd7bSdI.jpg",
+ "production_countries": [
+  {
+   "iso_3166_1": "TR",
+   "name": "Turkey"
+  }
+ ],
+ "seasons": [
+  {
+   "season_number": 1,
+   "episode_count": 27,
+   "air_date": "2019-11-20",
+   "name": "Сезон 1"
+  },
+  {
+   "season_number": 2,
+   "episode_count": 37,
+   "air_date": "2020-09-30",
+   "name": "Сезон 2"
+  },
+  {
+   "season_number": 3,
+   "episode_count": 34,
+   "air_date": "2021-10-06",
+   "name": "Сезон 3"
+  },
+  {
+   "season_number": 4,
+   "episode_count": 32,
+   "air_date": "2022-10-05",
+   "name": "Сезон 4"
+  },
+  {
+   "season_number": 5,
+   "episode_count": 34,
+   "air_date": "2023-10-04",
+   "name": "Сезон 5"
+  },
+  {
+   "season_number": 6,
+   "episode_count": 30,
+   "air_date": "2024-10-02",
+   "name": "Сезон 6"
+  }
+ ],
+ "softcore": false,
+ "status": "Ended",
+ "tagline": "",
+ "vote_average": 7.957,
+ "vote_count": 317,
+ "images": {
+  "backdrops": [
+   {
+    "file_path": "/3aOF8PtDe72GYd3Z7EzCxe32gxQ.jpg",
+    "iso_639_1": "ru",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/puLaqdcTRwFxwv9S3PO6jA3ep7J.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1152,
+    "aspect_ratio": 1.778,
+    "vote_average": 2.278,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/xC8wU0TcKhlbW9uINBjpcXbi5mG.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/rW9G5FBeFpR7bKDB2ZWz2rddfJU.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/yMg4vVrZQWiBc7HUwk9bg4Pa4zt.jpg",
+    "iso_639_1": null,
+    "width": 2880,
+    "height": 1620,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/ndLd4IIc90ajv5VpCaLfqmmEYOb.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/fZHCazukZgmRZOlliX3rWfLhyuz.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/cxVEiKE2jWTcnhwCnFNNKSzaD32.jpg",
+    "iso_639_1": "ru",
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/uQyVZ2qGIS0Ccb6gQLeIUwJWJpA.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/bFwq4XnF9o7OrtREeE7IE6SeXqx.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/sG0FRa0oztOU1F1IL8m2GEbBdcU.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/wcQbFxF0sqpsrG7srdIUgYuPKpO.jpg",
+    "iso_639_1": "en",
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/ihfoGIDEjVNrInI6dkrAZg1iwj8.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/hIvjI2M6Z4LpywvwACo2DM9KzwQ.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/kF4JefbgifY0hRtDPzYUB7wRlQW.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/sjxyrTUrMBZRBoKi4PxJM678Vlj.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/2jxxwlm55EB7AovfZ2TA70ScCrS.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/dLhVjV3aPROyvqlez3QtXjW6tT4.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/w0e4xH3V44wgLdG2m6HnXPSIIPh.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/mKdGscg5QYOf32SzHsM30lHQWkS.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/oySxbEuJrpTHtMeXZo1ALZS9L0E.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/ar0v27g3d6yaIkys3wSlpWjOa6D.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/fr3MLMvHrCK6mkFKLGTNqn6W7sp.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/9f71FxSsc37thFMYCOk5LO2ZBYy.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/mwx1W0rqH072lGy2Mh1lsCzp3oQ.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/gtHsLaeTwchudT5pF5NPzG0A3rK.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/BomLV2u2BIFJQv4cLglHq15PyJ.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/92xs6c7xsDByL9vlaB4XWGmIv1H.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/35cJ5xsyBiJQzOa5xtL5AFV9BCL.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/mJa7RDnfNddEUaDh8UK7aSnrpbN.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/j7e1cGSBVDfEf88E3tpHsLGgVYa.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1149,
+    "aspect_ratio": 1.782,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/zA3PWjmz7cRsG7TemZnUhvUkEMX.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1147,
+    "aspect_ratio": 1.785,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/cRZMrUy6lBaPx0Z7aA78uyt8BM9.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1149,
+    "aspect_ratio": 1.782,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/8S6fuH7oubw0YedB7NCAbGUPvLq.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/szHeXNEVppA7bOCt12fiSMfOxXN.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/mLDghsqG4NKOHC9kXL3tseq2N46.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1147,
+    "aspect_ratio": 1.785,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/7aO2gMFStnWp0iPvQdD1lMpjlt5.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/jUp5DDww8Dn1g2N8BmUWkf4uMHs.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/qm3HPE6P3OeSkUDpHiR0EeWWCaN.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/mSuBj00WYh61jYD9MhTzCqlWgdd.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/fSb2jqnluWACvapxrPFvvxFFtRA.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1152,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/eROSSjQvzAnJYwixYROHJz49381.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/aF4gKPLLYwqWV8ZYDU0u47Mfnm4.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/q9rqbrVgJXsu39mujEY32lFCyZY.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/qqaDJdqLGBrm1yM12PuGbr1q5O2.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1149,
+    "aspect_ratio": 1.782,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/UdgHpkWSyF1Sop1D59fmSbgMV2.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/adUzilyuUR3GOZdhp0CIpE0ItXD.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/kDvDKg7U7BDbTMyp60VsRnrUCOb.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1152,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/tcSGeF0T30RYGtG6n4Eg7xCVzd3.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/wquvzGuiv48AliWtGntmHu8BgKK.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1152,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/bEhmWhO29CDBjA2B3SR070jtNUf.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1149,
+    "aspect_ratio": 1.782,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/dUG2Dt8jrfm4DEB7aV8H7vwPYna.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1149,
+    "aspect_ratio": 1.782,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/nDzqFIqEqIDP8BaHAGDRBTSAN5J.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/9pgVQfFycoGEK72bYrXpHf7egOi.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1150,
+    "aspect_ratio": 1.78,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/pL6m2l2dbLDINXQsyHGNtEb5bjU.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/ivSdpGwdPMVkSjAoWxBzNOSG2V2.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/aVRlcWLIjBbKSWfvwk1KftCfveY.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/pEpKpY8ykDUB9Wb9JmhvNNKz9UE.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/n3abp76FaoXjF4IDS6zL5ka2YX3.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1152,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/ocJUgLXg7grPW6e9nsZ0yH0emgA.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/95dd5m4RwUFOoHg8ymEQn5fDQzF.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/m4DjEY40HvH1QEqhtPXmwtIgGXJ.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1147,
+    "aspect_ratio": 1.785,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/7cAiBcwTEYfLdKbQfUdOzX4hy51.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/lgLsCxleRgSKxOx0AOG7Se8VmDz.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/xdxNMZc5yHoQdbpJ5s6AbbMEWvV.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/lQHcyDgidQbTme9ZjX9CNqV5fwg.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/z4Uf2Awec811cJBOUc4VTxYwdeJ.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/631MoybHseYFVTyUM5AOL4AEDig.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/uJWEhudevGj6VDwXyARwRr84Aka.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/eWjag5ahaF9Tcfn9QMfzjXGyCF8.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/vIrUeS9ajnvWGnF8FDGt0e8bBUI.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/qNAIIaIinyJeuwie7xI8VeVEKp.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/aRFBEye6c2ttZZ03R6uPJGVuAdX.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/rVliWbf1gN7xtR6UlarplpZhMJK.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/wEXifSSI8mGaNLZcKLgnt2aZIP6.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/ee1RG6xz4Qd0uZRe5aK4ObJW4sa.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/euKKAcUVWmGtgOkNKyhHO4kNgmF.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/8oVKZ1RomSouMngOdU66kUWEF68.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/v5J5kFlM4nxt2gPg3T65iOMOwHr.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/oYvqwbREki057IfzRlvyzVnYfVj.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/mQIh0jzLnRWdAnUY4dLt82sl95t.jpg",
+    "iso_639_1": null,
+    "width": 2047,
+    "height": 1152,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/3z8lk6nxORSWwRLXsBOTR03td9p.jpg",
+    "iso_639_1": null,
+    "width": 1918,
+    "height": 1080,
+    "aspect_ratio": 1.776,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ],
+  "logos": [
+   {
+    "file_path": "/duF2UvHYQGd2WKSMG33FLRvW2G1.png",
+    "iso_639_1": "ru",
+    "width": 2000,
+    "height": 690,
+    "aspect_ratio": 2.899,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/nNYQ7iri4GuL5Bk8M4B8YoTz3a9.png",
+    "iso_639_1": "en",
+    "width": 794,
+    "height": 226,
+    "aspect_ratio": 3.513,
+    "vote_average": 1.75,
+    "vote_count": 2
+   }
+  ]
+ },
+ "videos": {
+  "results": [
+   {
+    "key": "WB_WS4LtwcE",
+    "name": "Bala Hatun Osman Bey'i yolcu ediyor - Kuruluş Osman",
+    "site": "YouTube",
+    "type": "Clip",
+    "iso_639_1": "en",
+    "official": false,
+    "published_at": "2024-01-14T17:00:33.000Z"
+   },
+   {
+    "key": "iuIxhuKYod8",
+    "name": "Kuruluş Osman 144.Bölüm Fragmanı",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "en",
+    "official": false,
+    "published_at": "2024-01-10T21:19:02.000Z"
+   },
+   {
+    "key": "iKQFYxBtp54",
+    "name": "Kuruluş Osman 5.Sezon İlk Tanıtımı / 4 Ekim Çarşamba",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "en",
+    "official": false,
+    "published_at": "2023-09-27T17:46:00.000Z"
+   },
+   {
+    "key": "LbOMrno3ByE",
+    "name": "Kuruluş Osman 4.Sezon 1.Fragmanı",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "en",
+    "official": false,
+    "published_at": "2022-09-26T16:44:40.000Z"
+   },
+   {
+    "key": "wdzj8P-hhes",
+    "name": "The Ottoman Season 3 Trailer",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "en",
+    "official": false,
+    "published_at": "2021-09-25T18:44:16.000Z"
+   },
+   {
+    "key": "tRGVsD9ryJ0",
+    "name": "The Ottoman Season 2 Trailer",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "en",
+    "official": false,
+    "published_at": "2020-09-09T16:44:07.000Z"
+   }
+  ]
+ },
+ "aggregate_credits": {
+  "cast": [
+   {
+    "name": "Бурак Озчивит",
+    "profile_path": "/pF8EHDM2ETDT2X2Pwg3Ak0ZCPAY.jpg",
+    "roles": [
+     {
+      "character": "Osman Bey"
+     }
+    ]
+   },
+   {
+    "name": "Özge Törer",
+    "profile_path": "/kHe6iJCGEgDuGl0Hdii9lzSIjOf.jpg",
+    "roles": [
+     {
+      "character": "Bala Hatun"
+     }
+    ]
+   },
+   {
+    "name": "Йийит Учан",
+    "profile_path": "/pqgzz1oBhfRcdMazjDZUAIxlcY5.jpg",
+    "roles": [
+     {
+      "character": "Boran Alp"
+     }
+    ]
+   },
+   {
+    "name": "Fatih Ayhan",
+    "profile_path": "/3n0lpUftSIe9DqR6xERjGq1nx1y.jpg",
+    "roles": [
+     {
+      "character": "Baysungur"
+     }
+    ]
+   },
+   {
+    "name": "Yıldız Çağrı Atiksoy",
+    "profile_path": "/aHaUvNR28tjQ6RoyvcbRps2gmGY.jpg",
+    "roles": [
+     {
+      "character": "Malhun Hatun"
+     }
+    ]
+   },
+   {
+    "name": "Açelya Özcan",
+    "profile_path": "/uve8kNTC5a6xWoUty5bmvrOb8QW.jpg",
+    "roles": [
+     {
+      "character": "Ayşe Hatun"
+     }
+    ]
+   },
+   {
+    "name": "Seda Yıldız",
+    "profile_path": "/tIiW5iOnR7VT4GZQtLpgiu5YrLQ.jpg",
+    "roles": [
+     {
+      "character": "Şeyh Edebali"
+     }
+    ]
+   },
+   {
+    "name": "Berk Erçer",
+    "profile_path": "/2YGK1eerLTjqoc3i2GGaBJGrmX8.jpg",
+    "roles": [
+     {
+      "character": "Konur Alp"
+     }
+    ]
+   },
+   {
+    "name": "Emre Basalak",
+    "profile_path": "/8I1pkD7ep8pUL1dzdA0bBkpv3lv.jpg",
+    "roles": [
+     {
+      "character": "Gündüz Bey"
+     }
+    ]
+   },
+   {
+    "name": "Buse Arslan",
+    "profile_path": "/4oh8I17orqeSKav5LwUlMb0FEA1.jpg",
+    "roles": [
+     {
+      "character": "Aygül Hatun"
+     }
+    ]
+   },
+   {
+    "name": "Didem Balçın",
+    "profile_path": "/2JDaSioqVK3HgN5usoe7tT0WCfX.jpg",
+    "roles": [
+     {
+      "character": "Selcan Hatun"
+     }
+    ]
+   },
+   {
+    "name": "Emel Dede",
+    "profile_path": "/yLcldViZLICv2ha8i16YtIopMBs.jpg",
+    "roles": [
+     {
+      "character": "Gonca Hatun"
+     }
+    ]
+   },
+   {
+    "name": "Burak Çelik",
+    "profile_path": "/i37OCilwZQLx5fOPL0X1UztLxmZ.jpg",
+    "roles": [
+     {
+      "character": "Göktuğ Alp"
+     }
+    ]
+   },
+   {
+    "name": "Ömer Agan",
+    "profile_path": "/jqdnP4vkOGyKTLz8nxSpo0k6If7.jpg",
+    "roles": [
+     {
+      "character": "Saltuk Alp"
+     }
+    ]
+   },
+   {
+    "name": "Begüm Çağla Taşkın",
+    "profile_path": "/nnBYihF1b4yGt0txPyaREKucNdj.jpg",
+    "roles": [
+     {
+      "character": "Ulgen Hatun"
+     }
+    ]
+   },
+   {
+    "name": "Çağrı Şensoy",
+    "profile_path": "/11JkDVSo1ZSiGRV1yoRj0e442A5.jpg",
+    "roles": [
+     {
+      "character": "Cerkutay"
+     }
+    ]
+   },
+   {
+    "name": "Erkan Avcı",
+    "profile_path": "/2SQBu38Hx4Yx2PM7OdKgbdz5UCd.jpg",
+    "roles": [
+     {
+      "character": "Aya (Hagia) Nikola"
+     }
+    ]
+   },
+   {
+    "name": "Hamza Gunëysu",
+    "profile_path": "/7oq7I3uxxj6j4LwGusMM0IRhURO.jpg",
+    "roles": [
+     {
+      "character": "Serhan Alp"
+     }
+    ]
+   },
+   {
+    "name": "Teoman Kumbaracıbaşı",
+    "profile_path": "/mYWVlzX95AGzH9a7FOprp7dYVYf.jpg",
+    "roles": [
+     {
+      "character": "Kara Şaman Togay"
+     }
+    ]
+   },
+   {
+    "name": "Yusuf Korkmaz",
+    "profile_path": "/zl7FQUueCBbY3yvy5lax0MzqePB.jpg",
+    "roles": [
+     {
+      "character": "Salguraga Alp"
+     }
+    ]
+   },
+   {
+    "name": "Murat Boncuk",
+    "profile_path": "/fmq8Z3Pz9zC3ifVyLCdpb6vt6H5.jpg",
+    "roles": [
+     {
+      "character": "Aykurt Alp"
+     }
+    ]
+   },
+   {
+    "name": "Aybars Kartal Özson",
+    "profile_path": "/9KX22bmq2nvQeO4JdmRHIT22wOy.jpg",
+    "roles": [
+     {
+      "character": "Orhan"
+     }
+    ]
+   },
+   {
+    "name": "Yaman Çınar Balcı",
+    "profile_path": "/8euYcxabVUCDsoSM40C8RuQs65M.jpg",
+    "roles": [
+     {
+      "character": "Alaeddin Ali"
+     }
+    ]
+   },
+   {
+    "name": "Cemre Demircan",
+    "profile_path": "/6yVPFzkxh8RbJxoninbxbCwidM1.jpg",
+    "roles": [
+     {
+      "character": "Fatma Hatun"
+     }
+    ]
+   },
+   {
+    "name": "Rüzgar Aksoy",
+    "profile_path": "/rXKWMOkcHLFdPKurYXEYk0R69rG.jpg",
+    "roles": [
+     {
+      "character": "Turgut Bey"
+     }
+    ]
+   },
+   {
+    "name": "Taha Baran Özbek",
+    "profile_path": "/r0vubAytMW86U5AyifbHR9gKwb3.jpg",
+    "roles": [
+     {
+      "character": "Aktemur"
+     }
+    ]
+   },
+   {
+    "name": "Deniz Hamzaoğlu",
+    "profile_path": "/dCNOuJeu8IPJGmseGWmlWquOPUb.jpg",
+    "roles": [
+     {
+      "character": "Bayındır Bey"
+     }
+    ]
+   },
+   {
+    "name": "Jaffa Dz",
+    "profile_path": "/2ycz0qY0Q3nZxrEIDmBMezWClf2.jpg",
+    "roles": [
+     {
+      "character": "Shamil Alp"
+     }
+    ]
+   },
+   {
+    "name": "Alpaslan Özmol",
+    "profile_path": "/qfLdTj4f55doqGvfmiKD0JPRvEA.jpg",
+    "roles": [
+     {
+      "character": "Gurbuz Alp"
+     }
+    ]
+   },
+   {
+    "name": "Burak Alp Yenilmez",
+    "profile_path": "/moxKBrHL3DUKE3VC3m06B4ggc3C.jpg",
+    "roles": [
+     {
+      "character": "Kutan Alp"
+     }
+    ]
+   }
+  ]
+ },
+ "content_ratings": {
+  "results": [
+   {
+    "iso_3166_1": "US",
+    "rating": "TV-14"
+   }
+  ]
+ },
+ "recommendations": {
+  "results": [
+   {
+    "id": 34899,
+    "media_type": "tv",
+    "name": "Великолепный век",
+    "first_air_date": "2011-01-06",
+    "poster_path": "/vYKtZlzS0NEFoIv2myhTZdrY4xQ.jpg",
+    "backdrop_path": "/gn8k4ztPnrURIIocMOYdWCFknKJ.jpg",
+    "adult": false
+   },
+   {
+    "id": 60972,
+    "media_type": "tv",
+    "name": "Тиран",
+    "first_air_date": "2014-06-24",
+    "poster_path": "/14xKxbF3Si8m5u0m5yPj9ZGlEkj.jpg",
+    "backdrop_path": "/dp4eaBQwxHgX5ALQABgd2Hrtm7O.jpg",
+    "adult": false
+   },
+   {
+    "id": 222766,
+    "media_type": "tv",
+    "name": "День Шакала",
+    "first_air_date": "2024-11-07",
+    "poster_path": "/uFdIebgylj64d9ze6y1C5jsHUZZ.jpg",
+    "backdrop_path": "/enVrO8TRkdT8dmYXTfI4sEjR5Kp.jpg",
+    "adult": false
+   },
+   {
+    "id": 220377,
+    "media_type": "tv",
+    "name": "Эль Турко",
+    "first_air_date": "2025-04-02",
+    "poster_path": "/c8yPhS1tCjAfzlx7u3qYh1qAfEF.jpg",
+    "backdrop_path": "/cyfyZvzxnnqRp8UjPSIwlHv6pWe.jpg",
+    "adult": false
+   },
+   {
+    "id": 111573,
+    "media_type": "tv",
+    "name": "Скользкий путь",
+    "first_air_date": "2020-10-18",
+    "poster_path": "/az1tB8cO1FuqZszJeL3OdVNyQ5n.jpg",
+    "backdrop_path": "/w4YBZv5tLbHGnODoNsfl6fHd504.jpg",
+    "adult": false
+   },
+   {
+    "id": 57276,
+    "media_type": "tv",
+    "name": "Агент",
+    "first_air_date": "2014-04-06",
+    "poster_path": "/AehTUycX0VSvCkOOkZzurLnjHsS.jpg",
+    "backdrop_path": "/fhIxXKTzGptL09psh3myhtndADD.jpg",
+    "adult": false
+   },
+   {
+    "id": 1407,
+    "media_type": "tv",
+    "name": "Родина",
+    "first_air_date": "2011-10-02",
+    "poster_path": "/hKkntXNF4xgg7HkBy3CIpYnjqoM.jpg",
+    "backdrop_path": "/391ixi0wVbFtFLQnOy8ZncWv2io.jpg",
+    "adult": false
+   },
+   {
+    "id": 271855,
+    "media_type": "tv",
+    "name": "Сандокан: Принц пиратов",
+    "first_air_date": "2025-12-01",
+    "poster_path": "/5syzopG2JrFrwm8NE0pUJzZFI1E.jpg",
+    "backdrop_path": "/1AA5xIVt1PTrbLxCCBxRyvjdpqO.jpg",
+    "adult": false
+   },
+   {
+    "id": 120911,
+    "media_type": "tv",
+    "name": "Список смертников",
+    "first_air_date": "2022-06-30",
+    "poster_path": "/cPLfYOulYQzRhZKc53FvCmoQdS4.jpg",
+    "backdrop_path": "/2qS2LGqsAyT1NEDeIj24Hp2IR10.jpg",
+    "adult": false
+   },
+   {
+    "id": 1399,
+    "media_type": "tv",
+    "name": "Игра Престолов",
+    "first_air_date": "2011-04-17",
+    "poster_path": "/1sIAsLSaMwm3mb7Y6jISMv56McR.jpg",
+    "backdrop_path": "/zZqpAXxVSBtxV9qPBcscfXBcL2w.jpg",
+    "adult": false
+   },
+   {
+    "id": 63333,
+    "media_type": "tv",
+    "name": "Последнее королевство",
+    "first_air_date": "2015-10-10",
+    "poster_path": "/eXRWYkffOq0be8hNlQTNeB0yLPX.jpg",
+    "backdrop_path": "/QbtctI8EzlhsyFDMUMyG3fli8B.jpg",
+    "adult": false
+   },
+   {
+    "id": 262352,
+    "media_type": "tv",
+    "name": "Убийца",
+    "first_air_date": "2025-07-25",
+    "poster_path": "/2mrJSOkLrgOaWQsYpk6vJRe7NlN.jpg",
+    "backdrop_path": "/7EB84rTBUmjY2tPhNpGjxnKJVeo.jpg",
+    "adult": false
+   },
+   {
+    "id": 1891,
+    "media_type": "tv",
+    "name": "Рим",
+    "first_air_date": "2005-08-28",
+    "poster_path": "/iku76TStBOYeWOMDvX5UNZAbOF0.jpg",
+    "backdrop_path": "/b2fhZk0xB2TgMsDXT6goR28PoHX.jpg",
+    "adult": false
+   },
+   {
+    "id": 87104,
+    "media_type": "tv",
+    "name": "Годы",
+    "first_air_date": "2019-05-14",
+    "poster_path": "/7cZRJfSvgSh1PJATnInCYIz2025.jpg",
+    "backdrop_path": "/95DOsfIpXweztOlzGBU1bnePCIS.jpg",
+    "adult": false
+   },
+   {
+    "id": 74823,
+    "media_type": "tv",
+    "name": "Чукур",
+    "first_air_date": "2017-10-23",
+    "poster_path": "/9FuoTvKSiMZzySfDMVBATI75UVu.jpg",
+    "backdrop_path": "/xtCzLQOocIajjQ5Mhwp834BQhVX.jpg",
+    "adult": false
+   },
+   {
+    "id": 80307,
+    "media_type": "tv",
+    "name": "Телохранитель",
+    "first_air_date": "2018-08-26",
+    "poster_path": "/Ai7wOErWiWz61ufYL77wtTu10NG.jpg",
+    "backdrop_path": "/tvYf5SOIgAumuVoYn2eYKlotAbf.jpg",
+    "adult": false
+   },
+   {
+    "id": 80752,
+    "media_type": "tv",
+    "name": "Видеть",
+    "first_air_date": "2019-11-01",
+    "poster_path": "/xI8GsMKify2ke4FvcmsoOaOdPIJ.jpg",
+    "backdrop_path": "/u5N8tXgGDY6jS7R8Xn42LDeL0Dk.jpg",
+    "adult": false
+   },
+   {
+    "id": 62553,
+    "media_type": "tv",
+    "name": "Курт Сеит и Александра",
+    "first_air_date": "2014-04-04",
+    "poster_path": "/3ugmNcc5RBcz4Zegaxr3vjbUFWc.jpg",
+    "backdrop_path": "/izP19rU3kc2go0WQuYPn9xUYQv3.jpg",
+    "adult": false
+   },
+   {
+    "id": 240459,
+    "media_type": "tv",
+    "name": "Спартак: Дом Ашура",
+    "first_air_date": "2025-12-05",
+    "poster_path": "/ov1TIIIZWfxGvF9lqbHOuB7V3X.jpg",
+    "backdrop_path": "/c78kbj781ddvmSn5mgLWFQbC7di.jpg",
+    "adult": false
+   },
+   {
+    "id": 219760,
+    "media_type": "tv",
+    "name": "Список смертников: Тёмный волк",
+    "first_air_date": "2025-08-27",
+    "poster_path": "/lKUJ5nhURs6Gj1cCFTa5As7FuJV.jpg",
+    "backdrop_path": "/m3m2wPu9Irw397jagBKFJrcobpx.jpg",
+    "adult": false
+   }
+  ]
+ }
+}

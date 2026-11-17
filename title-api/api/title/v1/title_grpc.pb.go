@@ -27,6 +27,8 @@ const (
 	TitleService_MarkEpisode_FullMethodName           = "/title.v1.TitleService/MarkEpisode"
 	TitleService_GetTmdbSettings_FullMethodName       = "/title.v1.TitleService/GetTmdbSettings"
 	TitleService_UpdateTmdbSettings_FullMethodName    = "/title.v1.TitleService/UpdateTmdbSettings"
+	TitleService_GetTmdbDetails_FullMethodName        = "/title.v1.TitleService/GetTmdbDetails"
+	TitleService_GetTmdbSeason_FullMethodName         = "/title.v1.TitleService/GetTmdbSeason"
 )
 
 // TitleServiceClient is the client API for TitleService service.
@@ -41,6 +43,8 @@ type TitleServiceClient interface {
 	MarkEpisode(ctx context.Context, in *MarkEpisodeCommand, opts ...grpc.CallOption) (*MarkEpisodeCommandResponse, error)
 	GetTmdbSettings(ctx context.Context, in *GetTmdbSettingsQuery, opts ...grpc.CallOption) (*TmdbSettings, error)
 	UpdateTmdbSettings(ctx context.Context, in *UpdateTmdbSettingsCommand, opts ...grpc.CallOption) (*TmdbSettings, error)
+	GetTmdbDetails(ctx context.Context, in *GetTmdbDetailsQuery, opts ...grpc.CallOption) (*TmdbDetails, error)
+	GetTmdbSeason(ctx context.Context, in *GetTmdbSeasonQuery, opts ...grpc.CallOption) (*TmdbSeason, error)
 }
 
 type titleServiceClient struct {
@@ -131,6 +135,26 @@ func (c *titleServiceClient) UpdateTmdbSettings(ctx context.Context, in *UpdateT
 	return out, nil
 }
 
+func (c *titleServiceClient) GetTmdbDetails(ctx context.Context, in *GetTmdbDetailsQuery, opts ...grpc.CallOption) (*TmdbDetails, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TmdbDetails)
+	err := c.cc.Invoke(ctx, TitleService_GetTmdbDetails_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *titleServiceClient) GetTmdbSeason(ctx context.Context, in *GetTmdbSeasonQuery, opts ...grpc.CallOption) (*TmdbSeason, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TmdbSeason)
+	err := c.cc.Invoke(ctx, TitleService_GetTmdbSeason_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TitleServiceServer is the server API for TitleService service.
 // All implementations must embed UnimplementedTitleServiceServer
 // for forward compatibility.
@@ -143,6 +167,8 @@ type TitleServiceServer interface {
 	MarkEpisode(context.Context, *MarkEpisodeCommand) (*MarkEpisodeCommandResponse, error)
 	GetTmdbSettings(context.Context, *GetTmdbSettingsQuery) (*TmdbSettings, error)
 	UpdateTmdbSettings(context.Context, *UpdateTmdbSettingsCommand) (*TmdbSettings, error)
+	GetTmdbDetails(context.Context, *GetTmdbDetailsQuery) (*TmdbDetails, error)
+	GetTmdbSeason(context.Context, *GetTmdbSeasonQuery) (*TmdbSeason, error)
 	mustEmbedUnimplementedTitleServiceServer()
 }
 
@@ -176,6 +202,12 @@ func (UnimplementedTitleServiceServer) GetTmdbSettings(context.Context, *GetTmdb
 }
 func (UnimplementedTitleServiceServer) UpdateTmdbSettings(context.Context, *UpdateTmdbSettingsCommand) (*TmdbSettings, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateTmdbSettings not implemented")
+}
+func (UnimplementedTitleServiceServer) GetTmdbDetails(context.Context, *GetTmdbDetailsQuery) (*TmdbDetails, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTmdbDetails not implemented")
+}
+func (UnimplementedTitleServiceServer) GetTmdbSeason(context.Context, *GetTmdbSeasonQuery) (*TmdbSeason, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTmdbSeason not implemented")
 }
 func (UnimplementedTitleServiceServer) mustEmbedUnimplementedTitleServiceServer() {}
 func (UnimplementedTitleServiceServer) testEmbeddedByValue()                      {}
@@ -342,6 +374,42 @@ func _TitleService_UpdateTmdbSettings_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TitleService_GetTmdbDetails_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTmdbDetailsQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TitleServiceServer).GetTmdbDetails(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TitleService_GetTmdbDetails_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TitleServiceServer).GetTmdbDetails(ctx, req.(*GetTmdbDetailsQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TitleService_GetTmdbSeason_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTmdbSeasonQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TitleServiceServer).GetTmdbSeason(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TitleService_GetTmdbSeason_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TitleServiceServer).GetTmdbSeason(ctx, req.(*GetTmdbSeasonQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TitleService_ServiceDesc is the grpc.ServiceDesc for TitleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +448,14 @@ var TitleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateTmdbSettings",
 			Handler:    _TitleService_UpdateTmdbSettings_Handler,
+		},
+		{
+			MethodName: "GetTmdbDetails",
+			Handler:    _TitleService_GetTmdbDetails_Handler,
+		},
+		{
+			MethodName: "GetTmdbSeason",
+			Handler:    _TitleService_GetTmdbSeason_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

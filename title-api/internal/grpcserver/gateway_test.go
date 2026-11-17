@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -188,5 +189,46 @@ func TestTitleDetailsHTTPAnnotation(t *testing.T) {
 		body.MediaType != "MEDIA_TYPE_SERIES" || len(body.Ratings) != 2 ||
 		len(body.Seasons) != 1 || body.Seasons[0].Episodes[0].EpisodeNumber != "1" {
 		t.Fatalf("unexpected details response: %s", response.Body.String())
+	}
+}
+
+func (gatewayTestService) GetTmdbDetails(
+	_ context.Context,
+	query *titlev1.GetTmdbDetailsQuery,
+) (*titlev1.TmdbDetails, error) {
+	return &titlev1.TmdbDetails{
+		Title: &titlev1.TmdbTitle{Id: query.GetTmdbId(), MediaType: titlev1.MediaType_MEDIA_TYPE_MOVIE},
+		Name:  query.GetMediaType(), BackdropPath: "c6OLXfKAk5BKeR6broC8pYiCquX.jpg", LogoAspect: 2.085,
+	}, nil
+}
+
+func (gatewayTestService) GetTmdbSeason(
+	_ context.Context,
+	query *titlev1.GetTmdbSeasonQuery,
+) (*titlev1.TmdbSeason, error) {
+	return &titlev1.TmdbSeason{Episodes: []*titlev1.TmdbEpisode{{
+		EpisodeNumber: query.GetSeasonNumber(), Name: "Пилот", StillPath: "x.jpg", Upcoming: true,
+	}}}, nil
+}
+
+func TestTmdbHTTPAnnotations(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct{ path, field, want string }{
+		{"/v1/tmdb/movie/550", "name", "movie"},
+		{"/v1/tmdb/movie/550", "title", "map[id:550 mediaType:MEDIA_TYPE_MOVIE]"},
+		{"/v1/tmdb/movie/550", "logoAspect", "2.085"},
+		{"/v1/tmdb/tv/1405", "name", "tv"},
+		{"/v1/tmdb/tv/1405/seasons/2", "episodes", "[map[airDate: episodeNumber:2 name:Пилот overview: runtimeMinutes:0 stillPath:x.jpg upcoming:true]]"},
+	} {
+		request := httptest.NewRequest(http.MethodGet, test.path, nil)
+		response := httptest.NewRecorder()
+		testGateway(t).ServeHTTP(response, request)
+		var body map[string]any
+		if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil || response.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", test.path, response.Code, response.Body.String())
+		}
+		if got := fmt.Sprint(body[test.field]); got != test.want {
+			t.Errorf("%s: %s = %s, want %s", test.path, test.field, got, test.want)
+		}
 	}
 }

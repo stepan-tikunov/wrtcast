@@ -1,0 +1,606 @@
+{
+ "backdrop_path": "/tH3tvJ9JKw2zkQqNGy22cE92WVY.jpg",
+ "created_by": [
+  {
+   "id": 1251934,
+   "credit_id": "52596f9f760ee34661a270ca",
+   "name": "Вячеслав Дусмухаметов",
+   "original_name": "Вячеслав Дусмухаметов",
+   "gender": 2,
+   "profile_path": "/uh9k2JcHP177mXHuVmxHOVPjtfc.jpg"
+  },
+  {
+   "id": 1250808,
+   "credit_id": "52596f9f760ee34661a270d0",
+   "name": "Семён Слепаков",
+   "original_name": "Семён Слепаков",
+   "gender": 2,
+   "profile_path": "/6k7BnaobSukDkUSE7KWKlC2CfXs.jpg"
+  }
+ ],
+ "first_air_date": "2008-08-25",
+ "genres": [
+  {
+   "id": 35,
+   "name": "комедия"
+  }
+ ],
+ "id": 46087,
+ "last_episode_to_air": {
+  "id": 907099,
+  "name": "Край",
+  "overview": "Наступила преддипломная пора. Кузя и Майкл не переживают о защите диплома - они подготовили дипломные работы еще в прошлом году. Но Майкл обнаруживает, что диск с его дипломной работой исчез. Кузя случайно испортил диск с дипломной работой Майкла. А Антон хочет купить дипломную работу, но у него нет денег. Тогда он решается на крайние меры - инсценировать собственное похищение... Таня не может определиться, приглашать ли «общажных» друзей на свадьбу",
+  "vote_average": 8.0,
+  "vote_count": 1,
+  "air_date": "2011-05-19",
+  "episode_number": 54,
+  "episode_type": "finale",
+  "production_code": "",
+  "runtime": 24,
+  "season_number": 5,
+  "show_id": 46087,
+  "still_path": null
+ },
+ "name": "Универ",
+ "next_episode_to_air": null,
+ "number_of_episodes": 255,
+ "number_of_seasons": 5,
+ "origin_country": [
+  "RU"
+ ],
+ "original_language": "ru",
+ "original_name": "Универ",
+ "overview": "Этих молодых людей объединяет очень многое - они живут в соседних комнатах университетской общаги, у них общая кухня, туалет и ванная. Им ничего не остаётся, кроме как искренне полюбить друг друга. Как они учатся и даже переходят с курса на курс - настоящая загадка, потому что целыми днями они выносят друг другу мозг и попадают в передряги.",
+ "poster_path": "/iYKcVZGi7lSr32Ycn4OliCWkXef.jpg",
+ "production_countries": [
+  {
+   "iso_3166_1": "RU",
+   "name": "Russia"
+  }
+ ],
+ "seasons": [
+  {
+   "season_number": 0,
+   "episode_count": 1,
+   "air_date": null,
+   "name": "Спецматериалы"
+  },
+  {
+   "season_number": 1,
+   "episode_count": 44,
+   "air_date": "2008-08-25",
+   "name": "Сезон 1"
+  },
+  {
+   "season_number": 2,
+   "episode_count": 56,
+   "air_date": "2009-02-03",
+   "name": "Сезон 2"
+  },
+  {
+   "season_number": 3,
+   "episode_count": 55,
+   "air_date": "2009-08-17",
+   "name": "Сезон 3"
+  },
+  {
+   "season_number": 4,
+   "episode_count": 46,
+   "air_date": "2010-05-11",
+   "name": "Сезон 4"
+  },
+  {
+   "season_number": 5,
+   "episode_count": 54,
+   "air_date": "2010-11-08",
+   "name": "Сезон 5"
+  }
+ ],
+ "softcore": false,
+ "status": "Ended",
+ "tagline": "«Общажные приключения»",
+ "vote_average": 5.902,
+ "vote_count": 51,
+ "images": {
+  "backdrops": [
+   {
+    "file_path": "/tH3tvJ9JKw2zkQqNGy22cE92WVY.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/ryyhEDg59NWPKDEHh1lPyzO9nc4.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/pUVbQdN6MnyIp7U03X8pfbMP6zj.jpg",
+    "iso_639_1": "ru",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ],
+  "logos": [
+   {
+    "file_path": "/zougGt0yteEMvmZTHVEhPwLYaBI.png",
+    "iso_639_1": "ru",
+    "width": 1798,
+    "height": 783,
+    "aspect_ratio": 2.296,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/sxR1yhfWaBdabY3xrBoDa9g6OHp.png",
+    "iso_639_1": "ru",
+    "width": 3840,
+    "height": 2059,
+    "aspect_ratio": 1.865,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ]
+ },
+ "videos": {
+  "results": []
+ },
+ "aggregate_credits": {
+  "cast": [
+   {
+    "name": "Андрей Гайдулян",
+    "profile_path": "/eHqk9iVFHzZRJISnF7KgyexhgN6.jpg",
+    "roles": [
+     {
+      "character": "Aleksandr Sergeev"
+     }
+    ]
+   },
+   {
+    "name": "Валентина Рубцова",
+    "profile_path": "/jfuiYFo7fHtFzKJSor5yLgwc7JO.jpg",
+    "roles": [
+     {
+      "character": "Tatyana Arkhipova"
+     }
+    ]
+   },
+   {
+    "name": "Виталий Гогунский",
+    "profile_path": "/5JqM0qHXZhwT8nfXiApeR24h5oW.jpg",
+    "roles": [
+     {
+      "character": "Kuzya (Eduard Kuzmin)"
+     }
+    ]
+   },
+   {
+    "name": "Мария Кожевникова",
+    "profile_path": "/wXMSSdmK86wpkiBdS5Qj7nsVTao.jpg",
+    "roles": [
+     {
+      "character": "Alla Grishko"
+     }
+    ]
+   },
+   {
+    "name": "Алексей Климушкин",
+    "profile_path": "/xDXWvrkr62zL6fM9cbidCBPZqC.jpg",
+    "roles": [
+     {
+      "character": "Silvestr Andreevich Sergeev"
+     }
+    ]
+   },
+   {
+    "name": "Арарат Кещян",
+    "profile_path": "/hlMR4uIrkN3HhF83gfzBWG0xNZe.jpg",
+    "roles": [
+     {
+      "character": "Maykl (Artur Mikaelyan)"
+     }
+    ]
+   },
+   {
+    "name": "Алексей Гаврилов",
+    "profile_path": "/tCLemCM69G4z7vfWA00FooYiVEx.jpg",
+    "roles": [
+     {
+      "character": "Gosha (Georgiy Rudkovskiy)"
+     }
+    ]
+   },
+   {
+    "name": "Лариса Баранова",
+    "profile_path": "/rOt5gYjSXdORgSN9Ji12DhfzFYD.jpg",
+    "roles": [
+     {
+      "character": "Liliya Volkova"
+     }
+    ]
+   },
+   {
+    "name": "Станислав Ярушин",
+    "profile_path": "/83F9apPaZuBxMk3yPqNJwsCyHXv.jpg",
+    "roles": [
+     {
+      "character": "Anton Martynov"
+     }
+    ]
+   },
+   {
+    "name": "Виктория Боня",
+    "profile_path": "/5BveTC2zhw3Mp93x4fuLm53Ejz6.jpg",
+    "roles": [
+     {
+      "character": "Polina Romanova (Oksana Zozulya)"
+     }
+    ]
+   },
+   {
+    "name": "Павел Воля",
+    "profile_path": "/cbhZKTRkOoq2v4hJCjMjhBVZ0Hw.jpg",
+    "roles": [
+     {
+      "character": "Pavel Volya"
+     }
+    ]
+   },
+   {
+    "name": "Ольга Бузова",
+    "profile_path": "/haCVnkZbwlUuIUHnkXCDmzK2CJN.jpg",
+    "roles": [
+     {
+      "character": "Olga Buzova"
+     }
+    ]
+   },
+   {
+    "name": "Гарик Мартиросян",
+    "profile_path": "/qB39BvG6XfBxyxbeJzUiuVQoxKg.jpg",
+    "roles": [
+     {
+      "character": "Garik Martirosyan"
+     }
+    ]
+   },
+   {
+    "name": "Анфиса Чехова",
+    "profile_path": "/hLbQATfC571dWLr3nvaPk3mXUST.jpg",
+    "roles": [
+     {
+      "character": "Anfisa Chekhova"
+     }
+    ]
+   },
+   {
+    "name": "Александр Якин",
+    "profile_path": "/vaG6T7VeoB3L1EUqof2gkxW973J.jpg",
+    "roles": [
+     {
+      "character": "Roma Bukin"
+     }
+    ]
+   },
+   {
+    "name": "Виктор Логинов",
+    "profile_path": "/deTg5r6brhX6AwqXp58wk3cQYhx.jpg",
+    "roles": [
+     {
+      "character": "Gennadiy Bukin"
+     }
+    ]
+   },
+   {
+    "name": "Илья Глинников",
+    "profile_path": "/CU7uy6ttOMXxra1QMBsIxseqId.jpg",
+    "roles": [
+     {
+      "character": "Pasha"
+     }
+    ]
+   },
+   {
+    "name": "Наталья Еприкян",
+    "profile_path": "/8A808w6jZyaLrTbhMv73RSbr4Sd.jpg",
+    "roles": [
+     {
+      "character": "Natalya Eprikyan"
+     }
+    ]
+   },
+   {
+    "name": "Екатерина Варнава",
+    "profile_path": "/pN7Sf3jQMb7eLwSBC0ZRmyeeJRL.jpg",
+    "roles": [
+     {
+      "character": "Yekaterina Varnava"
+     }
+    ]
+   },
+   {
+    "name": "Татьяна Морозова",
+    "profile_path": "/shWEomIJXwOPTgerAmaOOOX7QsU.jpg",
+    "roles": [
+     {
+      "character": "Tatyana Morozova"
+     }
+    ]
+   },
+   {
+    "name": "Владимир Кристовский",
+    "profile_path": "/x5yLhQBIxuMwigIftl2eRvzsQ0q.jpg",
+    "roles": [
+     {
+      "character": "Vladimir Kristovskiy"
+     }
+    ]
+   },
+   {
+    "name": "Сергей Писаренко",
+    "profile_path": "/uE8oejUBq2xFJr040mTvGRrK0wy.jpg",
+    "roles": [
+     {
+      "character": "neighbor upstairs"
+     }
+    ]
+   },
+   {
+    "name": "Евгений Никишин",
+    "profile_path": "/ekhkuOeMM5wnuExBy7TMgELS9A9.jpg",
+    "roles": [
+     {
+      "character": "neighbor downstairs, musician"
+     }
+    ]
+   },
+   {
+    "name": "Сергей Глушко",
+    "profile_path": "/pgvfkaccwvvJNzt4lsh9G57kniL.jpg",
+    "roles": [
+     {
+      "character": "Tarzan"
+     }
+    ]
+   },
+   {
+    "name": "Анна Шурочкина",
+    "profile_path": "/g22RIPdLFSHKCeQXDoT7B4D6iZ4.jpg",
+    "roles": [
+     {
+      "character": "Nyusha"
+     }
+    ]
+   },
+   {
+    "name": "Эвелина Блёданс",
+    "profile_path": "/xLKThcLQL7a5mIJ0O0iHdTp1hKj.jpg",
+    "roles": [
+     {
+      "character": "Iren"
+     }
+    ]
+   },
+   {
+    "name": "Иван Иванов",
+    "profile_path": "/Aezqwt8UbiYgVAHmFhrUxStHAVi.jpg",
+    "roles": [
+     {
+      "character": "guy"
+     }
+    ]
+   },
+   {
+    "name": "Надежда Нечаева",
+    "profile_path": null,
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   }
+  ]
+ },
+ "content_ratings": {
+  "results": [
+   {
+    "iso_3166_1": "RU",
+    "rating": "16+"
+   }
+  ]
+ },
+ "recommendations": {
+  "results": [
+   {
+    "id": 68133,
+    "media_type": "tv",
+    "name": "Ольга",
+    "first_air_date": "2016-09-05",
+    "poster_path": "/yT17ieMQPYF3g9FhluShgGJ4VRq.jpg",
+    "backdrop_path": "/duBThTkpJEZKVNQ687W0antjILZ.jpg",
+    "adult": false
+   },
+   {
+    "id": 45966,
+    "media_type": "tv",
+    "name": "Универ. Новая Общага",
+    "first_air_date": "2011-10-10",
+    "poster_path": "/4A4uzjfTCbS8Z6qYbLSHE9l5XG.jpg",
+    "backdrop_path": "/6TThkygRKwKAy0qhopA0ALMI9GW.jpg",
+    "adult": false
+   },
+   {
+    "id": 67877,
+    "media_type": "tv",
+    "name": "Однажды в России",
+    "first_air_date": "2014-09-28",
+    "poster_path": "/A57leDI80aTVDudNMj70WZ7pPGD.jpg",
+    "backdrop_path": "/9d4vHeRxvVn31B1fIsc8hTY0p1i.jpg",
+    "adult": false
+   },
+   {
+    "id": 94947,
+    "media_type": "tv",
+    "name": "Полярный",
+    "first_air_date": "2019-10-28",
+    "poster_path": "/prGGalRL6dGOaiEf0Vd1AJfyXdu.jpg",
+    "backdrop_path": "/pt2ltH6Sk7fxMnpAheyfaADn1yA.jpg",
+    "adult": false
+   },
+   {
+    "id": 100235,
+    "media_type": "tv",
+    "name": "Патриот",
+    "first_air_date": "2020-03-10",
+    "poster_path": "/oSekTMSSL7u2MMM8OWjcMbFGcSQ.jpg",
+    "backdrop_path": "/6AaEKBVgddXGzV9kkerp2qrChVD.jpg",
+    "adult": false
+   },
+   {
+    "id": 46078,
+    "media_type": "tv",
+    "name": "Воронины",
+    "first_air_date": "2009-11-16",
+    "poster_path": "/eR7hTug8P3nbCEm5kniVapt8J7M.jpg",
+    "backdrop_path": "/uKrkYiSuZwFzF0gYx1L8mtfBNiD.jpg",
+    "adult": false
+   },
+   {
+    "id": 105276,
+    "media_type": "tv",
+    "name": "Беспринципные",
+    "first_air_date": "2020-10-15",
+    "poster_path": "/ar6jao3ae3RcERIlpq8I4DPY1br.jpg",
+    "backdrop_path": "/xcfnOeqKGHyS2CK8r4k5Zq4CP2E.jpg",
+    "adult": false
+   },
+   {
+    "id": 81712,
+    "media_type": "tv",
+    "name": "Домашний Арест",
+    "first_air_date": "2018-08-16",
+    "poster_path": "/qCEY9RtEaGeywEAd9eVVNBBGKck.jpg",
+    "backdrop_path": "/4faafPnZJT4q0r4P55BCs3zbETH.jpg",
+    "adult": false
+   },
+   {
+    "id": 16870,
+    "media_type": "tv",
+    "name": "Камеди Клаб",
+    "first_air_date": "2005-04-23",
+    "poster_path": "/tPIbd7JZVxSWNjcJQYEvPu3qo5z.jpg",
+    "backdrop_path": "/csGZ0TL7Nh3HLdBNJhhu8N8sr0b.jpg",
+    "adult": false
+   },
+   {
+    "id": 119058,
+    "media_type": "tv",
+    "name": "Девушки с Макаровым",
+    "first_air_date": "2021-03-09",
+    "poster_path": "/ksm9dfDNjuXQwWEnZM90shykEUD.jpg",
+    "backdrop_path": "/oLRh1xTiF7kYowh7qYpA3i5DJKz.jpg",
+    "adult": false
+   },
+   {
+    "id": 75186,
+    "media_type": "tv",
+    "name": "Ивановы-Ивановы",
+    "first_air_date": "2017-10-09",
+    "poster_path": "/mWAfydz0rnThanR7eAj3POnVi4i.jpg",
+    "backdrop_path": "/yMDOfrYFH5c3LyMmCURtsQv3dxt.jpg",
+    "adult": false
+   },
+   {
+    "id": 713,
+    "media_type": "tv",
+    "name": "Шоу Шаппелла ",
+    "first_air_date": "2003-01-22",
+    "poster_path": "/aHpTmNU2wLHokoVpzcnh2VQBJOI.jpg",
+    "backdrop_path": "/m67I7sJNdmvOGs3I6EPdVSaQhl7.jpg",
+    "adult": false
+   },
+   {
+    "id": 138089,
+    "media_type": "tv",
+    "name": "Гарлем",
+    "first_air_date": "2021-12-02",
+    "poster_path": "/hQP2zAm5L52vs7fp3JzOI5LZ4uB.jpg",
+    "backdrop_path": "/olMqKtUQp4Hv4H2MErI2mrBzXZr.jpg",
+    "adult": false
+   },
+   {
+    "id": 250203,
+    "media_type": "tv",
+    "name": "Братья",
+    "first_air_date": "2026-09-22",
+    "poster_path": "/aPgmrBBWIp1HTazq0Q3ej7TmBTy.jpg",
+    "backdrop_path": "/aLE7R8QZPpTiWZS48PS22i2OWbl.jpg",
+    "adult": false
+   },
+   {
+    "id": 1568,
+    "media_type": "tv",
+    "name": "Долго и счастливо",
+    "first_air_date": "2006-09-07",
+    "poster_path": "/trOymv1SiVmMeWlCmV0EiOC6E6v.jpg",
+    "backdrop_path": "/polkS904EARo9mjGIFpLIz46XzG.jpg",
+    "adult": false
+   },
+   {
+    "id": 1551,
+    "media_type": "tv",
+    "name": "The Kids in the Hall",
+    "first_air_date": "1989-10-24",
+    "poster_path": "/2dNiB88EBv64V9rcicXwNGQosJW.jpg",
+    "backdrop_path": "/6OkpAR1IWKYe8bJPt1FVCtcPB7T.jpg",
+    "adult": false
+   },
+   {
+    "id": 30729,
+    "media_type": "tv",
+    "name": "Наша Russia",
+    "first_air_date": "2006-11-04",
+    "poster_path": "/aXbMtH2D875eNPOvOOdsQX4y4NT.jpg",
+    "backdrop_path": "/f17MCJKx6YO3LJdnua6vmGbLp28.jpg",
+    "adult": false
+   },
+   {
+    "id": 18614,
+    "media_type": "tv",
+    "name": "Жеребец",
+    "first_air_date": "2009-06-28",
+    "poster_path": "/v3ki6W3BGsh3PGDjtHdi6W2v8nQ.jpg",
+    "backdrop_path": "/m0vXVA5jhyseAeXdLXqVwu9vchR.jpg",
+    "adult": false
+   },
+   {
+    "id": 1915,
+    "media_type": "tv",
+    "name": "Шоу Ларри Сандерса",
+    "first_air_date": "1992-08-15",
+    "poster_path": "/uAYwC1jnIgwjaIAhy4SE9nnRgwN.jpg",
+    "backdrop_path": "/37v0WURfK4QLT5DfLzypLsjcLOA.jpg",
+    "adult": false
+   },
+   {
+    "id": 203614,
+    "media_type": "tv",
+    "name": "Колин из бухгалтерии",
+    "first_air_date": "2022-12-01",
+    "poster_path": "/zYPRXAImgarNSKrwd4kXobjXQNQ.jpg",
+    "backdrop_path": "/uOhTIXRxSyWbdP3KIX3eLXtx0Nt.jpg",
+    "adult": false
+   }
+  ]
+ }
+}

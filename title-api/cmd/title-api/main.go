@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"syscall"
@@ -33,6 +34,8 @@ const (
 	defaultGRPCAddr    = ":50051"
 	defaultHTTPAddr    = ":8080"
 	defaultStateDBPath = "title-api-state.db"
+	// TMDB's pictures kept on disk at most.
+	tmdbImagesLimit = 500 << 20
 )
 
 func main() {
@@ -64,6 +67,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	images, err := tmdb.NewImages(envOrDefault("TITLE_API_IMAGES", filepath.Join(filepath.Dir(stateDBPath), "tmdb-images")), tmdbImagesLimit)
+	if err != nil {
+		return err
+	}
 
 	client, err := provider.NewClient(provider.Config{
 		BaseURL:          baseURL,
@@ -87,6 +94,7 @@ func run() error {
 	log.Printf("provider anti-bot session initialized for %s", client.ProviderURL())
 	go marks.Run(ctx, client)
 	go matches.Run(ctx)
+	go images.Run(ctx)
 
 	grpcListener, err := net.Listen("tcp", grpcAddress)
 	if err != nil {
@@ -117,6 +125,7 @@ func run() error {
 		handler      runtime.HandlerFunc
 	}{
 		{http.MethodGet, "/v1/posters", posterHandler(client)},
+		{http.MethodGet, "/v1/tmdb/images/{size}/{file}", tmdbImageHandler(images)},
 		{http.MethodGet, "/v1/media/{id}/master.m3u8", masterPlaylistHandler(client)},
 		{http.MethodGet, "/v1/media/{id}/headers", mediaHeadersHandler(client)},
 		{http.MethodGet, "/v1/media/{id}/quality/{quality}/playlist.m3u8", qualityPlaylistHandler(client)},
@@ -438,6 +447,37 @@ func posterHandler(source posterSource) runtime.HandlerFunc {
 		}
 		response.Header().Set("Content-Type", contentType)
 		response.Header().Set("Cache-Control", "public, max-age=86400")
+		_, _ = response.Write(body)
+	}
+}
+
+type tmdbImageSource interface {
+	Image(ctx context.Context, size, file string) ([]byte, string, error)
+}
+
+// tmdbImageHandler serves GET /v1/tmdb/images/{size}/{file}: a picture of
+// TMDB, which the pictures of /v1/tmdb/... are files of, so that phones
+// and receivers load them from title-api, as they do posters. A file never
+// changes on TMDB.
+func tmdbImageHandler(source tmdbImageSource) runtime.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
+		body, contentType, err := source.Image(request.Context(), pathParams["size"], pathParams["file"])
+		switch {
+		case errors.Is(err, tmdb.ErrInvalidImage):
+			http.Error(response, err.Error(), http.StatusBadRequest)
+			return
+		case errors.Is(err, tmdb.ErrImageNotFound):
+			http.Error(response, err.Error(), http.StatusNotFound)
+			return
+		case err != nil:
+			if request.Context().Err() == nil {
+				log.Printf("tmdb image: %v", err)
+			}
+			http.Error(response, "image unavailable", http.StatusBadGateway)
+			return
+		}
+		response.Header().Set("Content-Type", contentType)
+		response.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		_, _ = response.Write(body)
 	}
 }

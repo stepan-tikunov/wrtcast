@@ -1,0 +1,658 @@
+{
+ "backdrop_path": "/3werZe0KJhNZbL2Tv4MuIqtg6bh.jpg",
+ "created_by": [
+  {
+   "id": 2687744,
+   "credit_id": "6458d9966c8492018187d824",
+   "name": "Алексей Акимов",
+   "original_name": "Алексей Акимов",
+   "gender": 2,
+   "profile_path": "/ztc6ZDfPuTo7aLDlLAIKXMqUlDR.jpg"
+  }
+ ],
+ "first_air_date": "2021-03-18",
+ "genres": [
+  {
+   "id": 9648,
+   "name": "детектив"
+  },
+  {
+   "id": 35,
+   "name": "комедия"
+  },
+  {
+   "id": 10765,
+   "name": "НФ и Фэнтези"
+  }
+ ],
+ "id": 105136,
+ "last_episode_to_air": {
+  "id": 6922447,
+  "name": "Эпизод 10",
+  "overview": "У спасения высокая цена. Любимым вампирам пришло время прощаться — с друзьями, домом и старой жизнью.",
+  "vote_average": 0.0,
+  "vote_count": 0,
+  "air_date": "2026-03-27",
+  "episode_number": 10,
+  "episode_type": "finale",
+  "production_code": "",
+  "runtime": 63,
+  "season_number": 3,
+  "show_id": 105136,
+  "still_path": "/tMX32MOdr3hy3aFC6gssCPX9a5x.jpg"
+ },
+ "name": "Вампиры средней полосы",
+ "next_episode_to_air": null,
+ "number_of_episodes": 26,
+ "number_of_seasons": 3,
+ "origin_country": [
+  "RU"
+ ],
+ "original_language": "ru",
+ "original_name": "Вампиры средней полосы",
+ "overview": "Смоленск — среднестатистический город, расположенный в средней полосе России. Лишь одно отличает Смоленск от любого другого провинциального города средней полосы - в Смоленске живут вампиры. Живут давно. Живут тихо. Живут по закону. Живут непримечательной жизнью обычной провинциальной семьи и вовсе не убивают людей. Хотя кровь, конечно, попивают. И вот когда в берёзовой роще под Смоленском находят обескровленных парней... их мирная жизнь оказывается под угрозой. Возглавляет вампирскую «ячейку общества» самый старый вампир, дед Слава — он же Святослав Вернидубович. А следят за соблюдением вампирско-мирских законов «хранители» во главе с суровой Ириной Витальевной.",
+ "poster_path": "/clHLjRvAGdNV0uQggne6LnbgIeA.jpg",
+ "production_countries": [
+  {
+   "iso_3166_1": "RU",
+   "name": "Russia"
+  }
+ ],
+ "seasons": [
+  {
+   "season_number": 0,
+   "episode_count": 3,
+   "air_date": "2021-05-13",
+   "name": "Спецматериалы"
+  },
+  {
+   "season_number": 1,
+   "episode_count": 8,
+   "air_date": "2021-03-18",
+   "name": "Сезон 1"
+  },
+  {
+   "season_number": 2,
+   "episode_count": 8,
+   "air_date": "2022-12-13",
+   "name": "Сезон 2"
+  },
+  {
+   "season_number": 3,
+   "episode_count": 10,
+   "air_date": "2025-11-01",
+   "name": "Сезон 3"
+  }
+ ],
+ "softcore": false,
+ "status": "Ended",
+ "tagline": "",
+ "vote_average": 8.223,
+ "vote_count": 94,
+ "images": {
+  "backdrops": [
+   {
+    "file_path": "/3werZe0KJhNZbL2Tv4MuIqtg6bh.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/AonPiDZ2FamT4fq01Tdl7jqGJT7.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/3atkXWNSqseY5Rlw04zLoPHZzqq.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/uU2cebzkXXxUt6bI7vUERZiUmIF.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/uzELUdwFAfl9TJvUagGQMchiEE2.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/6Nsag2WAKkAPgXhxSqmPl7gUk4q.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ],
+  "logos": [
+   {
+    "file_path": "/V5bnhMhGIWTsh6izj8eVUvzotg.png",
+    "iso_639_1": "ru",
+    "width": 900,
+    "height": 325,
+    "aspect_ratio": 2.769,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/eLHd5spOocunio76G29WXouLign.png",
+    "iso_639_1": "ru",
+    "width": 3170,
+    "height": 1936,
+    "aspect_ratio": 1.637,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/1LQv4l0yIGBDfVTDJb6Dp4JvB8t.png",
+    "iso_639_1": "ru",
+    "width": 1920,
+    "height": 730,
+    "aspect_ratio": 2.63,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ]
+ },
+ "videos": {
+  "results": [
+   {
+    "key": "FvB7pius1yY",
+    "name": "Вампиры средней полосы | Сериал с Юрием Стояновым и Глебом Калюжным | Трейлер",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "ru",
+    "official": true,
+    "published_at": "2021-02-25T10:17:18.000Z"
+   }
+  ]
+ },
+ "aggregate_credits": {
+  "cast": [
+   {
+    "name": "Юрий Стоянов",
+    "profile_path": "/608WncKqcLdTMo6jucbpsyqNT5q.jpg",
+    "roles": [
+     {
+      "character": "дед Слава / Святослав Вернидубович"
+     }
+    ]
+   },
+   {
+    "name": "Артём Ткаченко",
+    "profile_path": "/47fzIBKxprff2Mmy5Y1vKcNzciZ.jpg",
+    "roles": [
+     {
+      "character": "Жан Иванович"
+     }
+    ]
+   },
+   {
+    "name": "Ольга Медынич",
+    "profile_path": "/vB0dtxPQiuJo5xv6ou3cyeuYQxU.jpg",
+    "roles": [
+     {
+      "character": "Ольга Анваровна"
+     }
+    ]
+   },
+   {
+    "name": "Дмитрий Лысенков",
+    "profile_path": "/nMBUXh9uBRIDi8QWnafQlNZAR5f.jpg",
+    "roles": [
+     {
+      "character": "Костик, сын Ирины Витальевны"
+     }
+    ]
+   },
+   {
+    "name": "Дмитрий Чеботарёв",
+    "profile_path": "/63ZsvCgB4Uc5MFDPvNYeUCmk1vp.jpg",
+    "roles": [
+     {
+      "character": "Сергей Барановский"
+     }
+    ]
+   },
+   {
+    "name": "Татьяна Догилева",
+    "profile_path": "/kQjfWjjxMHvYpy7wtwaHirQVoXj.jpg",
+    "roles": [
+     {
+      "character": "Ирина Витальевна"
+     }
+    ]
+   },
+   {
+    "name": "Анастасия Стежко",
+    "profile_path": "/jFcUqzJ1B6cOzjOt1272IyL5qts.jpg",
+    "roles": [
+     {
+      "character": "Анна Остроумова"
+     }
+    ]
+   },
+   {
+    "name": "Андрей Соколов",
+    "profile_path": "/7O7i0KF5dqzjnNRXliH9qZKpnvW.jpg",
+    "roles": [
+     {
+      "character": "Усачёв"
+     }
+    ]
+   },
+   {
+    "name": "Павел Харланчук",
+    "profile_path": "/FMRN40fMJDcOn48rRWA9kczFZN.jpg",
+    "roles": [
+     {
+      "character": "Влад"
+     }
+    ]
+   },
+   {
+    "name": "Александр Сибирцев",
+    "profile_path": "/5fPAUSzVFlz5ABtNiDhIXjJW7OS.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Виталия Корниенко",
+    "profile_path": "/4C87fJityzFxR2ERBjUqARECKDp.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Игорь Хрипунов",
+    "profile_path": "/k9Nw2mZlLAtbZOJdTmnbX4Vj8hK.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Егор Дружинин",
+    "profile_path": "/4lC0W7Ii9hvR0tCZKTCfIBgfZ4S.jpg",
+    "roles": [
+     {
+      "character": "Борис"
+     }
+    ]
+   },
+   {
+    "name": "Роман Рипко",
+    "profile_path": "/qoxOPtDVyXzsdEnnwAnd6U9n0XX.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Андрей Харыбин",
+    "profile_path": "/m52Ysemm3s9aEi6Jg9t7Gb8ht9R.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Тимофей Кочнев",
+    "profile_path": "/aOM8elNoAIB2sWsZtLHXQ7caSkj.jpg",
+    "roles": [
+     {
+      "character": "Женёк"
+     }
+    ]
+   },
+   {
+    "name": "Глеб Калюжный",
+    "profile_path": "/8J15lGlzadaCJVTwr8nQvN3QDGx.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Вероника Лысакова",
+    "profile_path": "/acsc4A8MJADvb3bGQNR5rbYXacB.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Александр Фисенко",
+    "profile_path": "/uvv6XTCtgxq2GnPEUQlBTEEuSF5.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Евгения Дмитриева",
+    "profile_path": "/7FbcKCUmI0HPOWZTOPiWildTAPx.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Дмитрий Миллер",
+    "profile_path": "/wuQSGEO26fJkIKGKaIxwd9dPIRZ.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Никита Тарасов",
+    "profile_path": "/wSP2czk2KhLA5vH7MKQ7gGPeaQk.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Екатерина Кузнецова",
+    "profile_path": "/ws9NwVrfRNOrLF8aGHOPRJm3nNu.jpg",
+    "roles": [
+     {
+      "character": "Анна Остроумова"
+     }
+    ]
+   },
+   {
+    "name": "Ева Смирнова",
+    "profile_path": "/g3yYCwVB0A6AzXTtmehzn5i4QCu.jpg",
+    "roles": [
+     {
+      "character": "Мила"
+     }
+    ]
+   },
+   {
+    "name": "Михаил Гаврилов-Третьяков",
+    "profile_path": "/dNuJvDvzkDHpq6uTOnOTIz3j4Gk.jpg",
+    "roles": [
+     {
+      "character": "Иван Жалинский"
+     }
+    ]
+   },
+   {
+    "name": "Тагир Вильданов",
+    "profile_path": null,
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Платон Бабкин",
+    "profile_path": null,
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Мария Лисовая",
+    "profile_path": "/cbdZK9l94pWhusXsV4cskRgzvxM.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Антон Косточкин",
+    "profile_path": "/tHD1KAUt7RpQqSZhrINMj055lLS.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   },
+   {
+    "name": "Лукерья Ильяшенко",
+    "profile_path": "/uc8bGkZSsdaafi7EuZTcPy86UJT.jpg",
+    "roles": [
+     {
+      "character": ""
+     }
+    ]
+   }
+  ]
+ },
+ "content_ratings": {
+  "results": [
+   {
+    "iso_3166_1": "RU",
+    "rating": "16+"
+   }
+  ]
+ },
+ "recommendations": {
+  "results": [
+   {
+    "id": 65820,
+    "media_type": "tv",
+    "name": "Ван Хельсинг",
+    "first_air_date": "2016-09-23",
+    "poster_path": "/9lGB5SJsXqUVao8pYKC40qzncjx.jpg",
+    "backdrop_path": "/5VltHQJXdmbSD6gEJw3R8R1Kbmc.jpg",
+    "adult": false
+   },
+   {
+    "id": 253372,
+    "media_type": "tv",
+    "name": "Институт",
+    "first_air_date": "2025-07-13",
+    "poster_path": "/jK0FZcOdDXhNK9wqJBODkZd5Ipv.jpg",
+    "backdrop_path": "/wWleS7DxsoGCkOPisNf8OZ2udiD.jpg",
+    "adult": false
+   },
+   {
+    "id": 83631,
+    "media_type": "tv",
+    "name": "Чем мы заняты в тени",
+    "first_air_date": "2019-03-27",
+    "poster_path": "/9TCCD3DEdDY07T3t61066nqBRU7.jpg",
+    "backdrop_path": "/mKikck71CvVISUSTLk29fwRbH4y.jpg",
+    "adult": false
+   },
+   {
+    "id": 4585,
+    "media_type": "tv",
+    "name": "Улётный TRIP",
+    "first_air_date": "2004-03-04",
+    "poster_path": "/yAWGCy2lklxLQTDFgG1UFcwyp8D.jpg",
+    "backdrop_path": "/hFPd1n2S9zlQwAfu610AU8ksmvs.jpg",
+    "adult": false
+   },
+   {
+    "id": 157769,
+    "media_type": "tv",
+    "name": "Два холма",
+    "first_air_date": "2000-04-28",
+    "poster_path": "/nrJe7ndAoZ8obw2fUlG4oLhX2sh.jpg",
+    "backdrop_path": "/ixFXZMJwtXavPFiIAOTqxRHkNW7.jpg",
+    "adult": false
+   },
+   {
+    "id": 97645,
+    "media_type": "tv",
+    "name": "Обратная сторона Земли",
+    "first_air_date": "2020-05-08",
+    "poster_path": "/2FLjgHZgtjwV1a1o5APZ1a0OzK7.jpg",
+    "backdrop_path": "/1cVt0Tm7erwYT5lyae9vUkPr4XY.jpg",
+    "adult": false
+   },
+   {
+    "id": 132188,
+    "media_type": "tv",
+    "name": "Бу, сучка",
+    "first_air_date": "2022-07-08",
+    "poster_path": "/7FtPRLyNFWsRhq5V4X8C0UtnLoX.jpg",
+    "backdrop_path": "/ttmsbW7t6CPrx85mOUFppWKu9hR.jpg",
+    "adult": false
+   },
+   {
+    "id": 74440,
+    "media_type": "tv",
+    "name": "Харли Квинн",
+    "first_air_date": "2019-11-29",
+    "poster_path": "/4jNimEp4AJgPMDDKUWBZaE9CXkq.jpg",
+    "backdrop_path": "/sNHoOagykUU0WpVBa162w1NP0mP.jpg",
+    "adult": false
+   },
+   {
+    "id": 39373,
+    "media_type": "tv",
+    "name": "Red vs. Blue",
+    "first_air_date": "2003-04-01",
+    "poster_path": "/ieGCVoyOkOo6jNPM9v1L6jGiM0N.jpg",
+    "backdrop_path": "/5YsPnlbb1YjwsOQTzszMCIZLVFu.jpg",
+    "adult": false
+   },
+   {
+    "id": 84880,
+    "media_type": "tv",
+    "name": "А теперь – апокалипсис",
+    "first_air_date": "2019-03-10",
+    "poster_path": "/na5VPXggp0GUD1EyBfu77YKU6n3.jpg",
+    "backdrop_path": "/AolLwYWbASLPPNj1MialtpidpBZ.jpg",
+    "adult": false
+   },
+   {
+    "id": 67487,
+    "media_type": "tv",
+    "name": "Тик",
+    "first_air_date": "2016-08-19",
+    "poster_path": "/8sngJVF54bugHfCkjJOsY4wx8Hk.jpg",
+    "backdrop_path": "/5ak5dT375f1a9Tr1gpSodddf1aI.jpg",
+    "adult": false
+   },
+   {
+    "id": 66732,
+    "media_type": "tv",
+    "name": "Очень странные дела",
+    "first_air_date": "2016-07-15",
+    "poster_path": "/nW3cral1e2r3xfLySPE1U9bailS.jpg",
+    "backdrop_path": "/9P4IIMYY3HifqeruZq0ZZ9g7YUi.jpg",
+    "adult": false
+   },
+   {
+    "id": 112113,
+    "media_type": "tv",
+    "name": "Гости из прошлого",
+    "first_air_date": "2020-10-26",
+    "poster_path": "/2dgIJaXHvM1dCg8xuoOfu93v9hu.jpg",
+    "backdrop_path": "/yYlToZYNmEw8lUQ3TfWxLEdQYPo.jpg",
+    "adult": false
+   },
+   {
+    "id": 106454,
+    "media_type": "tv",
+    "name": "Вечеринка",
+    "first_air_date": "2022-01-28",
+    "poster_path": "/gLZsVGIGSmeGrROmICXXugAky7C.jpg",
+    "backdrop_path": "/kbehRFMpW7VHsoLB0FM2wsdZsyd.jpg",
+    "adult": false
+   },
+   {
+    "id": 239148,
+    "media_type": "tv",
+    "name": "Волшебный участок",
+    "first_air_date": "2023-11-09",
+    "poster_path": "/jkMfsY5XH3cs86IuGrxIcxRhTWx.jpg",
+    "backdrop_path": "/1LYcPZV57cKHrCkWI88XD6Qq6hm.jpg",
+    "adult": false
+   },
+   {
+    "id": 287620,
+    "media_type": "tv",
+    "name": "Стюарт Блум не смог спасти вселенную",
+    "first_air_date": "2026-07-23",
+    "poster_path": "/q85riCL9XVJgL0bNigtVnY75G3n.jpg",
+    "backdrop_path": "/nW7oUFiJrIWwll4mZ8tYays7XRm.jpg",
+    "adult": false
+   },
+   {
+    "id": 69470,
+    "media_type": "tv",
+    "name": "Диета из Санта-Клариты",
+    "first_air_date": "2017-02-03",
+    "poster_path": "/udgj9LKOgCsqVKhrTcPgutAqwFY.jpg",
+    "backdrop_path": "/zPCDfLwOEtEhddaT2xeO5ChErsV.jpg",
+    "adult": false
+   },
+   {
+    "id": 62264,
+    "media_type": "tv",
+    "name": "Эш против Зловещих мертвецов",
+    "first_air_date": "2015-10-31",
+    "poster_path": "/wyZhYr92GdIN1hWji0CrG5BVIHG.jpg",
+    "backdrop_path": "/bIna9BL7Uny1hM63ntTI9BpRkRJ.jpg",
+    "adult": false
+   },
+   {
+    "id": 281666,
+    "media_type": "tv",
+    "name": "Мурашки: Исчезновение",
+    "first_air_date": "2025-01-10",
+    "poster_path": "/ajghauMTZ4RKVeISDUzxcMWjXnI.jpg",
+    "backdrop_path": "/wJoMRuK93XCSBk0RnzOiL17NUTL.jpg",
+    "adult": false
+   },
+   {
+    "id": 67111,
+    "media_type": "tv",
+    "name": "Квест Хармона",
+    "first_air_date": "2016-07-14",
+    "poster_path": "/jeBr5TZoh3uZNqHqve12jKzkRUd.jpg",
+    "backdrop_path": "/zA7Flc83MPoN2Ys2joC9xu6wnX4.jpg",
+    "adult": false
+   }
+  ]
+ }
+}

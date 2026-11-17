@@ -1,0 +1,449 @@
+{
+ "backdrop_path": "/2Vc0BTGCKRhbJcZnMD46V5zzjQR.jpg",
+ "belongs_to_collection": null,
+ "genres": [
+  {
+   "id": 18,
+   "name": "драма"
+  },
+  {
+   "id": 53,
+   "name": "триллер"
+  }
+ ],
+ "id": 745078,
+ "origin_country": [
+  "PL"
+ ],
+ "original_language": "pl",
+ "original_title": "Prime Time",
+ "overview": "В канун Нового 2000-го года, странный человек с оружием захватывает заложников в телевизионной студии центрального телеканала Польши и выдвигает единственное требование: выступить в прямом эфире.",
+ "poster_path": "/mEegKDrhRZVnn0Y87TdKqGwjowo.jpg",
+ "production_countries": [
+  {
+   "iso_3166_1": "PL",
+   "name": "Poland"
+  }
+ ],
+ "release_date": "2021-01-30",
+ "runtime": 90,
+ "softcore": false,
+ "status": "Released",
+ "tagline": "",
+ "title": "Прайм-тайм",
+ "vote_average": 5.2,
+ "vote_count": 100,
+ "images": {
+  "backdrops": [
+   {
+    "file_path": "/2Vc0BTGCKRhbJcZnMD46V5zzjQR.jpg",
+    "iso_639_1": null,
+    "width": 2560,
+    "height": 1439,
+    "aspect_ratio": 1.779,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/91vA5qGuTmTZeIRKb8oGrMFcm87.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/bfopM58z8cSJ1CzsvLLnxZLRclx.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1152,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ],
+  "logos": [
+   {
+    "file_path": "/k7aWH6Tv6kDmp6hyNEydQvNmqGf.png",
+    "iso_639_1": "en",
+    "width": 923,
+    "height": 283,
+    "aspect_ratio": 3.261,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/zSjiACL73sWYhQqyyJk54iSOCNc.png",
+    "iso_639_1": "en",
+    "width": 924,
+    "height": 206,
+    "aspect_ratio": 4.485,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ]
+ },
+ "videos": {
+  "results": []
+ },
+ "credits": {
+  "cast": [
+   {
+    "name": "Bartosz Bielenia",
+    "profile_path": "/cfoo327LIp2WpZONjPIFOiIPitc.jpg",
+    "character": "Sebastian"
+   },
+   {
+    "name": "Magdalena Popławska",
+    "profile_path": "/f1bz0HdPPwZuQA73WoJkRzxASjf.jpg",
+    "character": "Mira Kryle"
+   },
+   {
+    "name": "Andrzej Kłak",
+    "profile_path": "/8YREyAWFOCMu44SCytZftpKkSLB.jpg",
+    "character": "Security Guard Grzegorz"
+   },
+   {
+    "name": "Małgorzata Hajewska-Krzysztofik",
+    "profile_path": "/ij0DZ1RH6e85S4ShXQuxUg6dk2Z.jpg",
+    "character": "Laura Kołodziej"
+   },
+   {
+    "name": "Dobromir Dymecki",
+    "profile_path": "/8hNSEpoFZ6ybX2x4ZROEP2FuKCO.jpg",
+    "character": "Krzysztof Jedynak"
+   },
+   {
+    "name": "Моника Фрайчик",
+    "profile_path": "/ikJJ14ZDoMUHBbhxU67wghpfITU.jpg",
+    "character": "Negotiator Lena"
+   },
+   {
+    "name": "Cezary Kosiński",
+    "profile_path": "/bSzg8I6sQeG7YyuPLF84visSx8s.jpg",
+    "character": "Negotiator Piotr"
+   },
+   {
+    "name": "Adam Nawojczyk",
+    "profile_path": "/climA9SaUSb3SOmQmJPBs244XlZ.jpg",
+    "character": "Andrzej Kostecki"
+   },
+   {
+    "name": "Юлиуш Хшонстовский",
+    "profile_path": "/bNYZg045Jq2zLBGOzSmRSPiH6RR.jpg",
+    "character": "Sebastian's Father"
+   },
+   {
+    "name": "Pola Błasik",
+    "profile_path": null,
+    "character": "Kasia Jaworska"
+   },
+   {
+    "name": "Michał Kaleta",
+    "profile_path": "/maV4BXZGwGjcBRR8gACIRiJAjyF.jpg",
+    "character": "Head of Anti-Terrorists"
+   },
+   {
+    "name": "Marek Kasprzyk",
+    "profile_path": "/ilxGSlmeeqvhxsV61NNDQ1CkTu9.jpg",
+    "character": "Security Boss"
+   },
+   {
+    "name": "Miron Jagniewski",
+    "profile_path": "/tVFESqtxzZP2zPaspILeAVHoILh.jpg",
+    "character": "Voice in the Phone (voice)"
+   },
+   {
+    "name": "Olga Miłaszewska",
+    "profile_path": "/35nOClO4a3rNg0M0cnCvVfsdpnJ.jpg",
+    "character": "Jadwiga Jeżewska (voice)"
+   },
+   {
+    "name": "Jan Nosal",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Agnieszka Podsiadlik",
+    "profile_path": "/aHxTltWX5InZZuRq3wbOfNzF1ev.jpg",
+    "character": "Journalist Monika (voice)"
+   },
+   {
+    "name": "Jolanta Rychłowska",
+    "profile_path": "/jRw3HNYKZOB4cM3nwhtEZaHNDbl.jpg",
+    "character": ""
+   },
+   {
+    "name": "Julian Świeżewski",
+    "profile_path": "/taFR99cVpDj2TC0YjoP45cni9JI.jpg",
+    "character": "Dawid (voice)"
+   },
+   {
+    "name": "Marcin Bogacz",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Marta Budzynska",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Mariusz Capiga",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Jerzy Ćwięk",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Klaudyna Góralska",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Radosław Jachym",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Szymon Jopek",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Daniel Jurzyna",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Witold Koprucha",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Andrzej Kurdziel",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Patrycja Kycia",
+    "profile_path": null,
+    "character": ""
+   },
+   {
+    "name": "Czesław Liana",
+    "profile_path": null,
+    "character": ""
+   }
+  ],
+  "crew": [
+   {
+    "name": "Jakub Piątek",
+    "job": "Director"
+   }
+  ]
+ },
+ "release_dates": {
+  "results": [
+   {
+    "iso_3166_1": "US",
+    "release_dates": [
+     {
+      "certification": ""
+     },
+     {
+      "certification": "R"
+     }
+    ]
+   }
+  ]
+ },
+ "recommendations": {
+  "results": [
+   {
+    "id": 619278,
+    "media_type": "movie",
+    "title": "Информатор",
+    "release_date": "2019-09-24",
+    "poster_path": "/zcDZisqVQK9akfKgyrB9HYzYuVh.jpg",
+    "backdrop_path": "/OvMX5sgJ0vLmKQbIiS5yy7jn5H.jpg",
+    "adult": false
+   },
+   {
+    "id": 19052,
+    "media_type": "movie",
+    "title": "Зажигай, ребята",
+    "release_date": "1999-11-04",
+    "poster_path": "/sHbII8OHz2uoyOpPAVYe0LIJcdN.jpg",
+    "backdrop_path": "/c9ZDn1mJUfs8L0IyGZXS6oXtXfX.jpg",
+    "adult": false
+   },
+   {
+    "id": 250388,
+    "media_type": "movie",
+    "title": "Ярость: Смертная казнь",
+    "release_date": "2014-07-19",
+    "poster_path": "/aZMNrhhw5VEg9mzY8OrYUUhKVf7.jpg",
+    "backdrop_path": "/bIDM2sMsOaCpKGB3EKLTTgH8kOZ.jpg",
+    "adult": false
+   },
+   {
+    "id": 199591,
+    "media_type": "movie",
+    "title": "Пентхаус с видом на север",
+    "release_date": "2013-04-17",
+    "poster_path": "/kgRYyBsi8v1OOXkvTZQaDu3keIY.jpg",
+    "backdrop_path": "/m9D5TR0HdiyiG9njjpeJvxHmfZX.jpg",
+    "adult": false
+   },
+   {
+    "id": 2026,
+    "media_type": "movie",
+    "title": "Заложник",
+    "release_date": "2005-03-09",
+    "poster_path": "/1khFSt9mDnsf2wJdBfLfuyVNlXL.jpg",
+    "backdrop_path": "/aK1uB5c111DXSvPOrriizPoWwh9.jpg",
+    "adult": false
+   },
+   {
+    "id": 128876,
+    "media_type": "movie",
+    "title": "Небоскреб смерти",
+    "release_date": "2012-09-19",
+    "poster_path": "/i2pK0l7C1frgDvhea0s1lB2mTYh.jpg",
+    "backdrop_path": "/qSj5BPXLXEV06euTz4q6r04rDT0.jpg",
+    "adult": false
+   },
+   {
+    "id": 49110,
+    "media_type": "movie",
+    "title": "Наше Рождество",
+    "release_date": "2001-12-14",
+    "poster_path": "/DzoSalOppsZ5by1X2ISevQH2U4.jpg",
+    "backdrop_path": "/AgA7fRQ1OtIU9kczLVKpJGWME4R.jpg",
+    "adult": false
+   },
+   {
+    "id": 10750,
+    "media_type": "movie",
+    "title": "Игрушечные солдатики",
+    "release_date": "1991-04-24",
+    "poster_path": "/nL3ccvqU1Wq1j31feHWAydzpbr2.jpg",
+    "backdrop_path": "/iLpBP4GSPzLUJt1wbhVRmY2QWS8.jpg",
+    "adult": false
+   },
+   {
+    "id": 81217,
+    "media_type": "movie",
+    "title": "Шаманка",
+    "release_date": "1996-05-10",
+    "poster_path": "/feVJnyUX5f1tvQzn64zeaGWMghm.jpg",
+    "backdrop_path": "/tW1azZ2j0ObJj4d0QMay30AFNTL.jpg",
+    "adult": false
+   },
+   {
+    "id": 7457,
+    "media_type": "movie",
+    "title": "Альфа Дог",
+    "release_date": "2006-01-27",
+    "poster_path": "/xK7EuPU4pvrWE3RovwFiNLGnhnF.jpg",
+    "backdrop_path": "/oxEvnbNAr1BFWX8XQ6KBU35uWN8.jpg",
+    "adult": false
+   },
+   {
+    "id": 435036,
+    "media_type": "movie",
+    "title": "Бесчестный",
+    "release_date": "2018-10-05",
+    "poster_path": "/sMi0sz3qnj2xBdT0tfHlqnw5zIh.jpg",
+    "backdrop_path": "/ngrFnbtZjEvDvvbwLBHQ05kbt6Q.jpg",
+    "adult": false
+   },
+   {
+    "id": 893086,
+    "media_type": "movie",
+    "title": "Идеальное убийство",
+    "release_date": "2022-06-17",
+    "poster_path": "/vWdHQjl9LcpJLaQeSACm1QRQ4ao.jpg",
+    "backdrop_path": "/AnmfRV7X0kwEn96pg0lAVopV8YK.jpg",
+    "adult": false
+   },
+   {
+    "id": 976734,
+    "media_type": "movie",
+    "title": "Досье «Чёрная канарейка»",
+    "release_date": "2024-10-10",
+    "poster_path": "/sst0jGr5ZRDCy7F5rYTmuFPI6VK.jpg",
+    "backdrop_path": "/5IIFJxwRzmkhczQidIhpoaolpZY.jpg",
+    "adult": false
+   },
+   {
+    "id": 10413,
+    "media_type": "movie",
+    "title": "Некуда Бежать",
+    "release_date": "1993-01-15",
+    "poster_path": "/tZq6OGsiSNRa2JZ3mmEMuX6hDLH.jpg",
+    "backdrop_path": "/5VF6N8dPSSPeyQdQoQ53mxDcUjw.jpg",
+    "adult": false
+   },
+   {
+    "id": 264644,
+    "media_type": "movie",
+    "title": "Комната",
+    "release_date": "2015-10-16",
+    "poster_path": "/t8ee0FShxIeijkg84wFZdc62ivX.jpg",
+    "backdrop_path": "/cGV6R2vzT4TYIabf3JgmrOISQ0y.jpg",
+    "adult": false
+   },
+   {
+    "id": 376004,
+    "media_type": "movie",
+    "title": "Прелюбодеи",
+    "release_date": "2016-01-05",
+    "poster_path": "/7weaBxcimjsN9zi89Dfk4fZFCUE.jpg",
+    "backdrop_path": "/8q6AJYqJzZPrNSbttcwslXx7QgO.jpg",
+    "adult": false
+   },
+   {
+    "id": 891699,
+    "media_type": "movie",
+    "title": "Немая ярость",
+    "release_date": "2023-11-29",
+    "poster_path": "/viGi2iY7XVMHmIu7NoWSFpeUvte.jpg",
+    "backdrop_path": "/gg4zZoTggZmpAQ32qIrP5dtnkEZ.jpg",
+    "adult": false
+   },
+   {
+    "id": 574207,
+    "media_type": "movie",
+    "title": "Связной",
+    "release_date": "2019-07-24",
+    "poster_path": "/tNbcrSi1Kk21O5A1jYYYpXKcNlE.jpg",
+    "backdrop_path": "/5WqVG4g6iWEcHUQUC1qOFQUXkdO.jpg",
+    "adult": false
+   },
+   {
+    "id": 399248,
+    "media_type": "movie",
+    "title": "Точка невозврата",
+    "release_date": "2018-04-11",
+    "poster_path": "/nWBoXMLJ9e11G7owfe7mnvVqmIg.jpg",
+    "backdrop_path": "/4CEwPhuexYCi3I3ASaaOGTeP4sB.jpg",
+    "adult": false
+   },
+   {
+    "id": 595743,
+    "media_type": "movie",
+    "title": "Спецслужба: Сигнал тревоги",
+    "release_date": "2021-08-11",
+    "poster_path": "/wOsNw48YRjVwj75OfpdSlHiSv0x.jpg",
+    "backdrop_path": "/feLcWM4lSq4fNSRZomeKVDBBOLK.jpg",
+    "adult": false
+   }
+  ]
+ }
+}

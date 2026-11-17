@@ -166,10 +166,7 @@ func (s *Server) GetTitleDetails(
 	}
 	if s.tmdb != nil {
 		if match, ok := s.tmdb.Match(ctx, metadata.TitleID); ok {
-			response.Tmdb = &titlev1.TmdbTitle{Id: match.ID, MediaType: titlev1.MediaType_MEDIA_TYPE_MOVIE}
-			if match.Kind == tmdb.KindTV {
-				response.Tmdb.MediaType = titlev1.MediaType_MEDIA_TYPE_SERIES
-			}
+			response.Tmdb = tmdbRef(match.Kind, match.ID)
 		} else {
 			s.tmdb.Opened(tmdbTitle(metadata))
 		}
@@ -222,6 +219,142 @@ func (s *Server) UpdateTmdbSettings(
 		return nil, status.Error(codes.Unavailable, err.Error())
 	}
 	return tmdbSettings(settings), nil
+}
+
+// GetTmdbDetails tells of a title on TMDB by its ID, whether title-api has
+// it or not.
+func (s *Server) GetTmdbDetails(
+	ctx context.Context,
+	query *titlev1.GetTmdbDetailsQuery,
+) (*titlev1.TmdbDetails, error) {
+	if s.tmdb == nil {
+		return nil, status.Error(codes.Unimplemented, "TMDB is off")
+	}
+	kind := query.GetMediaType()
+	if kind != tmdb.KindMovie && kind != tmdb.KindTV {
+		return nil, status.Error(codes.InvalidArgument, `media_type must be "movie" or "tv"`)
+	}
+	if query.GetTmdbId() == 0 {
+		return nil, status.Error(codes.InvalidArgument, "tmdb_id is required")
+	}
+	details, err := s.tmdb.Details(ctx, kind, query.GetTmdbId())
+	if err != nil {
+		return nil, tmdbStatus(err)
+	}
+	return tmdbDetails(details), nil
+}
+
+// GetTmdbSeason tells of a season of a series on TMDB.
+func (s *Server) GetTmdbSeason(
+	ctx context.Context,
+	query *titlev1.GetTmdbSeasonQuery,
+) (*titlev1.TmdbSeason, error) {
+	if s.tmdb == nil {
+		return nil, status.Error(codes.Unimplemented, "TMDB is off")
+	}
+	if query.GetTmdbId() == 0 || query.GetSeasonNumber() < 0 {
+		return nil, status.Error(codes.InvalidArgument, "tmdb_id and season_number are required")
+	}
+	season, err := s.tmdb.Season(ctx, query.GetTmdbId(), query.GetSeasonNumber())
+	if err != nil {
+		return nil, tmdbStatus(err)
+	}
+	response := &titlev1.TmdbSeason{Episodes: make([]*titlev1.TmdbEpisode, 0, len(season.Episodes))}
+	for _, episode := range season.Episodes {
+		response.Episodes = append(response.Episodes, &titlev1.TmdbEpisode{
+			EpisodeNumber: episode.Number, Name: episode.Name, Overview: episode.Overview,
+			StillPath: episode.Still, AirDate: episode.AirDate, RuntimeMinutes: episode.Runtime,
+			Upcoming: episode.Upcoming,
+		})
+	}
+	return response, nil
+}
+
+func tmdbStatus(err error) error {
+	switch {
+	case errors.Is(err, tmdb.ErrNoKey):
+		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, tmdb.ErrNotFound):
+		return status.Error(codes.NotFound, err.Error())
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return status.FromContextError(err).Err()
+	default:
+		return status.Error(codes.Unavailable, err.Error())
+	}
+}
+
+func tmdbDetails(details tmdb.Details) *titlev1.TmdbDetails {
+	response := &titlev1.TmdbDetails{
+		Title: tmdbRef(details.Kind, details.ID), Name: details.Name, OriginalName: details.OriginalName,
+		Year: details.Year(), ReleaseDate: details.Date, Tagline: details.Tagline, Overview: details.Overview,
+		BackdropPath: details.Backdrop, LogoPath: details.Logo, LogoAspect: details.LogoAspect,
+		PosterPath: details.Poster, Age: details.Age, VoteAverage: details.VoteAverage,
+		RuntimeMinutes: details.Runtime, Genres: details.Genres, Countries: details.Countries,
+		Directors: details.Directors, TitleId: details.TitleID,
+		Recommendations: tmdbRelated(details.Recommendations),
+	}
+	for _, person := range details.Cast {
+		response.Cast = append(response.Cast, &titlev1.TmdbPerson{
+			Name: person.Name, Character: person.Character, ProfilePath: person.Profile,
+		})
+	}
+	for _, video := range details.Videos {
+		response.Videos = append(response.Videos, &titlev1.TmdbVideo{
+			YoutubeKey: video.Key, Name: video.Name, Language: video.Language, Kind: video.Kind,
+		})
+	}
+	if collection := details.Collection; collection != nil {
+		response.Collection = &titlev1.TmdbCollection{
+			Id: collection.ID, Name: collection.Name, Parts: tmdbRelated(collection.Parts),
+		}
+	}
+	if series := details.Series; series != nil {
+		response.Status = tmdbStatuses[series.Status]
+		response.NextEpisode, response.LastEpisode = tmdbEpisodeRef(series.Next), tmdbEpisodeRef(series.Last)
+		response.NumberOfSeasons = uint32(max(series.Seasons, 0))
+		response.Creators = series.Creators
+		for _, season := range series.SeasonList {
+			response.Seasons = append(response.Seasons, &titlev1.TmdbSeasonRef{
+				SeasonNumber: season.Number, EpisodeCount: season.Episodes, AirDate: season.AirDate, Name: season.Name,
+			})
+		}
+	}
+	return response
+}
+
+var tmdbStatuses = map[string]titlev1.TmdbStatus{
+	tmdb.StatusReturning: titlev1.TmdbStatus_TMDB_STATUS_RETURNING,
+	tmdb.StatusEnded:     titlev1.TmdbStatus_TMDB_STATUS_ENDED,
+	tmdb.StatusCanceled:  titlev1.TmdbStatus_TMDB_STATUS_CANCELED,
+	tmdb.StatusOther:     titlev1.TmdbStatus_TMDB_STATUS_OTHER,
+}
+
+func tmdbRef(kind string, id uint64) *titlev1.TmdbTitle {
+	ref := &titlev1.TmdbTitle{Id: id, MediaType: titlev1.MediaType_MEDIA_TYPE_MOVIE}
+	if kind == tmdb.KindTV {
+		ref.MediaType = titlev1.MediaType_MEDIA_TYPE_SERIES
+	}
+	return ref
+}
+
+func tmdbEpisodeRef(ref *tmdb.EpisodeRef) *titlev1.TmdbEpisodeRef {
+	if ref == nil {
+		return nil
+	}
+	return &titlev1.TmdbEpisodeRef{
+		SeasonNumber: ref.Season, EpisodeNumber: ref.Episode, AirDate: ref.AirDate, Name: ref.Name,
+	}
+}
+
+func tmdbRelated(list []tmdb.Related) []*titlev1.TmdbRelated {
+	response := make([]*titlev1.TmdbRelated, 0, len(list))
+	for _, r := range list {
+		response = append(response, &titlev1.TmdbRelated{
+			Title: tmdbRef(r.Kind, r.ID), Name: r.Name, Year: r.Year(), ReleaseDate: r.Date,
+			PosterPath: r.Poster, BackdropPath: r.Backdrop, TitleId: r.TitleID,
+		})
+	}
+	return response
 }
 
 func tmdbSettings(settings tmdb.Settings) *titlev1.TmdbSettings {

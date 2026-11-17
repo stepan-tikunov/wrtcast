@@ -57,6 +57,18 @@ service TitleService {
       body: "*"
     };
   }
+
+  rpc GetTmdbDetails(GetTmdbDetailsQuery) returns (TmdbDetails) {
+    option (google.api.http) = {
+      get: "/v1/tmdb/{media_type}/{tmdb_id}"
+    };
+  }
+
+  rpc GetTmdbSeason(GetTmdbSeasonQuery) returns (TmdbSeason) {
+    option (google.api.http) = {
+      get: "/v1/tmdb/tv/{tmdb_id}/seasons/{season_number}"
+    };
+  }
 }
 
 enum MediaType {
@@ -250,4 +262,144 @@ message UpdateTmdbSettingsCommand {
   // A TMDB API key or read access token, which is checked before it is
   // kept; empty removes it.
   string api_key = 1;
+}
+
+// A title on TMDB by its ID, whether title-api has it or not (see
+// GetTitleDetailsQueryResponse.tmdb). NOT_FOUND when TMDB doesn't have it,
+// FAILED_PRECONDITION with no TMDB key.
+message GetTmdbDetailsQuery {
+  // "movie" or "tv", as TMDB's paths name them: a movie and a series may
+  // share an ID.
+  string media_type = 1;
+  uint64 tmdb_id = 2;
+}
+
+// What a title's page shows of a title on TMDB, in Russian, chosen by
+// title-api; what TMDB lacks is empty. A picture is a file of
+// /v1/tmdb/images/{size}/{file}.
+message TmdbDetails {
+  TmdbTitle title = 1;
+  string name = 2;
+  string original_name = 3;
+  string year = 4;
+  string tagline = 5;
+  string overview = 6;
+  // Without text, 1280 wide or more where TMDB has one.
+  string backdrop_path = 7;
+  // A PNG, in Russian, else English, else in no language.
+  string logo_path = 8;
+  // The logo's width to its height.
+  double logo_aspect = 9;
+  string poster_path = 10;
+  // In the Russian scale: 0+, 6+, 12+, 16+ or 18+; the American rating
+  // translated where there is no Russian one.
+  string age = 11;
+  double vote_average = 12;
+  // A movie's.
+  uint32 runtime_minutes = 13;
+  repeated string genres = 14;
+  repeated string countries = 15;
+  // A series'.
+  TmdbStatus status = 16;
+  TmdbEpisodeRef next_episode = 17;
+  TmdbEpisodeRef last_episode = 18;
+  uint32 number_of_seasons = 19;
+  repeated string creators = 20;
+  // Up to 12, those with a photo.
+  repeated TmdbPerson cast = 21;
+  // Up to 4 trailers and teasers on YouTube, Russian and official first.
+  repeated TmdbVideo videos = 22;
+  TmdbCollection collection = 23;
+  // Up to 12, those with a poster.
+  repeated TmdbRelated recommendations = 24;
+  // title-api's title of it, if it is matched.
+  string title_id = 25;
+  // A movie's.
+  repeated string directors = 26;
+  // A series' seasons, the specials left out.
+  repeated TmdbSeasonRef seasons = 27;
+  string release_date = 28;
+}
+
+enum TmdbStatus {
+  TMDB_STATUS_UNSPECIFIED = 0;
+  TMDB_STATUS_RETURNING = 1;
+  TMDB_STATUS_ENDED = 2;
+  TMDB_STATUS_CANCELED = 3;
+  // In production, planned, a pilot.
+  TMDB_STATUS_OTHER = 4;
+}
+
+message TmdbEpisodeRef {
+  int32 season_number = 1;
+  int32 episode_number = 2;
+  string air_date = 3;
+  // Empty when TMDB has it as its number alone, or not in Russian.
+  string name = 4;
+}
+
+message TmdbSeasonRef {
+  int32 season_number = 1;
+  int32 episode_count = 2;
+  string air_date = 3;
+  string name = 4;
+}
+
+message TmdbPerson {
+  string name = 1;
+  string character = 2;
+  string profile_path = 3;
+}
+
+message TmdbVideo {
+  // youtube.com/watch?v=<youtube_key>
+  string youtube_key = 1;
+  string name = 2;
+  string language = 3;
+  // "Trailer" or "Teaser".
+  string kind = 4;
+}
+
+// A collection's parts in the order they came out, those with no date
+// yet last.
+message TmdbCollection {
+  uint64 id = 1;
+  string name = 2;
+  repeated TmdbRelated parts = 3;
+}
+
+message TmdbRelated {
+  TmdbTitle title = 1;
+  string name = 2;
+  string year = 3;
+  string release_date = 4;
+  string poster_path = 5;
+  string backdrop_path = 6;
+  // title-api's title of it, if it is matched.
+  string title_id = 7;
+}
+
+// A season of a series on TMDB. One TMDB doesn't number so, as the
+// provider's season 9 of Dexter, which TMDB has as a series of its own,
+// has no episodes.
+message GetTmdbSeasonQuery {
+  uint64 tmdb_id = 1;
+  int32 season_number = 2;
+}
+
+message TmdbSeason {
+  repeated TmdbEpisode episodes = 1;
+}
+
+message TmdbEpisode {
+  int32 episode_number = 1;
+  // Empty when TMDB has it as its number alone, or not in Russian.
+  string name = 2;
+  // In English where TMDB has none in Russian.
+  string overview = 3;
+  string still_path = 4;
+  string air_date = 5;
+  uint32 runtime_minutes = 6;
+  // Not aired yet: its date is to come or unknown.
+  bool upcoming = 7;
 }

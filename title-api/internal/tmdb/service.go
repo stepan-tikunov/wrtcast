@@ -44,6 +44,7 @@ type Match struct {
 // time.
 type Service struct {
 	store *store
+	cache *cache
 	// TMDB's and Claude's APIs are asked directly, not through the proxy
 	// the provider is reached by.
 	http    *http.Client
@@ -64,7 +65,7 @@ func New(ctx context.Context, db *sql.DB, claudeKey func(context.Context) (strin
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	return &Service{
-		store: store, http: &http.Client{Transport: transport}, baseURL: apiURL,
+		store: store, cache: newCache(db), http: &http.Client{Transport: transport}, baseURL: apiURL,
 		claudeKey: claudeKey, wake: make(chan struct{}, 1),
 	}, nil
 }

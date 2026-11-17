@@ -11,7 +11,11 @@ import (
 	"testing"
 	"time"
 
+	titlev1 "title-api/api/title/v1"
 	"title-api/internal/provider"
+	"title-api/internal/tmdb"
+
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 )
 
 func TestAllowAllOrigins(t *testing.T) {
@@ -271,5 +275,62 @@ func TestMediaRelayHandler(t *testing.T) {
 		if response.Code != status {
 			t.Errorf("quality %s: %d", quality, response.Code)
 		}
+	}
+}
+
+type fakeTmdbImages struct{ requested []string }
+
+func (images *fakeTmdbImages) Image(_ context.Context, size, file string) ([]byte, string, error) {
+	images.requested = append(images.requested, size+"/"+file)
+	switch {
+	case size != "w500" || strings.Contains(file, "/") || strings.Contains(file, ".."):
+		return nil, "", tmdb.ErrInvalidImage
+	case file == "missing.jpg":
+		return nil, "", tmdb.ErrImageNotFound
+	case file == "down.jpg":
+		return nil, "", errors.New("TMDB is down")
+	}
+	return []byte("png"), "image/png", nil
+}
+
+// The pictures are served next to /v1/tmdb/{media_type}/{tmdb_id}, as
+// main routes them.
+func TestTmdbImageHandler(t *testing.T) {
+	t.Parallel()
+	images := &fakeTmdbImages{}
+	mux := runtime.NewServeMux()
+	if err := titlev1.RegisterTitleServiceHandlerServer(context.Background(), mux, titlev1.UnimplementedTitleServiceServer{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := mux.HandlePath(http.MethodGet, "/v1/tmdb/images/{size}/{file}", tmdbImageHandler(images)); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		path   string
+		status int
+	}{
+		{"/v1/tmdb/images/w500/logo.png", http.StatusOK},
+		{"/v1/tmdb/images/w9/logo.png", http.StatusBadRequest},
+		{"/v1/tmdb/images/w500/..%2F..%2Fstate.db", http.StatusNotFound},
+		{"/v1/tmdb/images/w500/..", http.StatusBadRequest},
+		{"/v1/tmdb/images/w500/missing.jpg", http.StatusNotFound},
+		{"/v1/tmdb/images/w500/down.jpg", http.StatusBadGateway},
+		{"/v1/tmdb/images/w500/a/b.jpg", http.StatusNotFound},
+		{"/v1/tmdb/images/../../titles/x", http.StatusNotFound},
+	} {
+		response := httptest.NewRecorder()
+		mux.ServeHTTP(response, httptest.NewRequest(http.MethodGet, test.path, nil))
+		if response.Code != test.status {
+			t.Errorf("%s: status = %d, want %d (%s)", test.path, response.Code, test.status, response.Body.String())
+		}
+		if test.status == http.StatusOK {
+			if response.Header().Get("Content-Type") != "image/png" || response.Body.String() != "png" ||
+				response.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
+				t.Errorf("%s: %v %q", test.path, response.Header(), response.Body.String())
+			}
+		}
+	}
+	if images.requested[0] != "w500/logo.png" {
+		t.Errorf("requested %v", images.requested)
 	}
 }

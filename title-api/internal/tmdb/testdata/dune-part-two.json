@@ -1,0 +1,2293 @@
+{
+ "backdrop_path": "/eZ239CUp1d6OryZEBPnO2n87gMG.jpg",
+ "belongs_to_collection": {
+  "id": 726871,
+  "name": "Дюна (Коллекция)",
+  "poster_path": "/e4XxLljYradqg8Eutk5QIB81VYE.jpg",
+  "backdrop_path": "/fahk0Fu7VUUfK6IkTt1R3waOD9F.jpg"
+ },
+ "genres": [
+  {
+   "id": 878,
+   "name": "фантастика"
+  },
+  {
+   "id": 12,
+   "name": "приключения"
+  }
+ ],
+ "id": 693134,
+ "origin_country": [
+  "US"
+ ],
+ "original_language": "en",
+ "original_title": "Dune: Part Two",
+ "overview": "Герцог Пол Атрейдес присоединяется к фременам, чтобы стать Муад Дибом, одновременно пытаясь остановить наступление войны.",
+ "poster_path": "/3aLghRkuJc9cs770fxo4a6YWht3.jpg",
+ "production_countries": [
+  {
+   "iso_3166_1": "US",
+   "name": "United States of America"
+  }
+ ],
+ "release_date": "2024-02-27",
+ "runtime": 166,
+ "softcore": false,
+ "status": "Released",
+ "tagline": "«Да здравствуют бесстрашные воители!»",
+ "title": "Дюна: Часть вторая",
+ "vote_average": 8.143,
+ "vote_count": 8992,
+ "images": {
+  "backdrops": [
+   {
+    "file_path": "/eZ239CUp1d6OryZEBPnO2n87gMG.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.83,
+    "vote_count": 41
+   },
+   {
+    "file_path": "/l6b9YZEokZl1nt7q0pprrur6btG.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.778,
+    "vote_count": 27
+   },
+   {
+    "file_path": "/24Ov8wnusgnzXwjV1eDm0Lzo5da.jpg",
+    "iso_639_1": null,
+    "width": 3598,
+    "height": 2024,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.616,
+    "vote_count": 13
+   },
+   {
+    "file_path": "/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.604,
+    "vote_count": 67
+   },
+   {
+    "file_path": "/rRBD8ORo9y34tYkAQJVbn4Ml6tu.jpg",
+    "iso_639_1": null,
+    "width": 3598,
+    "height": 2024,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.476,
+    "vote_count": 21
+   },
+   {
+    "file_path": "/o869RihWTdTyBcEZBjz0izvEsVf.jpg",
+    "iso_639_1": null,
+    "width": 2808,
+    "height": 1580,
+    "aspect_ratio": 1.777,
+    "vote_average": 5.404,
+    "vote_count": 31
+   },
+   {
+    "file_path": "/87IVlclAfWL6mdicU1DDuxdwXwe.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.394,
+    "vote_count": 33
+   },
+   {
+    "file_path": "/lDrlJzuLdg2bKcvek4ZpmN3Lo47.jpg",
+    "iso_639_1": null,
+    "width": 3588,
+    "height": 2020,
+    "aspect_ratio": 1.776,
+    "vote_average": 5.25,
+    "vote_count": 14
+   },
+   {
+    "file_path": "/WZCfWFlKnGKZy9Bdf1rdEQDGkc.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.25,
+    "vote_count": 12
+   },
+   {
+    "file_path": "/wauiyiVXpdvTvt2CzdSWbYlbaE3.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.25,
+    "vote_count": 24
+   },
+   {
+    "file_path": "/uUVQCwBsWdQDMssXv1TRvYKnXgS.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.25,
+    "vote_count": 18
+   },
+   {
+    "file_path": "/f6ahdeUZPwUVirr86gcZ1QmiasQ.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.25,
+    "vote_count": 18
+   },
+   {
+    "file_path": "/8uVKfOJUhmybNsVh089EqLHUYEG.jpg",
+    "iso_639_1": null,
+    "width": 2560,
+    "height": 1440,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.25,
+    "vote_count": 30
+   },
+   {
+    "file_path": "/uhUO7vQQKvCTfQWubOt5MAKokbL.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 5.044,
+    "vote_count": 24
+   },
+   {
+    "file_path": "/vtTl849UKBVQ0Lr796Krjr90y0J.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 4.97,
+    "vote_count": 17
+   },
+   {
+    "file_path": "/azNWPA0WvlGH1o5dhXJWB5ChJS.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 4.656,
+    "vote_count": 16
+   },
+   {
+    "file_path": "/qBQV4i2sjIydDJUKm7pwvpyfy5p.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 4.386,
+    "vote_count": 22
+   },
+   {
+    "file_path": "/8U6ww9eHilD88wmU3CDF4ANmRmH.jpg",
+    "iso_639_1": "en",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/nYsgTaKcg0P1vjuqOcZTKI3R7ph.jpg",
+    "iso_639_1": "en",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/vhnSAhPlVEn0gwnCniYdRDu18fo.jpg",
+    "iso_639_1": "en",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/iQcy93HmAEiGr2r1qfKwsjaO8Xg.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/oxfTPLZtoE16Lub4uurpyj0rw2E.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/liUVvHJclyEWgeedUD3ITJE0zrg.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/xbNjzR91rtvwTV3hp2N4AWgb8Qp.jpg",
+    "iso_639_1": null,
+    "width": 3464,
+    "height": 1948,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/gMQ1CvZzbD9RQkUBdIxVcXMaXn4.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/6TC1W6UaRO8WlDuYJVgPt3rRKwT.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/xfa2bWuY6aHNp0hr4vKADqiO2TX.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/dpmxapDnyAgA2Pnh3BJtQBRgT7Y.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/sgvNKJ1opNXZuGCBiKNeeuanECU.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/lkf9Zs13JOMTUiGRNK6k9cglAB7.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/9Rcx7TZH5tvRj5SrKP3cqFQWPhU.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/uEteaqxqhbBlRjib82ZVyJrsq0q.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/1fkinFdA5gPNZ6ieIA9Zexi6Q0B.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/jacDFwnSeGG9tcDWRKTjP5e7bwo.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/pemJB7bjq2YItcz9uRyj1oZlqwd.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/lRYja7QWcrqFv6rgzRcNK861PII.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/7GGrVbQhviNBW54RyVi1oN8JMJ5.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/b41iPkFx8WsvB30d2ygw6QTHlOB.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/eprEGytbW79LVl3SnBr6XKrzIwX.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/oBCR7ShGq9ZdnHMK8SGOckGpEgo.jpg",
+    "iso_639_1": null,
+    "width": 2857,
+    "height": 1607,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/yrTwMKU3y2eiW4ox4ULudB2QhUS.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/45aGRVWI9XpXveZ3h3WCSr0jQHt.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/dPgzqis8bZx85LYfjB2l7HwMob5.jpg",
+    "iso_639_1": "en",
+    "width": 2246,
+    "height": 1264,
+    "aspect_ratio": 1.777,
+    "vote_average": 3.334,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/v2os8EpbfGHnljCTpoLWOUKYUv5.jpg",
+    "iso_639_1": "en",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 2.542,
+    "vote_count": 4
+   },
+   {
+    "file_path": "/rmqiV9OperdByzpmCbhQ5DrImXu.jpg",
+    "iso_639_1": "en",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 2.278,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/e5DbpCYx5wtoEJKOoXBbSsOOy6f.jpg",
+    "iso_639_1": null,
+    "width": 2027,
+    "height": 1140,
+    "aspect_ratio": 1.778,
+    "vote_average": 2.278,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/5JRVaEP6vp2nHrtJiNOaRkTc5gN.jpg",
+    "iso_639_1": null,
+    "width": 1429,
+    "height": 804,
+    "aspect_ratio": 1.777,
+    "vote_average": 2.278,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/imuQ2yxiwgmBLCfqjLuqoqI2Tq8.jpg",
+    "iso_639_1": null,
+    "width": 1423,
+    "height": 800,
+    "aspect_ratio": 1.779,
+    "vote_average": 2.278,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/3jAmIiF931QuBAZ93OOgjaucNa7.jpg",
+    "iso_639_1": null,
+    "width": 3200,
+    "height": 1800,
+    "aspect_ratio": 1.778,
+    "vote_average": 2.066,
+    "vote_count": 5
+   },
+   {
+    "file_path": "/iKOs7caYOHzsRNWfY9RfIpbuLeI.jpg",
+    "iso_639_1": "en",
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 6
+   },
+   {
+    "file_path": "/7Ka1gozTtbqph71EAmCoZzp0IeV.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 4
+   },
+   {
+    "file_path": "/36q3LejjQbpyhhuMpJN6kALbFtR.jpg",
+    "iso_639_1": null,
+    "width": 3588,
+    "height": 2020,
+    "aspect_ratio": 1.776,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/tMSaxhbUFhYlADu1Aju4ETVHDwR.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/6QFs4p7kL7DnkBbVYbte4txKRZ0.jpg",
+    "iso_639_1": null,
+    "width": 1281,
+    "height": 720,
+    "aspect_ratio": 1.779,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/aUPWBGuNUDGKwHRqlojhd3Gk6Ic.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 4
+   },
+   {
+    "file_path": "/63aRv0BuMeQXRfm5yKRnAVV0qLx.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/f2GKTP0VbN96qTzz3o6qvAuMTeh.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 6
+   },
+   {
+    "file_path": "/z1AR7CJC80k4pw00URV9AVVgfjf.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 6
+   },
+   {
+    "file_path": "/93YSyic1EahCGMdkqPla1jcqpJy.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/iDPBor0fZBxqMiIsf4Yf9kfw9St.jpg",
+    "iso_639_1": null,
+    "width": 2642,
+    "height": 1486,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/aqMeHlGYd3OafJVrSqSrhX5Nb2C.jpg",
+    "iso_639_1": null,
+    "width": 1422,
+    "height": 800,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/o4WtRVT2ZYuBsoJQXtPt49T8tC3.jpg",
+    "iso_639_1": null,
+    "width": 1429,
+    "height": 804,
+    "aspect_ratio": 1.777,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/fLrEWOGNwjo2E8sbK97C3hDTafz.jpg",
+    "iso_639_1": null,
+    "width": 1423,
+    "height": 800,
+    "aspect_ratio": 1.779,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/d9OKAdZ7it54r4r2G17k2D9CPf.jpg",
+    "iso_639_1": null,
+    "width": 1423,
+    "height": 800,
+    "aspect_ratio": 1.779,
+    "vote_average": 1.75,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/lhKD4tQrt3XXezWJJq1uryBDA1a.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.714,
+    "vote_count": 7
+   },
+   {
+    "file_path": "/DZ5KkiZmBbnzHnCRouh2P0s9b3.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.562,
+    "vote_count": 8
+   },
+   {
+    "file_path": "/8L3u9DhzJUpGA65mrnBxxGyTudt.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.562,
+    "vote_count": 8
+   },
+   {
+    "file_path": "/4wtuXhDpvJRWDk03g8YLqtTUzRo.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.562,
+    "vote_count": 8
+   },
+   {
+    "file_path": "/irsdBEZxSgrs7YPDDCW9cB133VW.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.434,
+    "vote_count": 5
+   },
+   {
+    "file_path": "/beJK9Fpw9XZh2uaUmBnQT0zGH1l.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.434,
+    "vote_count": 5
+   },
+   {
+    "file_path": "/oJAIozGRYt8htcvqix6c5Ghv5Ck.jpg",
+    "iso_639_1": null,
+    "width": 3200,
+    "height": 1800,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.434,
+    "vote_count": 5
+   },
+   {
+    "file_path": "/8R07VhsX2P6ZcncX9UpXlRHNte.jpg",
+    "iso_639_1": null,
+    "width": 3000,
+    "height": 1688,
+    "aspect_ratio": 1.777,
+    "vote_average": 1.434,
+    "vote_count": 5
+   },
+   {
+    "file_path": "/oE8mGiWsP9UY9p5gj6tP1WOlbV0.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.434,
+    "vote_count": 5
+   },
+   {
+    "file_path": "/t4kGpjNVfEOHfipICznA5Y10QKI.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.434,
+    "vote_count": 5
+   },
+   {
+    "file_path": "/boa1EqhJ0g3n9ugrMeDQZTjtypm.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/x4nH6X9rV6msf3rqT2CJaMlYFME.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/qtfzjj2xrogers7i3eidM06AGeI.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/vJGgox2d4HWmm3icilCytCC6RCR.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/lDgLCaY8WMbb1V1mBmXfxjqq6uT.jpg",
+    "iso_639_1": null,
+    "width": 2048,
+    "height": 1152,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/qNHSIt6JAvjs76xcJUMd19aKYrL.jpg",
+    "iso_639_1": null,
+    "width": 3598,
+    "height": 2024,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/7bBBIBtWkHItzTmacaZ9XioeS3e.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/AfCzlGSn5LaaCbpvgP9jOJDU1M8.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/6tvykfnmrzjp9lCpLMvUKyC93sq.jpg",
+    "iso_639_1": null,
+    "width": 2844,
+    "height": 1600,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/1Vbs1O9UCHG8BjUYppo4DSmHwNC.jpg",
+    "iso_639_1": null,
+    "width": 3822,
+    "height": 2150,
+    "aspect_ratio": 1.778,
+    "vote_average": 1.066,
+    "vote_count": 5
+   },
+   {
+    "file_path": "/t1Fiqc3jlEuyMkheU49EoqCPKG7.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.958,
+    "vote_count": 4
+   },
+   {
+    "file_path": "/A4hrthPHGZWTfYN506IEYfGuJ7D.jpg",
+    "iso_639_1": "en",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/qU7EQna3n2NB3kxyPid4OynphVT.jpg",
+    "iso_639_1": null,
+    "width": 1980,
+    "height": 1114,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/iLYkwQMQbxTR6GUSSV7toIn7pfN.jpg",
+    "iso_639_1": null,
+    "width": 2000,
+    "height": 1125,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/4ZRUPoblB86AJaJZ8RdhRPlhzVA.jpg",
+    "iso_639_1": null,
+    "width": 3598,
+    "height": 2024,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/1or39DewHOkBiSFERlmMs4hoKQt.jpg",
+    "iso_639_1": null,
+    "width": 3598,
+    "height": 2024,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/8mYqFuycp23QafrO3SoUe4ahxHI.jpg",
+    "iso_639_1": null,
+    "width": 3051,
+    "height": 1716,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/oePvgygDchZaeauzgKYQtreP03l.jpg",
+    "iso_639_1": null,
+    "width": 3598,
+    "height": 2024,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/kki54TZiYQnPa7CpGPIZJMhmKy5.jpg",
+    "iso_639_1": null,
+    "width": 1814,
+    "height": 1020,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/nMlz33c7jrNZeFJwPNeqMpeSawr.jpg",
+    "iso_639_1": null,
+    "width": 3200,
+    "height": 1800,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/hhx0uslH9mxI3qJabTydrDzFugr.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/1lBRUpJdyQaiUdqqPRjNrjk1bOX.jpg",
+    "iso_639_1": "en",
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/gwTaQbGVl1qiHCSkeEKu6lr0ata.jpg",
+    "iso_639_1": "en",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/kknP5y6QRuypQHkjSyEhqXnns1q.jpg",
+    "iso_639_1": "ru",
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/pku1sSyHfDDA4GptqGfcvCH6U1T.jpg",
+    "iso_639_1": "en",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/qpRFUaO6w7nz6RJpOMCqkzZzIdc.jpg",
+    "iso_639_1": null,
+    "width": 2023,
+    "height": 1138,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/bdejpJb9Qi9pkJ1N9CPKAzu9IiQ.jpg",
+    "iso_639_1": null,
+    "width": 1873,
+    "height": 1054,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/5ZhEJV4AZwD7ZB4HnvFAKJKdT72.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/6RgKyGnXPfVqbJQzX3AkvHhXFsq.jpg",
+    "iso_639_1": null,
+    "width": 1909,
+    "height": 1074,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/tFC6hbmwkqBEOfnZK1cyBRCajMB.jpg",
+    "iso_639_1": null,
+    "width": 2560,
+    "height": 1440,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/2dS5bMwSrkeAWpGNrfa8wzGU9Ts.jpg",
+    "iso_639_1": "en",
+    "width": 2560,
+    "height": 1440,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/v5um9ZTzzE65F9hlzAfa7VZWpHf.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/yQVR9qIBcY6rko9HwpXtAgbev89.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/sKH4OkNhu26JcIwcluOrw1zQfBl.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/pXJXC8d2XZJ1UDCbzcF5vmSnEe3.jpg",
+    "iso_639_1": null,
+    "width": 2517,
+    "height": 1416,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/6qoibtt2NhSawynDRKiy08AoHLw.jpg",
+    "iso_639_1": null,
+    "width": 2235,
+    "height": 1257,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/2mZlpZXvMJ8umYLNeXn3vq1qi3.jpg",
+    "iso_639_1": null,
+    "width": 2242,
+    "height": 1262,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/veDUzNnrWaBfsah6lQoTOgqibu1.jpg",
+    "iso_639_1": null,
+    "width": 2247,
+    "height": 1264,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/sh9DOKUMIAZM9CSg9rR0pHjTV91.jpg",
+    "iso_639_1": null,
+    "width": 2261,
+    "height": 1272,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/ieOJdyqflKHW7HGq9OvyYj1Gxos.jpg",
+    "iso_639_1": null,
+    "width": 2240,
+    "height": 1260,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/6IpJKMchmjDeJqnu4HjM8FrrAR9.jpg",
+    "iso_639_1": null,
+    "width": 2234,
+    "height": 1255,
+    "aspect_ratio": 1.78,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/6OsZOKu1hfslnwkah4TFuOZfNPC.jpg",
+    "iso_639_1": null,
+    "width": 2242,
+    "height": 1262,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/dPJy5ZXR9N3fR11u3mGTgJu3FlR.jpg",
+    "iso_639_1": null,
+    "width": 2247,
+    "height": 1264,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/aOhrTYZLqvEz2mTLSOEAquGSKpn.jpg",
+    "iso_639_1": null,
+    "width": 2495,
+    "height": 1403,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/dBDXZmgjHw7i0XJbHKpxu7yDCZJ.jpg",
+    "iso_639_1": null,
+    "width": 2247,
+    "height": 1264,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/nv7yfVUp2mHEThcS2QBj4ceAi18.jpg",
+    "iso_639_1": null,
+    "width": 2482,
+    "height": 1397,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/cWcVJgfPemcIvys2dQelZg0XiWl.jpg",
+    "iso_639_1": null,
+    "width": 2487,
+    "height": 1398,
+    "aspect_ratio": 1.779,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/k6fDJ3ZG5CatPKH8Vq4qEFlYtAL.jpg",
+    "iso_639_1": null,
+    "width": 2240,
+    "height": 1260,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/4n88Op2DCKOwF3GwPkABFKMo1oD.jpg",
+    "iso_639_1": null,
+    "width": 2496,
+    "height": 1404,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/8MwjMToCENly4y0hrYHCO3JduHr.jpg",
+    "iso_639_1": null,
+    "width": 2487,
+    "height": 1398,
+    "aspect_ratio": 1.779,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/n2YZmdg6xOESWuX2m8XTeGgPCOq.jpg",
+    "iso_639_1": null,
+    "width": 2503,
+    "height": 1408,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/iPOJvxJblmfL4RtAIUdQBQuIfIL.jpg",
+    "iso_639_1": null,
+    "width": 2480,
+    "height": 1395,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/iUMopoMZ4s16cLQj0WGlZVgAQu8.jpg",
+    "iso_639_1": null,
+    "width": 2222,
+    "height": 1250,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/rRjwE2abjbCDwGpismuGyQUmhTA.jpg",
+    "iso_639_1": null,
+    "width": 2501,
+    "height": 1407,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/6VZMzk33WbWf1oEtY0zO0Q8n17a.jpg",
+    "iso_639_1": null,
+    "width": 2501,
+    "height": 1407,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/kxKPvLQ3LdNtwnUZIVzwqXMTtrE.jpg",
+    "iso_639_1": null,
+    "width": 2487,
+    "height": 1399,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/jRnEdrDA3LqcD6AcfyzoY2igmtM.jpg",
+    "iso_639_1": null,
+    "width": 2495,
+    "height": 1402,
+    "aspect_ratio": 1.78,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/1wg5XLcWR7IOmRKWA6sYkkbnBnz.jpg",
+    "iso_639_1": null,
+    "width": 2482,
+    "height": 1397,
+    "aspect_ratio": 1.777,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/vbtPFhnquMOczNMUS2QMxg3f1Q6.jpg",
+    "iso_639_1": null,
+    "width": 2495,
+    "height": 1403,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/d8wAEKfU4L1CZ8P2aVzknNIVxcr.jpg",
+    "iso_639_1": "en",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/oMHGcZJgWACGT8Ej26jEYHvXNXa.jpg",
+    "iso_639_1": "en",
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/gj6i5XPFUXklKO5UP8DFb6BsTAy.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/bT0BdOU8ECT3FRsX9wvaT2omkqA.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/dJDVGaE1Dup6h9OidFkCBVqaB18.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/iU5FI5YzgyEfIXUzRgVC10YpZt1.jpg",
+    "iso_639_1": null,
+    "width": 1280,
+    "height": 720,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/8wXrz17G8yWRlNmbY9ZK0Oe0iF7.jpg",
+    "iso_639_1": null,
+    "width": 1672,
+    "height": 940,
+    "aspect_ratio": 1.779,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/8grgcXoRBm22tPPjXjJap5IIb4N.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/tT6vqeSCLvqF8B9HY2lXMFxbMp4.jpg",
+    "iso_639_1": null,
+    "width": 1422,
+    "height": 800,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/ebZ78opH9WmbntBOAcv5TgU5hQ7.jpg",
+    "iso_639_1": null,
+    "width": 1422,
+    "height": 800,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/ft15em0A2doshx3aRURcidPA92c.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/ydRhtzVaBUV0CSb4BeE1MrgfdAJ.jpg",
+    "iso_639_1": null,
+    "width": 3840,
+    "height": 2160,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/mvV8Qw11QlIUdsx2vFpgXdESYir.jpg",
+    "iso_639_1": null,
+    "width": 2098,
+    "height": 1180,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/wUa8bNABLuVGwpHNvabbsspbcOT.jpg",
+    "iso_639_1": null,
+    "width": 1421,
+    "height": 799,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/upxFQGcg77BFX8UBTSDdRe4Ldkm.jpg",
+    "iso_639_1": null,
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio": 1.778,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ],
+  "logos": [
+   {
+    "file_path": "/eYvF1LhPKuoBxOAmWjFTAK7EPWl.png",
+    "iso_639_1": "en",
+    "width": 4319,
+    "height": 1299,
+    "aspect_ratio": 3.325,
+    "vote_average": 4.3,
+    "vote_count": 10
+   },
+   {
+    "file_path": "/gOWf4IYBP2m1Q7dhbQJkwxH714x.png",
+    "iso_639_1": "en",
+    "width": 4309,
+    "height": 919,
+    "aspect_ratio": 4.689,
+    "vote_average": 4.3,
+    "vote_count": 10
+   },
+   {
+    "file_path": "/ofo16Av8ssvqmGauI2kZsdiBbm2.png",
+    "iso_639_1": "en",
+    "width": 4616,
+    "height": 919,
+    "aspect_ratio": 5.023,
+    "vote_average": 3.334,
+    "vote_count": 2
+   },
+   {
+    "file_path": "/7j3nPn9CMYctl1KVcwBxVAu6vb1.png",
+    "iso_639_1": "en",
+    "width": 1113,
+    "height": 174,
+    "aspect_ratio": 6.397,
+    "vote_average": 1.222,
+    "vote_count": 3
+   },
+   {
+    "file_path": "/4P6qEkapgHJX8GacULkasiCpWK3.png",
+    "iso_639_1": "en",
+    "width": 1163,
+    "height": 250,
+    "aspect_ratio": 4.652,
+    "vote_average": 0.166,
+    "vote_count": 1
+   },
+   {
+    "file_path": "/uo5HZB1p4mvDqJq59wENcOcjvpR.png",
+    "iso_639_1": "ru",
+    "width": 1234,
+    "height": 232,
+    "aspect_ratio": 5.319,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/nSlDpQR8YaBuhA5GpGuPwIJ2amt.png",
+    "iso_639_1": "en",
+    "width": 1217,
+    "height": 241,
+    "aspect_ratio": 5.05,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/gQcmwjDCbTJ3KFyKzZVgtIxVyyj.png",
+    "iso_639_1": "ru",
+    "width": 4315,
+    "height": 786,
+    "aspect_ratio": 5.49,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/noOFaqX18Oe1jFy0ZMrjiwAeF.png",
+    "iso_639_1": "en",
+    "width": 1113,
+    "height": 174,
+    "aspect_ratio": 6.397,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/9IvqwJi7ASlixeYs4aIcJvNGG5H.png",
+    "iso_639_1": "ru",
+    "width": 4251,
+    "height": 787,
+    "aspect_ratio": 5.402,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/xQTqVZ9TbdG1SV9d5FO7CcP7rF0.png",
+    "iso_639_1": "ru",
+    "width": 4315,
+    "height": 607,
+    "aspect_ratio": 7.109,
+    "vote_average": 0.0,
+    "vote_count": 0
+   },
+   {
+    "file_path": "/n7VgUsDxUHyulVe37lkj6c0jxqH.png",
+    "iso_639_1": "ru",
+    "width": 3840,
+    "height": 600,
+    "aspect_ratio": 6.4,
+    "vote_average": 0.0,
+    "vote_count": 0
+   }
+  ]
+ },
+ "videos": {
+  "results": [
+   {
+    "key": "oOKHVtgPJ00",
+    "name": "In IMAX One Week Only - Tickets On Sale Now",
+    "site": "YouTube",
+    "type": "Teaser",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2026-10-30T16:00:31.000Z"
+   },
+   {
+    "key": "RT3zGuKkf7M",
+    "name": "Timothée Chalamet & Zendaya Spice Harvester Attack - Movie Clip",
+    "site": "YouTube",
+    "type": "Clip",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2026-03-13T12:01:01.000Z"
+   },
+   {
+    "key": "8kopgAy4fwY",
+    "name": "Rise of the Fremen Leader",
+    "site": "YouTube",
+    "type": "Clip",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2025-12-05T15:43:26.000Z"
+   },
+   {
+    "key": "WXFHNM-RuG8",
+    "name": "Paul Atreides Tries Riding A Sandworm",
+    "site": "YouTube",
+    "type": "Clip",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2025-03-21T23:00:32.000Z"
+   },
+   {
+    "key": "N_7lkWezncY",
+    "name": "'Dune: Part Two' Best Visual Effects Press Room Speech | 97th Oscars (2025)",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2025-03-03T03:22:42.000Z"
+   },
+   {
+    "key": "RaTTZKYn-ZI",
+    "name": "'Dune: Part Two' Best Sound Press Room | 97th Oscars (2025)",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2025-03-03T03:06:43.000Z"
+   },
+   {
+    "key": "yi0IIh1ibl8",
+    "name": "Dune: Part Two wins the BAFTA for Special Visual Effects | BAFTA Film Awards 2025",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2025-02-17T22:15:04.000Z"
+   },
+   {
+    "key": "UZoUlPAvigw",
+    "name": "The BAFTA for Sound goes to Dune: Part Two| BAFTA Film Awards 2025",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2025-02-17T11:54:54.000Z"
+   },
+   {
+    "key": "0TnNCpc5ld8",
+    "name": "'Dune: Part Two' | Scene at The Academy",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2025-01-23T16:00:06.000Z"
+   },
+   {
+    "key": "QzQynLEyzKA",
+    "name": "Scene Breakdown with Denis Villeneuve",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-11-15T18:02:00.000Z"
+   },
+   {
+    "key": "StUhbus2_N4",
+    "name": "Creating The Costumes of Dune",
+    "site": "YouTube",
+    "type": "Behind the Scenes",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-06-07T14:00:22.000Z"
+   },
+   {
+    "key": "yeBx9D8SQw8",
+    "name": "Becoming Feyd",
+    "site": "YouTube",
+    "type": "Behind the Scenes",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-05-31T14:00:46.000Z"
+   },
+   {
+    "key": "SFQpQTrtSEc",
+    "name": "Feyd-Rautha's Birthday Fight",
+    "site": "YouTube",
+    "type": "Clip",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-05-24T20:00:10.000Z"
+   },
+   {
+    "key": "3RmCS8s4i7I",
+    "name": "Buzz Around the New Thopter",
+    "site": "YouTube",
+    "type": "Behind the Scenes",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-05-24T14:00:02.000Z"
+   },
+   {
+    "key": "guIe_DtD2Wk",
+    "name": "Finding the Worlds of Dune",
+    "site": "YouTube",
+    "type": "Behind the Scenes",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-05-17T14:00:38.000Z"
+   },
+   {
+    "key": "lXg_fpfAlaE",
+    "name": "Zendaya, Timothée Chalamet, & The Cast Of Dune: Part Two Q&A",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-05-16T23:00:32.000Z"
+   },
+   {
+    "key": "DMNQ5HWQ1aU",
+    "name": "An Ensemble for the Ages",
+    "site": "YouTube",
+    "type": "Behind the Scenes",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-05-10T14:00:19.000Z"
+   },
+   {
+    "key": "76GrBO7sYec",
+    "name": "Deeper into the Desert: The Sounds of the Dune",
+    "site": "YouTube",
+    "type": "Behind the Scenes",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-05-03T14:00:05.000Z"
+   },
+   {
+    "key": "29zQBzteAh0",
+    "name": "Filmbooks: Water",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-04-26T14:00:02.000Z"
+   },
+   {
+    "key": "Faioi9RAoFE",
+    "name": "Filmbooks: The Reverend Mother",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-04-19T14:00:19.000Z"
+   },
+   {
+    "key": "rJxVPQRrRxc",
+    "name": "10 Minute Preview",
+    "site": "YouTube",
+    "type": "Clip",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-04-15T12:07:27.000Z"
+   },
+   {
+    "key": "J-GWW9LIOb0",
+    "name": "Filmbooks: House Corrino",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-04-09T14:00:19.000Z"
+   },
+   {
+    "key": "6czYOLR3tBg",
+    "name": "'Dune: Part Two' with Denis Villeneuve & more filmmakers | Academy Conversations",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-03-29T16:00:07.000Z"
+   },
+   {
+    "key": "p-4Xgcuwb00",
+    "name": "Vision ASMR",
+    "site": "YouTube",
+    "type": "Teaser",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-03-21T18:52:42.000Z"
+   },
+   {
+    "key": "2PnXSny-FkY",
+    "name": "Remain",
+    "site": "YouTube",
+    "type": "Teaser",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-03-21T18:52:38.000Z"
+   },
+   {
+    "key": "Xq6OPXGEzBo",
+    "name": "This or That",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-03-08T07:57:42.000Z"
+   },
+   {
+    "key": "tQucjg4-Q6M",
+    "name": "\"#1 Movie in the World\" - Now Playing",
+    "site": "YouTube",
+    "type": "Teaser",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-03-05T17:52:20.000Z"
+   },
+   {
+    "key": "N4StKUrf2ig",
+    "name": "Denis Villeneuve on Dune: Part Two",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-03-05T15:31:45.000Z"
+   },
+   {
+    "key": "asTOTXj5AtI",
+    "name": "Director Denis Villenueve talks Dune Part Two",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": false,
+    "published_at": "2024-03-01T21:16:46.000Z"
+   },
+   {
+    "key": "vVPUM0QNK4M",
+    "name": "\"A Remarkable Achievement\" - Now Playing",
+    "site": "YouTube",
+    "type": "Teaser",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-03-01T18:07:22.000Z"
+   },
+   {
+    "key": "un3uQ22WOCk",
+    "name": "Behind-the-Scenes Featurette",
+    "site": "YouTube",
+    "type": "Behind the Scenes",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-02-29T17:06:10.000Z"
+   },
+   {
+    "key": "xvKsRp_tkQs",
+    "name": "Love Dune More at Dolby Cinema",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": false,
+    "published_at": "2024-02-28T14:38:16.000Z"
+   },
+   {
+    "key": "xwYNVhFJyYk",
+    "name": "\"The Best Cast Assembled\" - Tickets on Sale Now",
+    "site": "YouTube",
+    "type": "Teaser",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-02-22T22:10:29.000Z"
+   },
+   {
+    "key": "B3nTuXYxUto",
+    "name": "Destiny Featurette",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-02-19T16:40:56.000Z"
+   },
+   {
+    "key": "gCqJEd6CftI",
+    "name": "IMAX Behind the Frame Clip",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-02-18T04:00:17.000Z"
+   },
+   {
+    "key": "fT4O8mbD7g0",
+    "name": "World Premiere",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-02-16T17:29:09.000Z"
+   },
+   {
+    "key": "2-5KCpEhHho",
+    "name": "In Conversation With Nolan & Villeneuve | IMAX® Behind the Frame",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-02-09T20:00:08.000Z"
+   },
+   {
+    "key": "VC7-OcFvVEw",
+    "name": "Extended Sneak Preview",
+    "site": "YouTube",
+    "type": "Clip",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-02-08T22:27:54.000Z"
+   },
+   {
+    "key": "FfN_duZkntw",
+    "name": "Austin Butler is Feyd-Rautha",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-02-01T02:31:32.000Z"
+   },
+   {
+    "key": "EfLtStz19r0",
+    "name": "Florence Pugh is Princess Irulan",
+    "site": "YouTube",
+    "type": "Featurette",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-01-30T18:08:49.000Z"
+   },
+   {
+    "key": "VHa103ITb68",
+    "name": "Rise",
+    "site": "YouTube",
+    "type": "Teaser",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-01-29T00:00:12.000Z"
+   },
+   {
+    "key": "0QPxaoGh19I",
+    "name": "Heart",
+    "site": "YouTube",
+    "type": "Teaser",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-01-28T20:49:35.000Z"
+   },
+   {
+    "key": "136rl6tckGg",
+    "name": "Tickets on Sale Now",
+    "site": "YouTube",
+    "type": "Teaser",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2024-01-26T17:16:35.000Z"
+   },
+   {
+    "key": "42RV2e1GyzM",
+    "name": "Дюна: Часть вторая",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "ru",
+    "official": false,
+    "published_at": "2023-12-14T10:08:36.000Z"
+   },
+   {
+    "key": "U2Qp5pL3ovA",
+    "name": "Official Trailer 3",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2023-12-12T17:00:20.000Z"
+   },
+   {
+    "key": "_YUzQa_1RCE",
+    "name": "Official Trailer 2",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2023-06-29T16:00:24.000Z"
+   },
+   {
+    "key": "Way9Dexny3w",
+    "name": "Official Trailer",
+    "site": "YouTube",
+    "type": "Trailer",
+    "iso_639_1": "en",
+    "official": true,
+    "published_at": "2023-05-02T15:06:46.000Z"
+   }
+  ]
+ },
+ "credits": {
+  "cast": [
+   {
+    "name": "Тимоти Шаламе",
+    "profile_path": "/dFxpwRpmzpVfP1zjluH68DeQhyj.jpg",
+    "character": "Paul Atreides"
+   },
+   {
+    "name": "Зендея",
+    "profile_path": "/1qup8tSt95HLbcy2c2xrx4iJNxv.jpg",
+    "character": "Chani"
+   },
+   {
+    "name": "Ребекка Фергюсон",
+    "profile_path": "/ty8ZPzaCBBlqIr5qzpOXI24iC8j.jpg",
+    "character": "Jessica"
+   },
+   {
+    "name": "Хавьер Бардем",
+    "profile_path": "/zfRID0jx8DKBluPGU9xtk9sZWUt.jpg",
+    "character": "Stilgar"
+   },
+   {
+    "name": "Джош Бролин",
+    "profile_path": "/7QpneI3HoZCCDVPyWx3p3t7yeo7.jpg",
+    "character": "Gurney Halleck"
+   },
+   {
+    "name": "Остин Батлер",
+    "profile_path": "/atdAs4pFGjUQ4m2W8kJYly7N6cC.jpg",
+    "character": "Feyd-Rautha"
+   },
+   {
+    "name": "Флоренс Пью",
+    "profile_path": "/2URrZb95t3kY6pLroKny3Enmabp.jpg",
+    "character": "Princess Irulan"
+   },
+   {
+    "name": "Дейв Батиста",
+    "profile_path": "/snk6JiXOOoRjPtHU5VMoy6qbd32.jpg",
+    "character": "Beast Rabban"
+   },
+   {
+    "name": "Кристофер Уокен",
+    "profile_path": "/ApgDL7nudR9T2GpjCG4vESgymO2.jpg",
+    "character": "Emperor"
+   },
+   {
+    "name": "Леа Сейду",
+    "profile_path": "/4q6xqqWLLleQrFjeqeYYV8B0fwE.jpg",
+    "character": "Lady Margot Fenring"
+   },
+   {
+    "name": "Стеллан Скарсгард",
+    "profile_path": "/mW7xmtGV4y79kQGn0zkKVGDMAmw.jpg",
+    "character": "Baron Harkonnen"
+   },
+   {
+    "name": "Шарлотта Рэмплинг",
+    "profile_path": "/7fhg5FCcl0VfYERP5D0unpybqgx.jpg",
+    "character": "Reverend Mother Mohiam"
+   },
+   {
+    "name": "Сухейла Якуб",
+    "profile_path": "/A233BHgXw0dzbeOpvHfJwL9gLy1.jpg",
+    "character": "Shishakli"
+   },
+   {
+    "name": "Роджер Йуан",
+    "profile_path": "/jHdxbT6n3ToYKw0DVFIUkva86SO.jpg",
+    "character": "Lanville"
+   },
+   {
+    "name": "Бабс Олусанмокун",
+    "profile_path": "/bqycmpUrpISeLzQniiYwAZ5X1RN.jpg",
+    "character": "Jamis"
+   },
+   {
+    "name": "Элисон Холстед",
+    "profile_path": "/zeMEPKMCDyVXvxGr6LeBLeZ9PdZ.jpg",
+    "character": "Maker Keeper"
+   },
+   {
+    "name": "Джуси Мерли",
+    "profile_path": "/90lHFn3PUJdoHHzcYRS2Ky1gbyi.jpg",
+    "character": "Reverend Mother Ramallo"
+   },
+   {
+    "name": "Кейт Тенисон",
+    "profile_path": "/1FwuNqLpXntCNPaxmWr48BnphdB.jpg",
+    "character": "Bene Gesserit Sister"
+   },
+   {
+    "name": "Тара Бретнах",
+    "profile_path": "/Ats6HnzudW0GehRntVvAVxPCcRO.jpg",
+    "character": "Bene Gesserit Sister"
+   },
+   {
+    "name": "Акико Хитоми",
+    "profile_path": "/3TMlP0tBoTjfls2UIPfj22zFtLI.jpg",
+    "character": "Bene Gesserit Sister"
+   },
+   {
+    "name": "Имола Гаспар",
+    "profile_path": "/ezCLIB3QdzxbAXjBM41DwqcPCV5.jpg",
+    "character": "Watermaster"
+   },
+   {
+    "name": "Элисон Аднет",
+    "profile_path": "/jVXfD9nhCDm8tZrEPk5qwDYAJ1h.jpg",
+    "character": "Young Fremen Patrol"
+   },
+   {
+    "name": "Хамза Байса",
+    "profile_path": "/u6AYgG3gu7VpejhvroniRee7e07.jpg",
+    "character": "Young Fremen Patrol"
+   },
+   {
+    "name": "Хассан Наджиб",
+    "profile_path": "/fWzMV4Xa9tJqkfII6jYU9qFfENe.jpg",
+    "character": "Young Fremen Patrol"
+   },
+   {
+    "name": "Джаспер Райан-Кейтер",
+    "profile_path": "/fWUnpcn1sgkHwmX5eO4y2LGYLap.jpg",
+    "character": "Young Fremen Patrol"
+   },
+   {
+    "name": "Омар Эльбуз",
+    "profile_path": null,
+    "character": "Young Fremen Patrol"
+   },
+   {
+    "name": "Абделькарим Хусейн Сели Мохамед Хасанин",
+    "profile_path": null,
+    "character": "Young Fremen Patrol"
+   },
+   {
+    "name": "Джозеф Бедделем",
+    "profile_path": "/3huFmzh7t8mQvDte7GK3s5Aiuiv.jpg",
+    "character": "Fedaykin Leader"
+   },
+   {
+    "name": "Хавьер Альба Ройо",
+    "profile_path": "/fSsgu5dUOppKaqi2Jq7NX56VvZU.jpg",
+    "character": "Fedaykin"
+   },
+   {
+    "name": "Рашид Аббад",
+    "profile_path": null,
+    "character": "Fedaykin"
+   }
+  ],
+  "crew": [
+   {
+    "name": "Дени Вильнёв",
+    "job": "Director"
+   }
+  ]
+ },
+ "release_dates": {
+  "results": [
+   {
+    "iso_3166_1": "RU",
+    "release_dates": [
+     {
+      "certification": ""
+     }
+    ]
+   },
+   {
+    "iso_3166_1": "US",
+    "release_dates": [
+     {
+      "certification": "PG-13"
+     },
+     {
+      "certification": "PG-13"
+     },
+     {
+      "certification": "PG-13"
+     },
+     {
+      "certification": "PG-13"
+     },
+     {
+      "certification": "PG-13"
+     },
+     {
+      "certification": "PG-13"
+     }
+    ]
+   }
+  ]
+ },
+ "recommendations": {
+  "results": [
+   {
+    "id": 438631,
+    "media_type": "movie",
+    "title": "Дюна",
+    "release_date": "2021-09-15",
+    "poster_path": "/3hbXNclcHaj5KiF6kK41GBMjyFr.jpg",
+    "backdrop_path": "/qVgZu5BTx6pu4owCvVOm4zjTfOi.jpg",
+    "adult": false
+   },
+   {
+    "id": 841,
+    "media_type": "movie",
+    "title": "Дюна",
+    "release_date": "1984-12-14",
+    "poster_path": "/ushxXCt5RAXtBFGrpMxiz5n6d3L.jpg",
+    "backdrop_path": "/5wJ2tckpvwcxGCAgZiccodwEJpf.jpg",
+    "adult": false
+   },
+   {
+    "id": 1895,
+    "media_type": "movie",
+    "title": "Звёздные войны: Эпизод 3 - Месть Ситхов",
+    "release_date": "2005-05-17",
+    "poster_path": "/lzwn2MMlUybAoV5G2tbjJo6dGeg.jpg",
+    "backdrop_path": "/5vDuLrjJXFS9PTF7Q1xzobmYKR9.jpg",
+    "adult": false
+   },
+   {
+    "id": 412656,
+    "media_type": "movie",
+    "title": "Поступь хаоса",
+    "release_date": "2021-02-24",
+    "poster_path": "/nKik625zZGwj7zniLH3uTgIeekC.jpg",
+    "backdrop_path": "/qCPLtXrTB10UsgAFxsWOB44gDPu.jpg",
+    "adult": false
+   },
+   {
+    "id": 299687,
+    "media_type": "movie",
+    "title": "5-я волна",
+    "release_date": "2016-01-14",
+    "poster_path": "/5ngef6vRYcn55NixtJAfK2JTDxY.jpg",
+    "backdrop_path": "/rtjZeFESiaRFOj0cwHiNV382flB.jpg",
+    "adult": false
+   },
+   {
+    "id": 9543,
+    "media_type": "movie",
+    "title": "Принц Персии: Пески времени",
+    "release_date": "2010-05-19",
+    "poster_path": "/bWKddjnlp2yF6zjy9kopvuUClk4.jpg",
+    "backdrop_path": "/iP0capCU4w5nxCDl398CH7yR1r9.jpg",
+    "adult": false
+   },
+   {
+    "id": 559,
+    "media_type": "movie",
+    "title": "Человек-паук 3: Враг в отражении",
+    "release_date": "2007-05-01",
+    "poster_path": "/ngNCHBZgNdbGisLbi1hImGh2SHl.jpg",
+    "backdrop_path": "/FfAU0PUs8AJkMU2VbkVNFtRXR4.jpg",
+    "adult": false
+   },
+   {
+    "id": 188927,
+    "media_type": "movie",
+    "title": "Стартрек: Бесконечность",
+    "release_date": "2016-07-07",
+    "poster_path": "/mkcP3g7XwmXT3fznyBfvGDcPgjA.jpg",
+    "backdrop_path": "/nkr43pY7ZzUt9b0kDFwJLVuDP8G.jpg",
+    "adult": false
+   },
+   {
+    "id": 294254,
+    "media_type": "movie",
+    "title": "Бегущий в лабиринте: Испытание огнём",
+    "release_date": "2015-09-09",
+    "poster_path": "/tA3uIM8dnZqwJnFyR9A7zLE5Wd1.jpg",
+    "backdrop_path": "/4mcOCiR06dqQ5eoEJcG3zvonjOa.jpg",
+    "adult": false
+   },
+   {
+    "id": 127585,
+    "media_type": "movie",
+    "title": "Люди Икс: Дни минувшего будущего",
+    "release_date": "2014-05-15",
+    "poster_path": "/9IdeGyzRZH66RgNq9zSZDwPPllg.jpg",
+    "backdrop_path": "/3czpqXzFy5UcNuD1AubecRLWkwD.jpg",
+    "adult": false
+   },
+   {
+    "id": 80274,
+    "media_type": "movie",
+    "title": "Игра Эндера",
+    "release_date": "2013-10-24",
+    "poster_path": "/cALA0dPggJOUiX9r0bHAAIt1X90.jpg",
+    "backdrop_path": "/zWvOs6lepfOI0dPa1ANVcdbkBuY.jpg",
+    "adult": false
+   },
+   {
+    "id": 447365,
+    "media_type": "movie",
+    "title": "Стражи Галактики. Часть 3",
+    "release_date": "2023-05-03",
+    "poster_path": "/mz7lPfNOLOWDKoz625tFgNcSPVi.jpg",
+    "backdrop_path": "/5YZbUmjbMa3ClvSW1Wj3D6XGolb.jpg",
+    "adult": false
+   },
+   {
+    "id": 262504,
+    "media_type": "movie",
+    "title": "Дивергент, глава 3: За стеной",
+    "release_date": "2016-03-09",
+    "poster_path": "/afn26Axrs3We3bQMfH8Gyaxjd6i.jpg",
+    "backdrop_path": "/qSP072apfe2EEcd5Qg9vGYy2OLw.jpg",
+    "adult": false
+   },
+   {
+    "id": 81005,
+    "media_type": "movie",
+    "title": "Джек - покоритель великанов",
+    "release_date": "2013-02-27",
+    "poster_path": "/bPBxZc3sHJzrQn7XweFFidzPsV8.jpg",
+    "backdrop_path": "/djSAd6HUm66eVNC3PiZbYwOpD5A.jpg",
+    "adult": false
+   },
+   {
+    "id": 181812,
+    "media_type": "movie",
+    "title": "Звёздные войны: Эпизод 9 - Скайуокер. Восход",
+    "release_date": "2019-12-18",
+    "poster_path": "/6uU4zk1AMZX3j9Mfl9Oy1ALXXzW.jpg",
+    "backdrop_path": "/auJKGst3vXpJozHZh4nMFs0xWIU.jpg",
+    "adult": false
+   },
+   {
+    "id": 1258151,
+    "media_type": "movie",
+    "title": "Кракен",
+    "release_date": "2025-04-17",
+    "poster_path": "/3Kq0lXKXDlqjIcRjkisqNDrkf2z.jpg",
+    "backdrop_path": "/xWYGs7o0lExX7XzdwyCFLZJ5C1L.jpg",
+    "adult": false
+   },
+   {
+    "id": 839033,
+    "media_type": "movie",
+    "title": "Властелин Колец: Война Рохирримов",
+    "release_date": "2024-12-05",
+    "poster_path": "/8V1AeHorTP4SnL8GvpR6cobRDxD.jpg",
+    "backdrop_path": "/ie8OSgIHEl6yQiGJ90dsyBWOpQA.jpg",
+    "adult": false
+   },
+   {
+    "id": 121,
+    "media_type": "movie",
+    "title": "Властелин колец: Две крепости",
+    "release_date": "2002-12-18",
+    "poster_path": "/fl7QZlAoZ4MLcxvgOaBjeUxlpQt.jpg",
+    "backdrop_path": "/6G73mNyooWAEQTpckPSnFxFoNmc.jpg",
+    "adult": false
+   },
+   {
+    "id": 517096,
+    "media_type": "movie",
+    "title": "Вратарь Галактики",
+    "release_date": "2020-08-27",
+    "poster_path": "/1AkgB1GoseuOB0i14uC185oqmCz.jpg",
+    "backdrop_path": "/egonBOHhHBhXiigeiNth2x1YSTm.jpg",
+    "adult": false
+   },
+   {
+    "id": 72710,
+    "media_type": "movie",
+    "title": "Гостья",
+    "release_date": "2013-03-22",
+    "poster_path": "/noUzGpOToyNLckAthhy1koLQh94.jpg",
+    "backdrop_path": "/1bDa2d9VqqBQlk42Gduu37Rz1ob.jpg",
+    "adult": false
+   }
+  ]
+ }
+}
