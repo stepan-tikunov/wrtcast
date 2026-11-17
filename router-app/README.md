@@ -65,6 +65,16 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
   сохранённых (закладка закрашивается). Сохранённые хранит роутер
   (`/api/save`). Сохранение сериала запускает разметку серии, с которой его
   начнут смотреть (см. «Повтор, заставка и титры»).
+- У сериалов на главной и на страницах секций внизу постера — значок
+  (`/api/updates`, дорисовывается после карточек): «Новая серия» акцентом,
+  если последняя открытая серия досмотрена, а у провайдера после неё есть
+  серия, появившаяся там уже после того, как роутер впервые увидел этот
+  сериал (так не отмечаются серии, которые просто давно не смотрели); иначе
+  тёмный «16 янв» — когда TMDB ждёт следующую серию идущего сериала.
+  Пока тайтл на телевизоре, вместо значка — «На ТВ». На странице такого
+  сериала над описанием — «Вышла новая серия» с той серией, с которой
+  продолжит кнопка запуска. Если провайдер не успел ответить обо всех
+  сериалах, значки запрашиваются ещё раз через 20 с.
 - Поиск сверху показывает вместо истории результаты. Крестик справа в
   строке (или стёртый запрос) возвращает историю. Поиск не сохраняется
   между загрузками. Карточка того, что сейчас на телевизоре, помечена
@@ -259,6 +269,7 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
 | `GET /api/tmdb/title?type=&id=` | что есть на TMDB о тайтле — есть он у провайдера или нет (`type` — `movie` или `tv`, `id` — его ID на TMDB, как их отдаёт `tmdb` у `/api/title`): `{id,type,title_id,title,original,year,date,tagline,overview,backdrop:{w780,w1280},logo:{url,aspect},poster,age,rating,runtime,genres,countries,directors,creators,status,last,next,seasons:[{season,episodes,date,title}],cast:[{name,character,photo}],trailers:[{name,lang,kind,url,thumb}],collection:{id,name,parts},recommendations}`; `cast` — первые 12 по титрам (`photo` — `null` без фото), `cast_total` — сколько их всего (см. `/api/tmdb/cast`); `title_id` — тайтл title-api, если он сопоставлен (так же у частей коллекции и рекомендаций: `{id,type,title_id,title,year,date,poster,backdrop}`); `age` — `0+`…`18+`, `runtime` — минуты фильма; `status` (`returning`, `ended`, `canceled`, `other`), `last` и `next` (`{season,episode,date,title}`) — у сериала; картинки — URL через title-api (и `/api/p`, если включён `proxy`); `null`, если на TMDB такого нет или в title-api не задан ключ; хранит title-api, роутер не кэширует |
 | `GET /api/tmdb/cast?type=&id=` | весь состав тайтла на TMDB по порядку титров: `{cast:[{name,character,photo}]}`, `photo` — `null`, если фото у TMDB нет; `null` — как у `/api/tmdb/title` |
 | `GET /api/tmdb/match?id=` | тайтл на TMDB для тайтла, который `/api/title` отдал без `tmdb`, пока title-api сопоставляет его в фоне (через Claude): ждёт до 15 с; `{tmdb:{id,type}\|null,pending}`, `pending` — ещё не сопоставлен, спросить снова |
+| `GET /api/updates` | что нового у сериалов для значков главной: `{updates:{"<id>":{new,next}},partial}`. Спрашивает title-api (`/v1/series/updates`) о последних сериях у провайдера до 30 последних смотревшихся сериалов и о следующей серии TMDB у них и у 30 последних сохранённых, которые не смотрели; ответ о каждом хранит 5 минут (в `kv`, до перезагрузки). `new` — последняя открытая серия досмотрена (или дальше 90 %), а у провайдера есть серия после неё и после той, что была у него последней, когда роутер впервые узнал о сериале (`known` в настройках, хранится на флеше); `next` — `{season,episode,date,title}` TMDB у идущего сериала (пришла ли дата, проверяет страница). `partial` — провайдер не успел ответить о некоторых, их спросят снова. До 20 с |
 | `POST /api/tmdb/lookup?type=&id=` | ищет тайтл TMDB у провайдера (title-api, ждёт до 15 с): `{state,title_id}`, `state` — `found` (`title_id` — тайтл провайдера), `pending` (ещё ищется, спросить снова) или `not_found` |
 | `GET /api/tmdb/season?id=&season=` | серии сезона сериала на TMDB: `{episodes:[{episode,title,overview,still,date,runtime,upcoming}]}`; `title` пуст, если у TMDB это просто номер или не по-русски, `overview` — по-английски, если по-русски нет, `upcoming` — ещё не вышла; сезона, которого у TMDB нет, — пустой список; `null` — как у `/api/tmdb/title` |
 | `POST /api/cmd` `c`, `arg`? | `pause resume stop quit mute unmute` · `seek ff rew volume` (число) · `audio subs` (id/язык/название/`off`) · `substyle` (`size=…,bg=#RRGGBBAA`, формат `castctl substyle`) |

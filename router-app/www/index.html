@@ -43,6 +43,13 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .card span{color:var(--mu);font-size:13px}
 .badge{position:absolute;top:6px;left:6px;padding:2px 7px;border-radius:6px;background:#000c;color:#ddd!important;font-size:11px!important;font-weight:600}
 .badge.on{background:var(--ac);color:#111!important}
+/* What is new of a series (see markUpdate): over its poster's top left
+   corner, level with the save button and clear of it (wrapping on a
+   narrow card); "На ТВ" takes its place. */
+.card .up{position:absolute;top:6px;left:6px;display:flex;align-items:center;min-height:32px;max-width:calc(100% - 50px);pointer-events:none}
+.card .up span{padding:3px 7px;line-height:1.2;border-radius:6px;background:#000c;color:#ddd;font-size:11px;font-weight:600}
+.card .up .new{background:var(--ac);color:#111}
+.card:has(.badge.on) .up{display:none}
 /* Saves the title to watch, over a poster's corner and next to a title's
    play button; lit while saved. */
 .sv{position:absolute;top:6px;right:6px;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#000c;color:#fff;transition:transform .12s}
@@ -657,6 +664,7 @@ let recent = [];        // /progress list: recently watched titles, latest first
 let saved = [];         // and the titles saved to watch, latest saved first
 let listShown = null;   // the list on a page of its own (see openList): 'recent', 'saved' or null
 let listsLoaded = false; // /progress has answered once
+let updates = {};       // /updates: what is new of the series watched and saved, by id
 let searching = 0;      // number of the search shown; 0 = the recent titles are
 let query = '';         // query of the search shown
 localStorage.removeItem('last'); // searches are no longer restored
@@ -1150,6 +1158,7 @@ function card(m, i, under, part) {
   const c = el('div', { className: 'card' }, open, saveButton(m));
   c.style.setProperty('--i', i);
   c.dataset.id = m.id;
+  markUpdate(c);
   return c;
 }
 
@@ -1230,6 +1239,47 @@ async function loadRecent() {
   if (!searching) renderRecent();
   renderList();
   document.querySelectorAll('.sv').forEach(showSaved);
+  loadUpdates();
+}
+
+// ---- series updates -----------------------------------------------------
+//
+// A series watched or saved has a badge over its card: a new episode on
+// the provider after the one watched last, or the date TMDB has the next
+// one for (see /updates). They come after the cards, the provider being
+// asked; the router keeps its answers for 5 minutes.
+
+let updating = null, updatesAgain = null;
+async function loadUpdates() {
+  if (updating) return;
+  try {
+    updating = api('updates');
+    const r = await updating;
+    updates = r.updates || {};
+    // Some came too late: once more, the router has them by then.
+    if (r.partial && !updatesAgain) updatesAgain = setTimeout(loadUpdates, 20000);
+  } catch {
+    return; // the badges are a convenience
+  } finally {
+    updating = null;
+  }
+  document.querySelectorAll('.card').forEach(markUpdate);
+}
+
+// "16 янв", "сегодня": when TMDB has an episode coming.
+const shortDay = date => date == today() ? 'Сегодня' :
+  new Date(date + 'T00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace(/\.$/, '');
+
+function markUpdate(c) {
+  const u = updates[c.dataset.id], e = u?.next, soon = !u?.new && e?.date >= today();
+  const text = u?.new ? 'Новая серия' : soon ? shortDay(e.date) : '';
+  const b = c.querySelector('.up');
+  if (b?.textContent == text) return;
+  b?.remove();
+  if (text) c.append(el('div', { className: 'up' }, el('span', {
+    className: u.new ? 'new' : '',
+    title: soon ? (e.episode == 1 ? `${e.season} сезон` : `${e.season} сезон, ${e.episode} серия`) + ' — ' + day(e.date) : '',
+  }, text)));
 }
 
 // "7s17e" for a series, plus "просмотрено" once the episode is watched or
@@ -1381,6 +1431,13 @@ function news(x) {
     { head: `Новая серия ${day(e.date)}`, sub: [`${e.season} сезон, ${e.episode} серия`, e.title].filter(Boolean).join(' · ') };
 }
 
+// A new episode of a series on the provider, after the one watched last
+// (see /updates): the one the play button goes on with.
+function fresh(t) {
+  const e = updates[t.id]?.new && item?.id == t.id && playTarget(item);
+  return e?.season != null && { head: 'Вышла новая серия', sub: `${e.season} сезон, ${e.episode} серия` };
+}
+
 // The title as the provider has it (t), with what TMDB adds (x) once it
 // answers; again: drawn anew with x, what was there doesn't pop up again.
 function renderInfo(t, x, again) {
@@ -1400,7 +1457,7 @@ function renderInfo(t, x, again) {
   const facts = [['Режиссёр', (t.directors.length ? t.directors : x?.directors ?? []).slice(0, 2)],
     ['Создатель', x?.creators?.slice(0, 2) ?? []], ['В ролях', cast ? [] : t.actors.slice(0, 6)]]
     .filter(([, v]) => v.length);
-  const text = t.description || x?.overview, soon = news(x);
+  const text = t.description || x?.overview, soon = fresh(t) || news(x);
   const desc = text && el('p', { id: 'ddesc', className: t.description ? still : '' }, text);
   if (desc) desc.onclick = () => desc.classList.toggle('full');
   $('dinfo').replaceChildren(...[

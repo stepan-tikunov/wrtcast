@@ -2587,6 +2587,112 @@ function mark_saved(id) {
 		api_post(`/v1/titles/${id}/marking`, { seasonNumber: e.season, episodeNumber: e.episode });
 }
 
+// ---- series updates ----------------------------------------------------------
+//
+// The main page's badges of series (see /updates): a new episode on the
+// provider, or the next one TMDB has a date for. The provider is asked of
+// the series watched (title-api keeps a series' episodes for 5 minutes and
+// asks it of them one after another), TMDB alone of those saved and never
+// watched.
+
+const UPDATES_MAX = 30;  // series asked of title-api at most, of each kind
+const UPDATES_TTL = 300; // seconds title-api's answer of a series is kept
+
+// An episode number's leading number ("10", "1-2"), to tell their order.
+const ep_num = e => +(match(`${e}`, /^[0-9]+/)?.[0] ?? 0);
+const ep_after = (a, b) => a.season > b.season ||
+	a.season == b.season && ep_num(a.episode) > ep_num(b.episode);
+
+// title-api's answers by title, as kept in kv (lost with a reboot):
+// { last: the provider's last episode, null if not told, next: TMDB's next
+// episode, if the series is coming back, t: when told, movie: not a
+// series }.
+function kept_updates() {
+	let u = kv_get('updates');
+	u = u != null ? json(u) : null;
+	return type(u) == 'object' ? u : {};
+}
+
+// The provider's last episode of each series watched when /updates first
+// told it, kept on flash with the history: an episode is new only after
+// it, so that one that was there all along, left unwatched, isn't.
+function known_episodes() {
+	let k = setting('known');
+	k = k != null ? json(k) : null;
+	return type(k) == 'object' ? k : {};
+}
+
+// What is new of the series watched (latest first) and saved: { updates:
+// { <id>: { new, next } }, partial }. new: the episode watched last is
+// watched, and the provider has one after it that came after it was first
+// seen there (see known); next: { season, episode, date, title } of TMDB,
+// whether or not it has come. partial: the provider's episodes of some
+// came too late, to be asked again.
+function series_updates() {
+	let watched = map(sql_rows(`SELECT id FROM titles WHERE season IS NOT NULL
+		ORDER BY t DESC LIMIT ${UPDATES_MAX}`), r => r.id);
+	let others = map(sql_rows(`SELECT id FROM saved WHERE id NOT IN (SELECT id FROM titles)
+		ORDER BY t DESC LIMIT ${UPDATES_MAX}`), r => r.id);
+	let u = kept_updates(), now = time(), still = {};
+	let due = x => !x || !x.movie && (now - x.t >= UPDATES_TTL || x.t > now);
+	let ask = filter(watched, id => due(u[id]) || !u[id].movie && !u[id].last);
+	let upcoming = filter(others, id => due(u[id]));
+	let partial = false;
+	if (length(ask) || length(upcoming)) {
+		let r = api_post('/v1/series/updates', { titleIds: ask, upcomingTitleIds: upcoming });
+		let j = r.status == 200 ? json(r.out) : null, told = {};
+		for (let x in j?.updates ?? []) {
+			let id = x.titleId, n = x.nextEpisode;
+			told[id] = true;
+			u[id] = {
+				// Not told in time: as told before, if it was.
+				last: x.lastEpisode ? { season: +x.lastSeason, episode: x.lastEpisode } : u[id]?.last,
+				next: x.status == 'TMDB_STATUS_RETURNING' && n?.airDate ? {
+					season: +n.seasonNumber, episode: +n.episodeNumber,
+					date: n.airDate, title: n.name || null,
+				} : null,
+				t: now,
+			};
+			if (!x.lastEpisode && index(ask, id) >= 0) {
+				partial = true;
+				u[id].t = 0;
+			}
+		}
+		// What title-api leaves out is no series; nothing told is asked
+		// again next time.
+		if (j)
+			for (let id in [...ask, ...upcoming])
+				if (!told[id])
+					u[id] = { movie: true, t: now };
+	}
+	let out = {}, known = known_episodes(), was = sprintf('%J', known);
+	for (let id in [...watched, ...others]) {
+		let x = u[id];
+		if (!x)
+			continue;
+		still[id] = x;
+		if (x.movie)
+			continue;
+		let e = index(watched, id) >= 0 ? title_row(id) : null, fresh = false;
+		if (e && x.last) {
+			known[id] ??= x.last;
+			let p = progress_row(id, ep_key(e.season, e.episode));
+			fresh = !!p && (p.done || p.dur > 0 && p.pos >= p.dur * 0.9) &&
+				ep_after(x.last, e) && ep_after(x.last, known[id]);
+		}
+		if (fresh || x.next)
+			out[id] = { new: fresh, next: x.next };
+	}
+	for (let id in keys(known))
+		if (index(watched, id) < 0)
+			delete known[id];
+	kv_set('updates', sprintf('%J', still));
+	if (sprintf('%J', known) != was)
+		set_setting('known', sprintf('%J', known));
+	return { updates: out, partial };
+}
+
+
 const marking = r => ({
 	enabled: !!r?.enabled, key: !!r?.keySet, hint: r?.keyHint || null, error: r?.error || null,
 });
@@ -2763,6 +2869,10 @@ const routes = {
 		return { progress, prefs: e?.prefs ?? null };
 	},
 
+
+	// What is new of the series watched and saved, for the main page's
+	// badges (see series_updates); up to 20 s, as the provider is asked.
+	'GET /updates': p => series_updates(),
 
 	// Saves a title to watch (on=1), with its name and poster for the list,
 	// or removes it (on=0); the titles saved, as /progress lists them.
