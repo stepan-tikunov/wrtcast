@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	titlev1 "title-api/api/title/v1"
@@ -225,6 +226,13 @@ func (gatewayTestService) WaitTmdbMatch(
 	return &titlev1.TmdbMatch{Tmdb: &titlev1.TmdbTitle{Id: 1405, MediaType: titlev1.MediaType_MEDIA_TYPE_SERIES}, Pending: query.GetTitleId() == "wait"}, nil
 }
 
+func (gatewayTestService) LookupTmdbTitle(
+	_ context.Context,
+	command *titlev1.LookupTmdbTitleCommand,
+) (*titlev1.TmdbLookup, error) {
+	return &titlev1.TmdbLookup{State: titlev1.TmdbLookup_STATE_FOUND, TitleId: fmt.Sprint(command.GetMediaType(), command.GetTmdbId())}, nil
+}
+
 func TestTmdbHTTPAnnotations(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct{ path, field, want string }{
@@ -235,9 +243,15 @@ func TestTmdbHTTPAnnotations(t *testing.T) {
 		{"/v1/titles/64aee42620222/tmdb", "tmdb", "map[id:1405 mediaType:MEDIA_TYPE_SERIES]"},
 		{"/v1/titles/wait/tmdb", "pending", "true"},
 		{"/v1/tmdb/tv/1405/cast", "cast", "[map[character: name:tv profilePath:]]"},
+		{"POST /v1/tmdb/tv/1405/lookup", "titleId", "tv1405"},
+		{"POST /v1/tmdb/tv/1405/lookup", "state", "STATE_FOUND"},
 		{"/v1/tmdb/tv/1405/seasons/2", "episodes", "[map[airDate: episodeNumber:2 name:Пилот overview: runtimeMinutes:0 stillPath:x.jpg upcoming:true]]"},
 	} {
-		request := httptest.NewRequest(http.MethodGet, test.path, nil)
+		method, path, ok := strings.Cut(test.path, " ")
+		if !ok {
+			method, path = http.MethodGet, test.path
+		}
+		request := httptest.NewRequest(method, path, nil)
 		response := httptest.NewRecorder()
 		testGateway(t).ServeHTTP(response, request)
 		var body map[string]any

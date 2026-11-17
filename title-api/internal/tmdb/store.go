@@ -31,7 +31,11 @@ const schema = `
 		cost REAL, reason TEXT, updated INTEGER NOT NULL
 	);
 	CREATE INDEX IF NOT EXISTS tmdb_titles_by_tmdb ON tmdb_titles (tmdb_id, kind);
-	CREATE TABLE IF NOT EXISTS tmdb_cache (key TEXT PRIMARY KEY, json TEXT NOT NULL, fetched INTEGER NOT NULL);`
+	CREATE TABLE IF NOT EXISTS tmdb_cache (key TEXT PRIMARY KEY, json TEXT NOT NULL, fetched INTEGER NOT NULL);
+	CREATE TABLE IF NOT EXISTS tmdb_lookups (
+		kind TEXT NOT NULL, tmdb_id INTEGER NOT NULL, state TEXT NOT NULL, title TEXT,
+		retry_at INTEGER, updated INTEGER NOT NULL, PRIMARY KEY (kind, tmdb_id)
+	);`
 
 // store keeps the key and what became of each title, in title-api's state
 // database.

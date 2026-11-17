@@ -59,9 +59,17 @@ type Service struct {
 	mu    sync.Mutex
 	queue []Title
 	wake  chan struct{}
-	// The title being matched, and what is closed once it is.
+	// The title being matched, and what is closed once it is, or a TMDB
+	// title is looked for.
 	current string
 	changed chan struct{}
+
+	// TMDB's titles to be looked for on the provider, and the one being.
+	provider   Provider
+	lookups    []lookup
+	lookingFor lookup
+	lookupWake chan struct{}
+	now        func() time.Time
 }
 
 func New(ctx context.Context, db *sql.DB, claudeKey func(context.Context) (string, error)) (*Service, error) {
@@ -74,6 +82,7 @@ func New(ctx context.Context, db *sql.DB, claudeKey func(context.Context) (strin
 	return &Service{
 		store: store, cache: newCache(db), http: &http.Client{Transport: transport}, baseURL: apiURL,
 		claudeKey: claudeKey, wake: make(chan struct{}, 1), changed: make(chan struct{}),
+		lookupWake: make(chan struct{}, 1), now: time.Now,
 	}, nil
 }
 
@@ -118,7 +127,7 @@ func (s *Service) Update(ctx context.Context, key string) (Settings, error) {
 	}
 	if key == "" {
 		s.mu.Lock()
-		s.queue = nil
+		s.queue, s.lookups = nil, nil
 		s.notify()
 		s.mu.Unlock()
 	}
@@ -223,8 +232,10 @@ func (s *Service) due(ctx context.Context, title string) bool {
 	return !ok || kept.state == stateFailed && kept.attempts < maxAttempts && time.Now().After(kept.retryAt)
 }
 
-// Run matches the titles queued, one at a time, until ctx is done.
+// Run matches the titles queued, one at a time, and looks for TMDB's
+// titles queued on the provider, one at a time, until ctx is done.
 func (s *Service) Run(ctx context.Context) {
+	go s.runLookups(ctx)
 	for {
 		s.mu.Lock()
 		var t Title

@@ -34,10 +34,33 @@ func (s *Server) WithMarking(service *marking.Service) *Server {
 }
 
 // WithTmdb has the server match the titles whose details are asked for
-// with TMDB, tell their TMDB titles, and serve its settings.
+// with TMDB, tell their TMDB titles, look for TMDB's titles on the
+// provider, and serve its settings.
 func (s *Server) WithTmdb(service *tmdb.Service) *Server {
 	s.tmdb = service
+	if s.client != nil {
+		service.UseProvider(tmdbProvider{s.client})
+	}
 	return s
+}
+
+// tmdbProvider is the provider, as TMDB's titles are looked for on it.
+type tmdbProvider struct {
+	client *provider.Client
+}
+
+func (p tmdbProvider) Search(ctx context.Context, query string) ([]tmdb.Found, error) {
+	results, err := p.client.Search(ctx, query)
+	found := make([]tmdb.Found, 0, len(results))
+	for _, result := range results {
+		found = append(found, tmdb.Found{ID: result.TitleID, Title: result.Title, Year: result.Year})
+	}
+	return found, err
+}
+
+func (p tmdbProvider) Title(ctx context.Context, id string) (tmdb.Title, error) {
+	metadata, err := p.client.TitleMetadata(ctx, id)
+	return tmdbTitle(metadata), err
 }
 
 func (s *Server) SearchTitles(
@@ -199,6 +222,38 @@ func (s *Server) WaitTmdbMatch(
 		response.Tmdb = tmdbRef(match.Kind, match.ID)
 	}
 	return response, nil
+}
+
+// tmdbLookupWait bounds a wait of LookupTmdbTitle, as tmdbMatchWait.
+const tmdbLookupWait = 15 * time.Second
+
+var tmdbLookupStates = map[string]titlev1.TmdbLookup_State{
+	tmdb.LookupPending:  titlev1.TmdbLookup_STATE_PENDING,
+	tmdb.LookupFound:    titlev1.TmdbLookup_STATE_FOUND,
+	tmdb.LookupNotFound: titlev1.TmdbLookup_STATE_NOT_FOUND,
+}
+
+func (s *Server) LookupTmdbTitle(
+	ctx context.Context,
+	command *titlev1.LookupTmdbTitleCommand,
+) (*titlev1.TmdbLookup, error) {
+	if s.tmdb == nil {
+		return nil, status.Error(codes.Unimplemented, "TMDB is off")
+	}
+	kind, err := tmdbQuery(&titlev1.GetTmdbDetailsQuery{MediaType: command.GetMediaType(), TmdbId: command.GetTmdbId()})
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, tmdbLookupWait)
+	defer cancel()
+	state, title, err := s.tmdb.Lookup(ctx, kind, command.GetTmdbId())
+	if errors.Is(err, tmdb.ErrNoProvider) {
+		return nil, status.Error(codes.Unimplemented, err.Error())
+	}
+	if err != nil {
+		return nil, tmdbStatus(err)
+	}
+	return &titlev1.TmdbLookup{State: tmdbLookupStates[state], TitleId: title}, nil
 }
 
 // tmdbTitle is a title as matching with TMDB knows it.

@@ -81,6 +81,12 @@ service TitleService {
       get: "/v1/titles/{title_id}/tmdb"
     };
   }
+
+  rpc LookupTmdbTitle(LookupTmdbTitleCommand) returns (TmdbLookup) {
+    option (google.api.http) = {
+      post: "/v1/tmdb/{media_type}/{tmdb_id}/lookup"
+    };
+  }
 }
 
 enum MediaType {
@@ -174,6 +180,32 @@ message TmdbMatch {
   TmdbTitle tmdb = 1;
   // Still to be matched, as the wait ended first: to be asked again.
   bool pending = 2;
+}
+
+// A title on TMDB to be looked for on the provider: what the provider's
+// search finds by its Russian name and its original one, three titles at
+// most, of its year or one off, is matched with TMDB as the titles opened
+// are, in the background; waited for up to 15 s. A title not found is
+// looked for again a week later, one whose lookup failed half an hour
+// later. FAILED_PRECONDITION with no TMDB key.
+message LookupTmdbTitleCommand {
+  // "movie" or "tv".
+  string media_type = 1;
+  uint64 tmdb_id = 2;
+}
+
+message TmdbLookup {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    // Still being looked for, as the wait ended first: to be asked again.
+    STATE_PENDING = 1;
+    STATE_FOUND = 2;
+    STATE_NOT_FOUND = 3;
+  }
+
+  State state = 1;
+  // The title on the provider, when found.
+  string title_id = 2;
 }
 
 // A title on TMDB: themoviedb.org/<movie or tv>/<id>.
