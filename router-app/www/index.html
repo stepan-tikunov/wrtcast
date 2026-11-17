@@ -1598,7 +1598,7 @@ async function openDetails(m, quiet) {
   if (t.poster && t.poster != m.poster && !quiet) showPoster(t.poster);
   Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: t.poster || m.poster });
   $('det').classList.remove('loading');
-  $('dsave').disabled = false;
+  $('dsave').hidden = false;
   $('dposter').hidden = !m.poster;
   $('dtitle').textContent = t.title;
   keepTop(() => {
@@ -1634,8 +1634,7 @@ function skeleton(m) {
   clearArt();
   m.tm = null;
   $('dsave').dataset.id = m.id;
-  $('dsave').disabled = true; // until its name is known, for the saved list
-  $('dsave').hidden = !!m.tmdbOnly; // not to be watched here
+  $('dsave').hidden = true; // until the title is known; never one of TMDB's alone
   showSaved($('dsave'));
   $('dfrom0').hidden = true;
   $('seasons').replaceChildren();
