@@ -190,6 +190,26 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .ep span{flex:1}
 .ep small{color:var(--mu)}
 .ep.on,.ep.on b,.ep.on small{color:var(--ac)}
+/* An episode with TMDB's still and overview: the still beside its title,
+   the overview under both, two lines until tapped. */
+.ep.x{display:grid;grid-template-columns:118px 1fr;grid-template-areas:"st eh" "eo eo";align-items:center;gap:10px 12px;padding:12px 0;cursor:pointer}
+.ep.x:active{transform:scale(.98)}
+.ep.x:has(.eo:active),.ep.soon:active{transform:none}
+.ep.soon{opacity:.55;cursor:default}
+.st{grid-area:st;position:relative;display:grid;place-items:center;aspect-ratio:16/9;border-radius:6px;overflow:hidden;background:var(--s2)}
+.st img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s}
+.st img.ld{opacity:1}
+.st>b{min-width:0;font-size:20px}
+.ep .st .pb{left:0;bottom:0;height:3px;border-radius:0}
+.st .ok{position:absolute;top:5px;right:5px;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#000a;color:var(--tx)}
+.st .ok svg{width:14px;height:14px}
+.eh{grid-area:eh;display:flex;flex-direction:column;gap:3px;min-width:0}
+.ep .eh b{min-width:0;color:var(--tx);font-weight:600;overflow-wrap:anywhere}
+.ep.done .eh b{color:var(--mu)}
+.ep.on .eh b{color:var(--ac)}
+.eh small{font-size:13px}
+.eo{grid-area:eo;margin:0;color:var(--mu);font-size:14px;line-height:1.4;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;cursor:default}
+.eo.full{-webkit-line-clamp:unset}
 
 /* player */
 #shade{position:fixed;inset:0;z-index:5;background:#000a;animation:fade .2s}
@@ -343,7 +363,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .card img{opacity:0;transition:opacity .35s}
 .card img.ld{opacity:1}
 .sk{display:block;aspect-ratio:2/3;border-radius:12px}
-.sk,.skl,.nop.ph,.pf.ph,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
+.sk,.skl,.nop.ph,.pf.ph,.st.ph,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
 .skl{display:block;height:12px;margin-top:9px;border-radius:6px}
 .skl+.skl{width:40%}
 .badge.on{animation:bounce .35s ease-out}
@@ -420,6 +440,10 @@ svg.spring{animation:spring .3s ease-out}
   #ddesc{max-width:760px;-webkit-line-clamp:6;font-size:16px}
   #seasons{flex-wrap:wrap;padding:20px var(--dgut) 10px}
   #eps{padding:0 var(--dgut)}
+  .ep.x{grid-template-columns:200px 1fr;grid-template-rows:auto 1fr;grid-template-areas:"st eh" "st eo";align-items:start;gap:6px 16px;padding:14px 0}
+  .eh{padding-top:4px}
+  .eh b{font-size:16px}
+  .eo{max-width:760px;-webkit-line-clamp:3}
   #pl,.sheet{margin:0 auto;bottom:16px;border-radius:20px}
   #pl{width:min(560px,calc(100% - 32px));padding-bottom:12px}
   #collapse{display:grid}
@@ -462,6 +486,7 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-film" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm6 4v6l5-3z"/></symbol>
   <symbol id="i-restart" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></symbol>
   <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
@@ -593,6 +618,7 @@ let season = null;
 let pollError = '';
 const titles = {};      // /title answers by id
 const tmdbs = {};       // /tmdb/title answers by type and TMDB ID; null where TMDB has none
+const tmdbSeasons = {}; // /tmdb/season answers by TMDB ID and season, as promises
 const layers = [];      // open overlays; the back button closes the last one
 let plOpen = false;     // the player is open; not an overlay, history leaves it be
 let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF default
@@ -1484,6 +1510,8 @@ function showTmdb(m, t, x) {
   m.tm = x;
   renderArt(t, x);
   $('dattr').hidden = false;
+  // Come after the season was shown: its stills, a season coming.
+  if (m.seasons?.includes(season)) showSeason(season, true);
 }
 
 // Placeholder lines of the given widths, in %.
@@ -1634,44 +1662,155 @@ function renderDetails() {
   $('dfrom0').hidden = !t.resume || on || starting;
 }
 
-function showSeason(s) {
+// The chips of the seasons, with one TMDB has coming that the provider has
+// not yet; again: drawn anew, as TMDB answers, the list doesn't pop up again.
+function showSeason(s, again) {
   season = s;
   if (!s) return $('eps').replaceChildren(el('p', { className: 'note' }, 'Серий нет'));
-  $('seasons').replaceChildren(...item.seasons.map(x => {
+  const soon = comingSeason(item);
+  $('seasons').replaceChildren(...[...item.seasons, ...soon ? [soon] : []].map(x => {
     const c = el('button', { className: 'chip' + (x == s ? ' on' : '') }, `${x.season} сезон`);
     c.onclick = () => showSeason(x);
     return c;
   }));
-  renderEpisodes(true);
+  renderEpisodes(again ? 'again' : 'anim');
+  loadSeason(item, s);
+}
+
+// A season TMDB has an episode of coming that the provider has none of
+// (a chip of its own, with nothing to play), kept with the title's page.
+function comingSeason(m) {
+  const e = m.tm?.type == 'tv' && m.tm.next;
+  if (!e?.date || e.date < today() || m.seasons.some(s => s.season == e.season)) return null;
+  if (m.coming?.season != e.season) m.coming = { season: e.season, episodes: [], coming: true };
+  return m.coming;
+}
+
+// TMDB's episodes of a season, matched to the provider's (s.tm, null if
+// they can't be), drawn once they come.
+async function loadSeason(m, s) {
+  const x = m.tm;
+  if (x?.type != 'tv' || s.tm !== undefined) return;
+  const k = `${x.id}:${s.season}`;
+  tmdbSeasons[k] ??= api(`tmdb/season?id=${x.id}&season=${s.season}`).catch(() => {
+    delete tmdbSeasons[k];
+    return null;
+  });
+  const r = await tmdbSeasons[k];
+  if (s.tm !== undefined) return;
+  s.tm = r && matchSeason(s, r.episodes);
+  if (item == m && season == s) keepTop(() => renderEpisodes('again'));
+}
+
+// TMDB's episodes along the provider's, by number, and those TMDB has
+// coming after them; null where the numbering can't be told to agree: a
+// number the provider joins (1-2) or TMDB hasn't, or the provider short of
+// what has come out by more than it may lag. Of a season only TMDB has, what
+// it has coming.
+function matchSeason(s, eps) {
+  if (s.coming) return { eps: [], coming: eps.filter(e => e.upcoming && e.date) };
+  const by = new Map(eps.map(e => [String(e.episode), e]));
+  const out = eps.filter(e => !e.upcoming).length;
+  if (!eps.length || s.episodes.some(e => !by.has(String(e.episode))) || s.episodes.length < out - 2)
+    return null;
+  const last = Math.max(0, ...s.episodes.map(e => +e.episode));
+  return {
+    eps: s.episodes.map(e => by.get(String(e.episode))),
+    coming: eps.filter(e => e.upcoming && e.date && e.episode > last),
+  };
+}
+
+// An episode's title as TMDB's, the provider's or none: the provider's are
+// usually just "<series> (N сезон) - M серия", TMDB's "Эпизод M".
+const epTitle = (...ts) => ts.find(t => t && !/(^|\s)(серия|эпизод|episode)(\s*\d+)?\s*$/i.test(t)) || null;
+
+// A date gone by (2011-04-17) as "17 апреля 2011", without this year's.
+function aired(date) {
+  const d = new Date(date + 'T00:00'), o = { day: 'numeric', month: 'long' };
+  if (d.getFullYear() != new Date().getFullYear()) o.year = 'numeric';
+  return d.toLocaleDateString('ru-RU', o).replace(/ г\.$/, '');
+}
+
+// A still in a frame that shimmers until it has loaded and fades in; the
+// episode's number where TMDB has none or it fails.
+function still(src, n) {
+  const none = () => el('b', {}, n);
+  if (!src) return el('span', { className: 'st' }, none());
+  const img = el('img', { src, alt: '', loading: 'lazy' }), frame = el('span', { className: 'st ph' }, img);
+  img.onload = () => {
+    img.classList.add('ld');
+    setTimeout(() => frame.classList.remove('ph'), 300);
+  };
+  img.onerror = () => {
+    img.replaceWith(none());
+    frame.classList.remove('ph');
+  };
+  return frame;
 }
 
 // Called on every status poll; rebuilds the list only when the highlighted
-// episode or the progress changes so a tap in progress isn't lost.
-function renderEpisodes(force) {
+// episode or the progress changes so a tap in progress isn't lost. how:
+// anim, as the season is shown; again, as TMDB's comes over it.
+function renderEpisodes(how) {
   if (!item?.seasons || !season) return;
   const now = pending || (st?.media && st.now);
-  const key = `${item.id}|${season.season}|${now?.id}|${now?.season}|${now?.episode}|${!!pending}|${JSON.stringify(item.progress)}`;
-  if (!force && $('eps').dataset.key == key) return;
+  const s = season, x = item.tm?.type == 'tv' ? s.tm : null;
+  const key = `${item.id}|${s.season}|${now?.id}|${now?.season}|${now?.episode}|${!!pending}|${JSON.stringify(item.progress)}|${x === undefined ? '?' : !!x}`;
+  if (!how && $('eps').dataset.key == key) return;
   $('eps').dataset.key = key;
-  const m = item, sn = season.season, cont = continueAt(m);
-  $('eps').replaceChildren(...season.episodes.map((e, i) => {
+  const m = item, sn = s.season, cont = continueAt(m);
+  // Until TMDB answers, the rows it is asked for have their stills to come.
+  const rich = x !== null && item.tm?.type == 'tv';
+  const rows = s.episodes.map((e, i) => {
     const on = now?.id == m.id && now.season == sn && now.episode == e.episode;
     const p = m.progress?.eps?.[epKey({ season: sn, episode: e.episode })];
     const part = p && !p.done && p.pos > 10 && p.dur ? p.pos / p.dur : 0;
     const next = !on && cont?.season == sn && cont.episode == e.episode;
-    // Provider titles are usually just "<series> (N сезон) - M серия".
-    const generic = !e.title || /серия\s*$/i.test(e.title);
-    const b = el('button', { className: 'ep' + (on ? ' on' : '') + (p?.done ? ' done' : '') + (next ? ' cont' : '') + (force ? ' anim' : '') },
-      ...(generic ? [el('span', {}, `${e.episode} серия`)] : [el('b', {}, e.episode), el('span', {}, e.title)]),
-      el('small', {}, on ? (pending ? 'запуск…' : 'на ТВ') :
-        part ? (next ? 'продолжить · ' : '') + 'ещё ' + Math.ceil((p.dur - p.pos) / 60) + ' мин' :
-        next ? 'следующая' : p?.done ? 'просмотрено' :
-        e.duration ? Math.round(e.duration / 60) + ' мин' : ''),
-      ...(part && !on ? [el('i', { className: 'pb', style: `width:${100 * part}%` })] : []));
-    b.style.setProperty('--i', i);
-    b.onclick = () => start({ id: m.id, title: m.title, poster: m.poster, season: sn, episode: e.episode });
-    return b;
+    const t = x?.eps[i], dur = e.duration || t?.runtime * 60;
+    const state = on ? (pending ? 'запуск…' : 'на ТВ') :
+      part ? (next ? 'продолжить · ' : '') + 'ещё ' + Math.ceil((p.dur - p.pos) / 60) + ' мин' :
+      next ? 'следующая' : p?.done ? 'просмотрено' : '';
+    const cls = 'ep' + (on ? ' on' : '') + (p?.done ? ' done' : '') + (next ? ' cont' : '');
+    const play = () => start({ id: m.id, title: m.title, poster: m.poster, season: sn, episode: e.episode });
+    if (!rich) {
+      const name = epTitle(e.title);
+      const b = el('button', { className: cls },
+        ...(name ? [el('b', {}, e.episode), el('span', {}, name)] : [el('span', {}, `${e.episode} серия`)]),
+        el('small', {}, state || (dur ? Math.round(dur / 60) + ' мин' : '')),
+        ...(part && !on ? [el('i', { className: 'pb', style: `width:${100 * part}%` })] : []));
+      b.onclick = play;
+      return b;
+    }
+    const name = epTitle(t?.title, e.title);
+    const frame = x ? still(t.still, e.episode) : el('span', { className: 'st ph' });
+    if (part && !on) frame.append(el('i', { className: 'pb', style: `width:${100 * part}%` }));
+    if (p?.done) frame.append(el('i', { className: 'ok' }, svgIcon('check')));
+    const desc = t?.overview && el('p', { className: 'eo' }, t.overview);
+    const row = el('div', { className: cls + ' x', role: 'button', tabIndex: 0 }, frame,
+      el('div', { className: 'eh' }, el('b', {}, name ? `${e.episode}. ${name}` : `Серия ${e.episode}`),
+        el('small', {}, state || [dur && duration(dur), t?.date && aired(t.date)].filter(Boolean).join(' · '))),
+      ...(desc ? [desc] : []));
+    row.onclick = play;
+    row.onkeydown = ev => ev.key == 'Enter' && play();
+    if (desc) desc.onclick = ev => {
+      ev.stopPropagation();
+      desc.classList.toggle('full');
+    };
+    return row;
+  });
+  // What TMDB has coming: dim, with nothing to play.
+  rows.push(...(x?.coming ?? []).map(t => {
+    const name = epTitle(t.title);
+    return el('div', { className: 'ep x soon' }, still(t.still, t.episode),
+      el('div', { className: 'eh' }, el('b', {}, name ? `${t.episode}. ${name}` : `Серия ${t.episode}`),
+        el('small', {}, 'Выйдет ' + day(t.date))),
+      ...(t.overview ? [el('p', { className: 'eo' }, t.overview)] : []));
   }));
+  rows.forEach((r, i) => {
+    if (how == 'anim') r.classList.add('anim');
+    r.style.setProperty('--i', i);
+  });
+  $('eps').replaceChildren(...rows);
 }
 
 // Without start the router resumes where it was left off.
