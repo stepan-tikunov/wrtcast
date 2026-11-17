@@ -1306,10 +1306,11 @@ function renderInfo(t, x, again) {
 function renderArt(t, x) {
   const bd = $('dbd').firstChild, logo = $('dlogo');
   if (x.backdrop) {
-    bd.sizes = '(min-width:900px) 72vw, 100vw';
-    bd.srcset = `${x.backdrop.w780} 780w, ${x.backdrop.w1280} 1280w`;
+    bd.sizes = BD_SIZES;
+    bd.srcset = bdSet(x);
     bd.src = x.backdrop.w780;
     $('det').classList.add('bd');
+    if (bd.complete && bd.naturalWidth) $('dbd').classList.add('ld'); // loaded ahead
   }
   if (x.logo) {
     logo.style.setProperty('--a', x.logo.aspect || 3);
@@ -1337,22 +1338,53 @@ function clearArt() {
   $('dattr').hidden = $('dtrailer').hidden = true;
 }
 
-// What TMDB has of a title, once title-api has matched it (t.tmdb): drawn
-// over the page as it comes, the page staying as it is if TMDB has none or
-// fails.
-async function loadTmdb(m, t) {
-  const k = t.tmdb.type + t.tmdb.id, kept = k in tmdbs;
+// What TMDB has of a title, once title-api has matched it (t.tmdb), with
+// its backdrop and logo loaded, so the page is drawn once with them; those
+// that fail to load left out. null if TMDB has none or fails.
+async function tmdbOf(t) {
+  const k = t.tmdb.type + t.tmdb.id;
   try {
     if (!(k in tmdbs)) tmdbs[k] = await api(`tmdb/title?type=${t.tmdb.type}&id=${t.tmdb.id}`);
   } catch {
-    return;
+    return null;
   }
   const x = tmdbs[k];
-  if (item != m || !x) return;
+  if (!x) return null;
+  const [bd, logo] = await Promise.all([x.backdrop && preload(x.backdrop.w780, bdSet(x)), x.logo && preload(x.logo.url)]);
+  return { ...x, backdrop: bd ? x.backdrop : null, logo: logo ? x.logo : null };
+}
+
+const BD_SIZES = '(min-width:900px) 72vw, 100vw';
+const bdSet = x => `${x.backdrop.w780} 780w, ${x.backdrop.w1280} 1280w`;
+
+// Whether a picture loads; as the page's own (the same candidate of the
+// srcset) it then comes from the cache.
+const preload = (src, srcset) => new Promise(done => {
+  const i = new Image();
+  if (srcset) Object.assign(i, { sizes: BD_SIZES, srcset });
+  i.onload = () => done(true);
+  i.onerror = () => done(false);
+  i.src = src;
+});
+
+// The titles last drawn with TMDB's backdrop, so their page opens laid out
+// for it rather than for the poster.
+function backdropKnown(id, on) {
+  let ids = [];
+  try {
+    ids = JSON.parse(localStorage.backdrops || '[]');
+  } catch {}
+  if (on === undefined) return ids.includes(id);
+  ids = ids.filter(x => x != id);
+  if (on) ids.push(id);
+  try {
+    localStorage.backdrops = JSON.stringify(ids.slice(-500));
+  } catch {}
+}
+
+function showTmdb(m, t, x) {
   m.tm = x;
   renderArt(t, x);
-  renderInfo(t, x, !kept); // kept, it comes with the page
-  renderDetails();
   $('dattr').hidden = false;
 }
 
@@ -1386,6 +1418,7 @@ async function openDetails(m) {
   $('dplab').textContent = 'Смотреть на ТВ'; // the width of the button on desktop
   $('dpbar').style.width = 0;
   clearArt();
+  $('det').classList.toggle('bd', backdropKnown(m.id));
   m.tm = null;
   $('dsave').dataset.id = m.id;
   $('dsave').disabled = true; // until its name is known, for the saved list
@@ -1418,6 +1451,18 @@ async function openDetails(m) {
     return toast(e);
   }
   if (item != m) return;
+  // TMDB's comes with the page if it is quick, else it is drawn over the
+  // page when it comes.
+  const tm = t.tmdb && tmdbOf(t);
+  const x = tm ? await Promise.race([tm, new Promise(done => setTimeout(done, 2500))]) : null;
+  if (item != m) return;
+  if (x !== undefined) backdropKnown(m.id, !!x?.backdrop);
+  else tm.then(x => {
+    if (!x || item != m) return;
+    showTmdb(m, t, x);
+    renderInfo(t, x, true);
+    renderDetails();
+  });
   // A saved poster can point at a host the provider has since left.
   if (t.poster && t.poster != m.poster) showPoster(t.poster);
   Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: t.poster || m.poster });
@@ -1425,9 +1470,10 @@ async function openDetails(m) {
   $('dsave').disabled = false;
   $('dposter').hidden = !m.poster;
   $('dtitle').textContent = t.title;
-  renderInfo(t);
+  $('det').classList.remove('bd'); // as the page opened, which may be wrong
+  if (x) showTmdb(m, t, x);
+  renderInfo(t, x);
   renderDetails();
-  if (t.tmdb) loadTmdb(m, t);
   if (t.type != 'series') return;
   const now = st?.now?.id == m.id ? st.now : null;
   const cont = continueAt(m);
