@@ -365,7 +365,8 @@ function run(cmd) {
 	return { code: p.close(), out: trim(out) };
 }
 
-function api(path) {
+// absent: the statuses that answer null, as what title-api has none of.
+function api(path, absent) {
 	// uclient-fetch drops the body of an error reply and only prints
 	// "HTTP error N" (not with -q): keep that line of stderr, the body goes
 	// to stdout through fd 3.
@@ -380,6 +381,8 @@ function api(path) {
 	// A 4xx won't change on retry.
 	if (r.status != 200 && (r.status < 400 || r.status >= 500))
 		r = fetch();
+	if (index(absent ?? [], r.status) >= 0)
+		return null;
 	if (r.status == 403)
 		fail(403, 'Источник показывает этот тайтл только зарегистрированным пользователям');
 	if (r.status != 200)
@@ -2590,6 +2593,78 @@ const marking = r => ({
 
 const tmdb = r => ({ key: !!r?.keySet, hint: r?.keyHint || null, error: r?.error || null });
 
+// A picture of TMDB of a size, through title-api, which keeps them; null
+// for none.
+function tmdb_img(file, size) {
+	if (!file)
+		return null;
+	let via_api = `${API}/v1/tmdb/images/${size}/${file}`;
+	return PROXY ? purl(via_api, null, file) : via_api;
+}
+
+const tmdb_type = t => t == 'MEDIA_TYPE_SERIES' ? 'tv' : 'movie';
+
+// An episode a series' details tell (the last or the next), or null.
+const tmdb_episode = e => e?.episodeNumber ? {
+	season: e.seasonNumber, episode: e.episodeNumber, date: e.airDate || null, title: e.name || null,
+} : null;
+
+// A title of a collection or of the recommendations.
+const tmdb_related = r => ({
+	id: +r.title?.id, type: tmdb_type(r.title?.mediaType), title_id: r.titleId || null,
+	title: r.name, year: r.year || null, date: r.releaseDate || null,
+	poster: tmdb_img(r.posterPath, 'w342'), backdrop: tmdb_img(r.backdropPath, 'w500'),
+});
+
+const TMDB_STATUSES = {
+	TMDB_STATUS_RETURNING: 'returning', TMDB_STATUS_ENDED: 'ended',
+	TMDB_STATUS_CANCELED: 'canceled', TMDB_STATUS_OTHER: 'other',
+};
+
+// What TMDB has of a title (see GetTmdbDetails of title-api), its pictures
+// as URLs.
+function tmdb_details(type, id, r) {
+	return {
+		id, type, title_id: r.titleId || null,
+		title: r.name, original: r.originalName || null, year: r.year || null,
+		date: r.releaseDate || null, tagline: r.tagline || null, overview: r.overview || null,
+		backdrop: r.backdropPath ? {
+			w780: tmdb_img(r.backdropPath, 'w780'), w1280: tmdb_img(r.backdropPath, 'w1280'),
+		} : null,
+		logo: r.logoPath ? { url: tmdb_img(r.logoPath, 'w500'), aspect: +(r.logoAspect ?? 0) || null } : null,
+		poster: tmdb_img(r.posterPath, 'w342'),
+		age: r.age || null, rating: +(r.voteAverage ?? 0) || null,
+		runtime: +(r.runtimeMinutes ?? 0) || null,
+		genres: r.genres ?? [], countries: r.countries ?? [],
+		directors: r.directors ?? [], creators: r.creators ?? [],
+		status: TMDB_STATUSES[r.status] ?? null,
+		last: tmdb_episode(r.lastEpisode), next: tmdb_episode(r.nextEpisode),
+		seasons: map(r.seasons ?? [], s => ({
+			season: s.seasonNumber ?? 0, episodes: s.episodeCount ?? 0,
+			date: s.airDate || null, title: s.name || null,
+		})),
+		cast: map(r.cast ?? [], c => ({
+			name: c.name, character: c.character || null, photo: tmdb_img(c.profilePath, 'w185'),
+		})),
+		trailers: map(r.videos ?? [], v => ({
+			name: v.name, lang: v.language || null, kind: v.kind,
+			url: 'https://www.youtube.com/watch?v=' + v.youtubeKey,
+			thumb: 'https://i.ytimg.com/vi/' + v.youtubeKey + '/mqdefault.jpg',
+		})),
+		collection: r.collection?.id ? {
+			id: +r.collection.id, name: r.collection.name, parts: map(r.collection.parts ?? [], tmdb_related),
+		} : null,
+		recommendations: map(r.recommendations ?? [], tmdb_related),
+	};
+}
+
+// A TMDB ID the page sent.
+function tmdb_id(p) {
+	if (!match(p.id ?? '', /^[1-9][0-9]{0,9}$/))
+		fail(400, 'invalid id');
+	return p.id;
+}
+
 // A key for title-api, as the page sends it: printable ASCII, 512 bytes at
 // most (TMDB's read access token is a JWT of some 250). musl's regular
 // expressions repeat 255 times at most, hence the length apart.
@@ -2643,7 +2718,7 @@ const routes = {
 			actors: r.actors ?? [],
 			ratings: map(r.ratings ?? [], x => ({ source: x.source, value: x.value })),
 			duration: +(r.durationSeconds ?? 0),
-			// The title on TMDB, once title-api has matched it (see /tmdb).
+			// The title on TMDB, once title-api has matched it (see /tmdb/title).
 			tmdb: r.tmdb?.id ? {
 				id: +r.tmdb.id, type: r.tmdb.mediaType == 'MEDIA_TYPE_SERIES' ? 'tv' : 'movie',
 			} : null,
@@ -2781,6 +2856,31 @@ const routes = {
 		if (r.status != 200)
 			fail(502, 'title-api request failed' + (r.status ? ` (HTTP ${r.status})` : ''));
 		return tmdb(json(r.out));
+	},
+
+	// What TMDB has of a title (type movie or tv, id its TMDB ID, as /title
+	// tells them), whether the provider has it or not; null if TMDB has no
+	// such title or title-api no key. title-api keeps it.
+	'GET /tmdb/title': p => {
+		if (!match(p.type ?? '', /^(movie|tv)$/))
+			fail(400, 'invalid type');
+		let id = tmdb_id(p), r = api(`/v1/tmdb/${p.type}/${id}`, [400, 404]);
+		return r ? tmdb_details(p.type, +id, r) : null;
+	},
+
+	// The episodes of a season of a series on TMDB (id its TMDB ID); null
+	// as /tmdb/title.
+	'GET /tmdb/season': p => {
+		if (!match(p.season ?? '', /^[0-9]{1,4}$/))
+			fail(400, 'invalid season');
+		let r = api(`/v1/tmdb/tv/${tmdb_id(p)}/seasons/${+p.season}`, [400, 404]);
+		return r ? {
+			episodes: map(r.episodes ?? [], e => ({
+				episode: e.episodeNumber, title: e.name || null, overview: e.overview || null,
+				still: tmdb_img(e.stillPath, 'w300'), date: e.airDate || null,
+				runtime: +(e.runtimeMinutes ?? 0) || null, upcoming: !!e.upcoming,
+			})),
+		} : null;
 	},
 
 	'POST /cmd': p => {
