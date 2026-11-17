@@ -203,6 +203,8 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .chip.on{background:var(--tx);color:#111;font-weight:600}
 #eps{padding:0 16px}
 .ep{position:relative;display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:8px 0;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
+/* The last one's line would double the attribution's over it. */
+#eps>.ep:last-child{border-bottom:0}
 .ep .pb{position:absolute;left:0;bottom:-1px;height:2px;border-radius:1px;background:var(--ac)}
 .ep.done span,.ep.done b{color:var(--mu)}
 .ep.cont small{color:var(--ac)}
