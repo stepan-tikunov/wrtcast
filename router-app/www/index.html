@@ -85,13 +85,16 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .age{display:inline-block;padding:0 5px;border:1px solid #ffffff59;border-radius:4px;font-size:.8em;font-weight:600;line-height:1.45;vertical-align:1px}
 #dmeta .gen{margin-top:8px;color:var(--mu)}
 /* TMDB's backdrop (#det.bd): the picture across the top, the logo or the
-   title over its faded lower edge; the blurred poster shows until it loads. */
+   title over its faded lower edge. The page is laid out so once the
+   backdrop and the logo have loaded (see tmdbOf); while it loads, laid out
+   so as the title was last, the blurred poster shows where the backdrop
+   fades in. */
 #dbd{display:none}
 #det.bd #dbd{position:relative;display:block;margin:calc(-1 * max(8px,env(safe-area-inset-top))) -16px 0;aspect-ratio:16/10}
 #dbd img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s}
 #dbd.ld img{opacity:1}
-#dbd::after{content:'';position:absolute;inset:0;background:linear-gradient(#0e0e1099,#0e0e1000 30%,#0e0e1000 50%,var(--bg))}
 #dbg{transition:opacity .4s}
+#dbd::after{content:'';position:absolute;inset:0;background:linear-gradient(#0e0e1099,#0e0e1000 30%,#0e0e1000 50%,var(--bg))}
 #det.bd:has(#dbd.ld) #dbg{opacity:0}
 #det.bd .nav{position:absolute;z-index:1;top:max(8px,env(safe-area-inset-top));left:8px;margin:0}
 #det.bd #dback{background:#0008}
@@ -319,7 +322,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .card img{opacity:0;transition:opacity .35s}
 .card img.ld{opacity:1}
 .sk{display:block;aspect-ratio:2/3;border-radius:12px}
-.sk,.skl,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
+.sk,.skl,.cast .ph,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
 .skl{display:block;height:12px;margin-top:9px;border-radius:6px}
 .skl+.skl{width:40%}
 .badge.on{animation:bounce .35s ease-out}
@@ -1297,8 +1300,16 @@ function renderInfo(t, x, again) {
     el('div', { className: 'facts' + still }, ...facts.map(([k, v]) => el('div', {}, el('b', {}, k + ': '), v.join(', ')))),
     cast && el('h2', { className: 'dh' }, 'В ролях'),
     cast && el('div', { className: 'cast' }, ...cast.map(c => el('div', {},
-      el('img', { src: c.photo, alt: '', loading: 'lazy' }), el('b', {}, c.name), ...(c.character ? [el('span', {}, c.character)] : [])))),
+      photo(c.photo), el('b', {}, c.name), ...(c.character ? [el('span', {}, c.character)] : [])))),
   ].filter(Boolean));
+}
+
+// An actor's photo: a placeholder circle until it loads, and if it fails.
+function photo(src) {
+  const img = el('img', { src, alt: '', loading: 'lazy', className: 'ph' });
+  img.onload = () => img.classList.remove('ph');
+  img.onerror = () => img.src = BLANK; // a circle stays
+  return img;
 }
 
 // TMDB's backdrop and logo over the page's top; without them, or should
@@ -1310,7 +1321,7 @@ function renderArt(t, x) {
     bd.srcset = bdSet(x);
     bd.src = x.backdrop.w780;
     $('det').classList.add('bd');
-    if (bd.complete && bd.naturalWidth) $('dbd').classList.add('ld'); // loaded ahead
+    $('dbd').classList.add('ld'); // loaded ahead
   }
   if (x.logo) {
     logo.style.setProperty('--a', x.logo.aspect || 3);
@@ -1320,7 +1331,6 @@ function renderArt(t, x) {
     $('dtitle').classList.add('vh');
   }
 }
-$('dbd').firstChild.onload = e => e.target.getAttribute('src') && $('dbd').classList.add('ld');
 $('dbd').firstChild.onerror = e => e.target.getAttribute('src') && $('det').classList.remove('bd');
 $('dlogo').onerror = () => {
   $('dlogo').hidden = true;
@@ -1339,8 +1349,9 @@ function clearArt() {
 }
 
 // What TMDB has of a title, once title-api has matched it (t.tmdb), with
-// its backdrop and logo loaded, so the page is drawn once with them; those
-// that fail to load left out. null if TMDB has none or fails.
+// its backdrop and logo loaded, so that the page isn't laid out for them
+// before they can show; those that fail to load left out. null if TMDB has
+// none or fails.
 async function tmdbOf(t) {
   const k = t.tmdb.type + t.tmdb.id;
   try {
@@ -1454,7 +1465,7 @@ async function openDetails(m) {
   // TMDB's comes with the page if it is quick, else it is drawn over the
   // page when it comes.
   const tm = t.tmdb && tmdbOf(t);
-  const x = tm ? await Promise.race([tm, new Promise(done => setTimeout(done, 2500))]) : null;
+  const x = tm ? await Promise.race([tm, new Promise(done => setTimeout(done, 3000))]) : null;
   if (item != m) return;
   if (x !== undefined) backdropKnown(m.id, !!x?.backdrop);
   else tm.then(x => {
