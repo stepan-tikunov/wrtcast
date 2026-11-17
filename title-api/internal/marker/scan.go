@@ -18,6 +18,8 @@ const (
 	joinGap = 5.0
 	// Credits that end so close to the video's end run to it.
 	creditsTail = 5.0
+	// An intro that begins so near the start, with no recap, begins there.
+	introLead = 15.0
 )
 
 // Span is a part as a scan found it: the numbers of its first frame and of
@@ -173,6 +175,11 @@ func (m *Marker) Mark(ctx context.Context, video Video, cues []Cue, duration flo
 	start, hasStart := result.Times["intro_start"]
 	if hasEnd && hasStart && start-end >= -joinGap && start-end <= joinGap {
 		result.Times["recap_end"], result.Times["intro_start"] = (end+start)/2, (end+start)/2
+	}
+	// Black and a network's logo are all an intro so near the start has
+	// before it.
+	if hasStart && !hasEnd && start <= introLead {
+		result.Times["intro_start"] = 0
 	}
 	return result, nil
 }
