@@ -25,6 +25,8 @@ const (
 	TitleService_GetMarkingSettings_FullMethodName    = "/title.v1.TitleService/GetMarkingSettings"
 	TitleService_UpdateMarkingSettings_FullMethodName = "/title.v1.TitleService/UpdateMarkingSettings"
 	TitleService_MarkEpisode_FullMethodName           = "/title.v1.TitleService/MarkEpisode"
+	TitleService_GetTmdbSettings_FullMethodName       = "/title.v1.TitleService/GetTmdbSettings"
+	TitleService_UpdateTmdbSettings_FullMethodName    = "/title.v1.TitleService/UpdateTmdbSettings"
 )
 
 // TitleServiceClient is the client API for TitleService service.
@@ -37,6 +39,8 @@ type TitleServiceClient interface {
 	GetMarkingSettings(ctx context.Context, in *GetMarkingSettingsQuery, opts ...grpc.CallOption) (*MarkingSettings, error)
 	UpdateMarkingSettings(ctx context.Context, in *UpdateMarkingSettingsCommand, opts ...grpc.CallOption) (*MarkingSettings, error)
 	MarkEpisode(ctx context.Context, in *MarkEpisodeCommand, opts ...grpc.CallOption) (*MarkEpisodeCommandResponse, error)
+	GetTmdbSettings(ctx context.Context, in *GetTmdbSettingsQuery, opts ...grpc.CallOption) (*TmdbSettings, error)
+	UpdateTmdbSettings(ctx context.Context, in *UpdateTmdbSettingsCommand, opts ...grpc.CallOption) (*TmdbSettings, error)
 }
 
 type titleServiceClient struct {
@@ -107,6 +111,26 @@ func (c *titleServiceClient) MarkEpisode(ctx context.Context, in *MarkEpisodeCom
 	return out, nil
 }
 
+func (c *titleServiceClient) GetTmdbSettings(ctx context.Context, in *GetTmdbSettingsQuery, opts ...grpc.CallOption) (*TmdbSettings, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TmdbSettings)
+	err := c.cc.Invoke(ctx, TitleService_GetTmdbSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *titleServiceClient) UpdateTmdbSettings(ctx context.Context, in *UpdateTmdbSettingsCommand, opts ...grpc.CallOption) (*TmdbSettings, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TmdbSettings)
+	err := c.cc.Invoke(ctx, TitleService_UpdateTmdbSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TitleServiceServer is the server API for TitleService service.
 // All implementations must embed UnimplementedTitleServiceServer
 // for forward compatibility.
@@ -117,6 +141,8 @@ type TitleServiceServer interface {
 	GetMarkingSettings(context.Context, *GetMarkingSettingsQuery) (*MarkingSettings, error)
 	UpdateMarkingSettings(context.Context, *UpdateMarkingSettingsCommand) (*MarkingSettings, error)
 	MarkEpisode(context.Context, *MarkEpisodeCommand) (*MarkEpisodeCommandResponse, error)
+	GetTmdbSettings(context.Context, *GetTmdbSettingsQuery) (*TmdbSettings, error)
+	UpdateTmdbSettings(context.Context, *UpdateTmdbSettingsCommand) (*TmdbSettings, error)
 	mustEmbedUnimplementedTitleServiceServer()
 }
 
@@ -144,6 +170,12 @@ func (UnimplementedTitleServiceServer) UpdateMarkingSettings(context.Context, *U
 }
 func (UnimplementedTitleServiceServer) MarkEpisode(context.Context, *MarkEpisodeCommand) (*MarkEpisodeCommandResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MarkEpisode not implemented")
+}
+func (UnimplementedTitleServiceServer) GetTmdbSettings(context.Context, *GetTmdbSettingsQuery) (*TmdbSettings, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTmdbSettings not implemented")
+}
+func (UnimplementedTitleServiceServer) UpdateTmdbSettings(context.Context, *UpdateTmdbSettingsCommand) (*TmdbSettings, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateTmdbSettings not implemented")
 }
 func (UnimplementedTitleServiceServer) mustEmbedUnimplementedTitleServiceServer() {}
 func (UnimplementedTitleServiceServer) testEmbeddedByValue()                      {}
@@ -274,6 +306,42 @@ func _TitleService_MarkEpisode_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TitleService_GetTmdbSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTmdbSettingsQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TitleServiceServer).GetTmdbSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TitleService_GetTmdbSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TitleServiceServer).GetTmdbSettings(ctx, req.(*GetTmdbSettingsQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TitleService_UpdateTmdbSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateTmdbSettingsCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TitleServiceServer).UpdateTmdbSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TitleService_UpdateTmdbSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TitleServiceServer).UpdateTmdbSettings(ctx, req.(*UpdateTmdbSettingsCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TitleService_ServiceDesc is the grpc.ServiceDesc for TitleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -304,6 +372,14 @@ var TitleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "MarkEpisode",
 			Handler:    _TitleService_MarkEpisode_Handler,
+		},
+		{
+			MethodName: "GetTmdbSettings",
+			Handler:    _TitleService_GetTmdbSettings_Handler,
+		},
+		{
+			MethodName: "UpdateTmdbSettings",
+			Handler:    _TitleService_UpdateTmdbSettings_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -44,6 +44,19 @@ service TitleService {
       body: "*"
     };
   }
+
+  rpc GetTmdbSettings(GetTmdbSettingsQuery) returns (TmdbSettings) {
+    option (google.api.http) = {
+      get: "/v1/tmdb"
+    };
+  }
+
+  rpc UpdateTmdbSettings(UpdateTmdbSettingsCommand) returns (TmdbSettings) {
+    option (google.api.http) = {
+      post: "/v1/tmdb"
+      body: "*"
+    };
+  }
 }
 
 enum MediaType {
@@ -122,6 +135,14 @@ message GetTitleDetailsQueryResponse {
   // A movie's, marked on a video of duration_seconds; an episode's are with
   // the episode.
   repeated Section sections = 16;
+  // The title on TMDB, once it is matched (see TmdbSettings).
+  TmdbTitle tmdb = 17;
+}
+
+// A title on TMDB: themoviedb.org/<movie or tv>/<id>.
+message TmdbTitle {
+  uint64 id = 1;
+  MediaType media_type = 2;
 }
 
 // A part of a movie or an episode that viewers may skip, as the primary
@@ -209,3 +230,24 @@ message MarkEpisodeCommand {
 }
 
 message MarkEpisodeCommandResponse {}
+
+message GetTmdbSettingsQuery {}
+
+// How title-api matches its titles with TMDB: in the background, each
+// title the first time its details are asked for, by TMDB's search, and
+// with Claude (the key of MarkingSettings) when the search finds no title
+// or several that fit.
+message TmdbSettings {
+  // Whether there is a TMDB API key (or read access token), and its last
+  // four characters.
+  bool key_set = 1;
+  string key_hint = 2;
+  // Why the last match failed, if it did.
+  string error = 3;
+}
+
+message UpdateTmdbSettingsCommand {
+  // A TMDB API key or read access token, which is checked before it is
+  // kept; empty removes it.
+  string api_key = 1;
+}

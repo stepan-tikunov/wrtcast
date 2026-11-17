@@ -114,6 +114,12 @@ func (s *Service) Settings(ctx context.Context) (Settings, error) {
 	return result, nil
 }
 
+// Key is the Claude API key, if there is one, which matching with TMDB
+// asks too.
+func (s *Service) Key(ctx context.Context) (string, error) {
+	return s.store.setting(ctx, "key")
+}
+
 // Update turns marking on or off, and keeps a key once Claude's API takes
 // it, or removes it when empty; nil leaves either as it is.
 func (s *Service) Update(ctx context.Context, enabled *bool, key *string) (Settings, error) {

@@ -19,6 +19,7 @@ import (
 	"title-api/internal/grpcserver"
 	"title-api/internal/marking"
 	"title-api/internal/provider"
+	"title-api/internal/tmdb"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
@@ -59,6 +60,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	matches, err := tmdb.New(ctx, urlStore.DB(), marks.Key)
+	if err != nil {
+		return err
+	}
 
 	client, err := provider.NewClient(provider.Config{
 		BaseURL:          baseURL,
@@ -81,6 +86,7 @@ func run() error {
 	}
 	log.Printf("provider anti-bot session initialized for %s", client.ProviderURL())
 	go marks.Run(ctx, client)
+	go matches.Run(ctx)
 
 	grpcListener, err := net.Listen("tcp", grpcAddress)
 	if err != nil {
@@ -92,7 +98,7 @@ func run() error {
 		return err
 	}
 
-	service := grpcserver.New(client).WithMarking(marks)
+	service := grpcserver.New(client).WithMarking(marks).WithTmdb(matches)
 	grpcServer := grpc.NewServer()
 	titlev1.RegisterTitleServiceServer(grpcServer, service)
 	healthServer := health.NewServer()

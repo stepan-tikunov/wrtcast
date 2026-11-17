@@ -8,6 +8,7 @@ import (
 	titlev1 "title-api/api/title/v1"
 	"title-api/internal/marking"
 	"title-api/internal/provider"
+	"title-api/internal/tmdb"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,6 +18,7 @@ type Server struct {
 	titlev1.UnimplementedTitleServiceServer
 	client  *provider.Client
 	marking *marking.Service
+	tmdb    *tmdb.Service
 }
 
 func New(client *provider.Client) *Server {
@@ -27,6 +29,13 @@ func New(client *provider.Client) *Server {
 // serve its settings.
 func (s *Server) WithMarking(service *marking.Service) *Server {
 	s.marking = service
+	return s
+}
+
+// WithTmdb has the server match the titles whose details are asked for
+// with TMDB, tell their TMDB titles, and serve its settings.
+func (s *Server) WithTmdb(service *tmdb.Service) *Server {
+	s.tmdb = service
 	return s
 }
 
@@ -155,7 +164,68 @@ func (s *Server) GetTitleDetails(
 		}
 		response.Seasons = titleDetailsSeasons(seasons)
 	}
+	if s.tmdb != nil {
+		if match, ok := s.tmdb.Match(ctx, metadata.TitleID); ok {
+			response.Tmdb = &titlev1.TmdbTitle{Id: match.ID, MediaType: titlev1.MediaType_MEDIA_TYPE_MOVIE}
+			if match.Kind == tmdb.KindTV {
+				response.Tmdb.MediaType = titlev1.MediaType_MEDIA_TYPE_SERIES
+			}
+		} else {
+			s.tmdb.Opened(tmdbTitle(metadata))
+		}
+	}
 	return response, nil
+}
+
+// tmdbTitle is a title as matching with TMDB knows it.
+func tmdbTitle(metadata provider.TitleMetadata) tmdb.Title {
+	title := tmdb.Title{
+		ID: metadata.TitleID, Title: metadata.Title, OriginalTitle: metadata.OriginalTitle,
+		Year: metadata.Year, Countries: metadata.Countries, Directors: metadata.Directors,
+		Actors: metadata.Actors[:min(len(metadata.Actors), 5)], Description: metadata.Description,
+	}
+	switch metadata.MediaType {
+	case provider.MediaTypeMovie:
+		title.Kind = tmdb.KindMovie
+	case provider.MediaTypeSeries:
+		title.Kind = tmdb.KindTV
+	}
+	return title
+}
+
+func (s *Server) GetTmdbSettings(
+	ctx context.Context,
+	_ *titlev1.GetTmdbSettingsQuery,
+) (*titlev1.TmdbSettings, error) {
+	if s.tmdb == nil {
+		return nil, status.Error(codes.Unimplemented, "TMDB is off")
+	}
+	settings, err := s.tmdb.Settings(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return tmdbSettings(settings), nil
+}
+
+func (s *Server) UpdateTmdbSettings(
+	ctx context.Context,
+	command *titlev1.UpdateTmdbSettingsCommand,
+) (*titlev1.TmdbSettings, error) {
+	if s.tmdb == nil {
+		return nil, status.Error(codes.Unimplemented, "TMDB is off")
+	}
+	settings, err := s.tmdb.Update(ctx, command.GetApiKey())
+	switch {
+	case errors.Is(err, tmdb.ErrInvalidKey):
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	case err != nil:
+		return nil, status.Error(codes.Unavailable, err.Error())
+	}
+	return tmdbSettings(settings), nil
+}
+
+func tmdbSettings(settings tmdb.Settings) *titlev1.TmdbSettings {
+	return &titlev1.TmdbSettings{KeySet: settings.KeySet, KeyHint: settings.KeyHint, Error: settings.Error}
 }
 
 func (s *Server) GetMarkingSettings(
