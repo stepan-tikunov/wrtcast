@@ -233,6 +233,42 @@ func (gatewayTestService) LookupTmdbTitle(
 	return &titlev1.TmdbLookup{State: titlev1.TmdbLookup_STATE_FOUND, TitleId: fmt.Sprint(command.GetMediaType(), command.GetTmdbId())}, nil
 }
 
+func (gatewayTestService) GetSeriesUpdates(
+	_ context.Context,
+	query *titlev1.GetSeriesUpdatesQuery,
+) (*titlev1.GetSeriesUpdatesQueryResponse, error) {
+	response := &titlev1.GetSeriesUpdatesQueryResponse{}
+	for _, id := range query.GetTitleIds() {
+		response.Updates = append(response.Updates, &titlev1.SeriesUpdate{TitleId: id, LastSeason: 2, LastEpisode: "1"})
+	}
+	for _, id := range query.GetUpcomingTitleIds() {
+		response.Updates = append(response.Updates, &titlev1.SeriesUpdate{
+			TitleId: id, Status: titlev1.TmdbStatus_TMDB_STATUS_RETURNING,
+			NextEpisode: &titlev1.TmdbEpisodeRef{SeasonNumber: 3, EpisodeNumber: 1, AirDate: "2027-01-16"},
+		})
+	}
+	return response, nil
+}
+
+func TestSeriesUpdatesHTTPAnnotation(t *testing.T) {
+	t.Parallel()
+	request := httptest.NewRequest(http.MethodPost, "/v1/series/updates",
+		strings.NewReader(`{"titleIds":["a"],"upcomingTitleIds":["b"]}`))
+	response := httptest.NewRecorder()
+	testGateway(t).ServeHTTP(response, request)
+	want := `{"updates":[{"titleId":"a","lastSeason":2,"lastEpisode":"1","status":"TMDB_STATUS_UNSPECIFIED","nextEpisode":null},` +
+		`{"titleId":"b","lastSeason":0,"lastEpisode":"","status":"TMDB_STATUS_RETURNING",` +
+		`"nextEpisode":{"seasonNumber":3,"episodeNumber":1,"airDate":"2027-01-16","name":""}}]}`
+	var got, wanted any
+	if err := json.Unmarshal(response.Body.Bytes(), &got); err != nil || response.Code != http.StatusOK {
+		t.Fatalf("%d %s", response.Code, response.Body.String())
+	}
+	_ = json.Unmarshal([]byte(want), &wanted)
+	if fmt.Sprint(got) != fmt.Sprint(wanted) {
+		t.Errorf("got %s\nwant %s", response.Body.String(), want)
+	}
+}
+
 func TestTmdbHTTPAnnotations(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct{ path, field, want string }{

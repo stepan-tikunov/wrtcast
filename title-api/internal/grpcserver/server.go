@@ -256,6 +256,69 @@ func (s *Server) LookupTmdbTitle(
 	return &titlev1.TmdbLookup{State: tmdbLookupStates[state], TitleId: title}, nil
 }
 
+// seriesUpdatesWait bounds the provider's part of GetSeriesUpdates, below
+// the router's 20 s for a request of title-api.
+const seriesUpdatesWait = 15 * time.Second
+
+// seriesUpdatesMax is the most titles of a list of GetSeriesUpdates.
+const seriesUpdatesMax = 30
+
+func (s *Server) GetSeriesUpdates(
+	ctx context.Context,
+	query *titlev1.GetSeriesUpdatesQuery,
+) (*titlev1.GetSeriesUpdatesQueryResponse, error) {
+	if len(query.GetTitleIds()) > seriesUpdatesMax || len(query.GetUpcomingTitleIds()) > seriesUpdatesMax {
+		return nil, status.Errorf(codes.InvalidArgument, "at most %d titles a list", seriesUpdatesMax)
+	}
+	// The provider is asked one title after another, as long as there is
+	// time; those it takes too long for are fetched on and kept (see
+	// provider.Client.Series).
+	wait, cancel := context.WithTimeout(ctx, seriesUpdatesWait)
+	defer cancel()
+	response := &titlev1.GetSeriesUpdatesQueryResponse{}
+	update := func(id string, last bool) {
+		update := &titlev1.SeriesUpdate{TitleId: id}
+		if s.tmdb != nil {
+			match, series, ok := s.tmdb.Upcoming(ctx, id)
+			if ok && match.Kind != tmdb.KindTV {
+				return
+			}
+			if series != nil {
+				update.Status = tmdbStatuses[series.Status]
+				update.NextEpisode = tmdbEpisodeRef(series.Next)
+			}
+		}
+		if last && s.client != nil && wait.Err() == nil {
+			seasons, err := s.client.Series(wait, id)
+			if errors.Is(err, provider.ErrNotSeries) {
+				return
+			}
+			if err == nil {
+				update.LastSeason, update.LastEpisode = lastEpisode(seasons)
+			}
+		}
+		response.Updates = append(response.Updates, update)
+	}
+	for _, id := range query.GetTitleIds() {
+		update(id, true)
+	}
+	for _, id := range query.GetUpcomingTitleIds() {
+		update(id, false)
+	}
+	return response, nil
+}
+
+// lastEpisode is a series' last episode on the provider: that of its last
+// season with any.
+func lastEpisode(seasons []provider.Season) (int32, string) {
+	for i := len(seasons) - 1; i >= 0; i-- {
+		if episodes := seasons[i].Episodes; len(episodes) > 0 {
+			return seasons[i].Number, episodes[len(episodes)-1].Number
+		}
+	}
+	return 0, ""
+}
+
 // tmdbTitle is a title as matching with TMDB knows it.
 func tmdbTitle(metadata provider.TitleMetadata) tmdb.Title {
 	title := tmdb.Title{

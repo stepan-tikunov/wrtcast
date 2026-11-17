@@ -89,31 +89,11 @@ func cached[T any](
 	ttl func(T, time.Time) time.Duration,
 	fetch func(context.Context) (T, error),
 ) (T, error) {
-	var value T
-	fetchJSON := func(ctx context.Context) ([]byte, error) {
-		value, err := fetch(ctx)
-		if err != nil {
-			return nil, err
-		}
-		return json.Marshal(value)
-	}
-	data, fetched, ok, err := c.read(ctx, key)
-	if err != nil {
-		log.Printf("tmdb cache %s: %v", key, err)
-	}
-	if ok && json.Unmarshal(data, &value) == nil {
-		if now := c.now(); now.Sub(fetched) >= ttl(value, now) {
-			f := c.fetch(key, fetchJSON)
-			go func() {
-				<-f.done
-				if f.err != nil {
-					log.Printf("tmdb cache %s: %v", key, f.err)
-				}
-			}()
-		}
+	if value, ok := stored(ctx, c, key, ttl, fetch, false); ok {
 		return value, nil
 	}
-	f := c.fetch(key, fetchJSON)
+	var value T
+	f := c.fetch(key, fetchJSON(fetch))
 	select {
 	case <-ctx.Done():
 		return value, ctx.Err()
@@ -122,7 +102,44 @@ func cached[T any](
 	if f.err != nil {
 		return value, f.err
 	}
-	var fresh T
-	err = json.Unmarshal(f.data, &fresh)
-	return fresh, err
+	err := json.Unmarshal(f.data, &value)
+	return value, err
+}
+
+// stored is the value of a key as the cache has it, fetched again in the
+// background once past its time; missing, it is fetched in the
+// background as well if fetchMissing, never waited for.
+func stored[T any](
+	ctx context.Context, c *cache, key string,
+	ttl func(T, time.Time) time.Duration,
+	fetch func(context.Context) (T, error),
+	fetchMissing bool,
+) (T, bool) {
+	var value T
+	data, fetched, ok, err := c.read(ctx, key)
+	if err != nil {
+		log.Printf("tmdb cache %s: %v", key, err)
+	}
+	ok = ok && json.Unmarshal(data, &value) == nil
+	if ok && c.now().Sub(fetched) < ttl(value, c.now()) || !ok && !fetchMissing {
+		return value, ok
+	}
+	f := c.fetch(key, fetchJSON(fetch))
+	go func() {
+		<-f.done
+		if f.err != nil {
+			log.Printf("tmdb cache %s: %v", key, f.err)
+		}
+	}()
+	return value, ok
+}
+
+func fetchJSON[T any](fetch func(context.Context) (T, error)) func(context.Context) ([]byte, error) {
+	return func(ctx context.Context) ([]byte, error) {
+		value, err := fetch(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(value)
+	}
 }

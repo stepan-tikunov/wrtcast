@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"golang.org/x/net/publicsuffix"
+	"golang.org/x/sync/singleflight"
 )
 
 // The CDN binds signed media URLs to the User-Agent used to request the embed
@@ -88,6 +89,11 @@ type Client struct {
 
 	marks Marks
 
+	// The series' episodes fetched lately (see Series).
+	seriesMu     sync.Mutex
+	series       map[string]seriesEntry
+	seriesFlight singleflight.Group
+
 	mu             sync.RWMutex
 	session        *session
 	nextGeneration uint64
@@ -135,6 +141,7 @@ func NewClient(config Config) (*Client, error) {
 		alignmentStore:   config.AlignmentStore,
 		marks:            config.Marks,
 		alignments:       map[string]*videoAlignment{},
+		series:           map[string]seriesEntry{},
 		primaries:        map[string]*primaryVideo{},
 		alignSlots:       make(chan struct{}, alignJobs),
 		browser:          newBrowser(false),

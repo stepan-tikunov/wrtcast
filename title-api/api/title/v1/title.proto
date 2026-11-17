@@ -87,6 +87,13 @@ service TitleService {
       post: "/v1/tmdb/{media_type}/{tmdb_id}/lookup"
     };
   }
+
+  rpc GetSeriesUpdates(GetSeriesUpdatesQuery) returns (GetSeriesUpdatesQueryResponse) {
+    option (google.api.http) = {
+      post: "/v1/series/updates"
+      body: "*"
+    };
+  }
 }
 
 enum MediaType {
@@ -467,4 +474,33 @@ message TmdbEpisode {
   uint32 runtime_minutes = 6;
   // Not aired yet: its date is to come or unknown.
   bool upcoming = 7;
+}
+
+// What is new of series: their last episode on the provider and what TMDB
+// has coming, for the main page's badges.
+message GetSeriesUpdatesQuery {
+  // The series whose last episode on the provider is told, at most 30,
+  // asked of it one by one, as long as the request may take: those it
+  // takes too long for come without it, fetched meanwhile for the next
+  // request. A series' episodes are kept for 5 minutes.
+  repeated string title_ids = 1;
+  // The series of which only what TMDB has coming is told, at most 30.
+  repeated string upcoming_title_ids = 2;
+}
+
+message GetSeriesUpdatesQueryResponse {
+  // Of the titles asked for, those not known to be movies, as asked.
+  repeated SeriesUpdate updates = 1;
+}
+
+message SeriesUpdate {
+  string title_id = 1;
+  // The provider's last episode, empty when not asked for or not told in
+  // time.
+  int32 last_season = 2;
+  string last_episode = 3;
+  // As TMDB has the series, of the details kept of it: unspecified, and no
+  // next episode, until it is matched and its details are kept.
+  TmdbStatus status = 4;
+  TmdbEpisodeRef next_episode = 5;
 }

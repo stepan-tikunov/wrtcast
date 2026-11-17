@@ -304,3 +304,38 @@ func TestSeason(t *testing.T) {
 		t.Fatalf("season 9: %+v, %v", none, err)
 	}
 }
+
+func TestUpcoming(t *testing.T) {
+	fake := newFakeTMDB(t)
+	service, now := newServingService(t, fake, "key")
+	ctx := context.Background()
+	if err := service.store.matched(ctx, "dexter", 1405, KindTV, byName, "", 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.store.matched(ctx, "fight", 550, KindMovie, byName, "", 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := service.Upcoming(ctx, "other"); ok {
+		t.Error("a title not matched")
+	}
+	if match, series, ok := service.Upcoming(ctx, "fight"); !ok || match.Kind != KindMovie || series != nil {
+		t.Errorf("a movie: %+v, %+v, %v", match, series, ok)
+	}
+	// Not kept: nothing yet, fetched in the background.
+	if match, series, ok := service.Upcoming(ctx, "dexter"); !ok || match.ID != 1405 || series != nil {
+		t.Fatalf("not kept: %+v, %+v, %v", match, series, ok)
+	}
+	waitFor(t, "the details to be kept", func() bool {
+		_, _, ok, _ := service.cache.read(ctx, detailsKey(KindTV, 1405))
+		return ok
+	})
+	if _, series, _ := service.Upcoming(ctx, "dexter"); series == nil || series.Status != StatusEnded || series.Next != nil {
+		t.Fatalf("kept: %+v", series)
+	}
+	// Past its time: as kept, fetched again in the background.
+	now.advance(31 * 24 * time.Hour)
+	if _, series, _ := service.Upcoming(ctx, "dexter"); series == nil {
+		t.Fatal("stale: nothing")
+	}
+	waitFor(t, "the refresh", func() bool { return fake.count("/tv/1405") == 2 })
+}

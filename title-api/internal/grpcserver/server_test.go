@@ -156,3 +156,72 @@ func TestMediaStreamsMapsProxyHeaders(t *testing.T) {
 		t.Fatalf("unexpected streams: %+v", streams)
 	}
 }
+
+func TestGetSeriesUpdates(t *testing.T) {
+	t.Parallel()
+
+	var serverURL string
+	upstream := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/":
+			_, _ = response.Write([]byte("ready"))
+		case "/index.php":
+			_, _ = fmt.Fprintf(response, `<iframe src="%s/embed/movie/%s"></iframe>`, serverURL, request.URL.Query().Get("newsid"))
+		case "/embed/movie/20973":
+			_, _ = response.Write([]byte(`makePlayer({playlist:{seasons:[` +
+				`{"season":2,"episodes":[{"episode":"1","hls":"x/master.m3u8"}]},` +
+				`{"season":1,"episodes":[{"episode":"10","hls":"x/master.m3u8"},{"episode":"2","hls":"x/master.m3u8"}]}` +
+				`]}}); var lok=1,x="marker";`))
+		case "/embed/movie/42185":
+			_, _ = response.Write([]byte(`makePlayer({source:{hls:"x/master.m3u8"}}); var lok=1,x="marker";`))
+		default:
+			response.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer upstream.Close()
+	serverURL = upstream.URL
+
+	client, err := provider.NewClient(provider.Config{BaseURL: upstream.URL, RefreshInterval: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := client.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	service := New(client)
+	series, movie := client.ExternalTitleID("20973"), client.ExternalTitleID("42185")
+	response, err := service.GetSeriesUpdates(ctx, &titlev1.GetSeriesUpdatesQuery{
+		TitleIds: []string{series, movie}, UpcomingTitleIds: []string{movie},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The movie asked for its episodes is left out; asked for what TMDB
+	// has coming alone, it isn't known to be one.
+	updates := response.GetUpdates()
+	if len(updates) != 2 || updates[0].GetTitleId() != series || updates[1].GetTitleId() != movie ||
+		updates[0].GetLastSeason() != 2 || updates[0].GetLastEpisode() != "1" || updates[1].GetLastEpisode() != "" {
+		t.Fatalf("updates %v", updates)
+	}
+
+	ids := make([]string, seriesUpdatesMax+1)
+	for i := range ids {
+		ids[i] = series
+	}
+	if _, err := service.GetSeriesUpdates(ctx, &titlev1.GetSeriesUpdatesQuery{UpcomingTitleIds: ids}); status.Code(err) != codes.InvalidArgument {
+		t.Errorf("too many: %v", err)
+	}
+}
+
+func TestLastEpisode(t *testing.T) {
+	t.Parallel()
+	seasons := []provider.Season{{Number: 1, Episodes: []provider.Episode{{Number: "1"}, {Number: "2"}}}, {Number: 2}}
+	if season, episode := lastEpisode(seasons); season != 1 || episode != "2" {
+		t.Errorf("lastEpisode = %d, %q", season, episode)
+	}
+	if season, episode := lastEpisode(nil); season != 0 || episode != "" {
+		t.Errorf("none = %d, %q", season, episode)
+	}
+}

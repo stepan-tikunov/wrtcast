@@ -85,7 +85,9 @@ func (s *scalarString) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (c *Client) Series(ctx context.Context, externalMovieID string) ([]Season, error) {
+// fetchSeries are a series' episodes by season, from the provider's pages
+// (see Series).
+func (c *Client) fetchSeries(ctx context.Context, externalMovieID string) ([]Season, error) {
 	current, movieHTML, embedURLs, err := c.movieDocument(ctx, externalMovieID)
 	if err != nil {
 		return nil, err

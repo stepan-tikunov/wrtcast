@@ -75,18 +75,47 @@ const detailsVersion = 2
 
 // details are a title on TMDB as cached.
 func (s *Service) details(ctx context.Context, tmdb *client, kind string, id uint64) (Details, error) {
-	details, err := cached(ctx, s.cache, fmt.Sprintf("%s:%d:v%d", kind, id, detailsVersion), Details.ttl,
-		func(ctx context.Context) (Details, error) {
-			raw, err := tmdb.details(ctx, kind, id)
-			if err != nil {
-				return Details{}, err
-			}
-			return pickDetails(kind, raw), nil
-		})
+	details, err := cached(ctx, s.cache, detailsKey(kind, id), Details.ttl, fetchDetails(tmdb, kind, id))
 	if errors.Is(err, errNotFound) {
 		return Details{}, ErrNotFound
 	}
 	return details, err
+}
+
+func detailsKey(kind string, id uint64) string {
+	return fmt.Sprintf("%s:%d:v%d", kind, id, detailsVersion)
+}
+
+func fetchDetails(tmdb *client, kind string, id uint64) func(context.Context) (Details, error) {
+	return func(ctx context.Context) (Details, error) {
+		raw, err := tmdb.details(ctx, kind, id)
+		if err != nil {
+			return Details{}, err
+		}
+		return pickDetails(kind, raw), nil
+	}
+}
+
+// Upcoming is what TMDB has of a series of title-api's (its status and
+// next episode), and its match: as kept, never waited for. Its details
+// missing or past their time are fetched in the background, for the next
+// time. A title matched with a movie has its match alone, as has a series
+// with no key or its details not kept; one not matched, nothing.
+func (s *Service) Upcoming(ctx context.Context, title string) (Match, *Series, bool) {
+	match, ok := s.Match(ctx, title)
+	if !ok || match.Kind != KindTV {
+		return match, nil, ok
+	}
+	tmdb, err := s.keyed(ctx)
+	if err != nil {
+		return match, nil, true
+	}
+	details, ok := stored(ctx, s.cache, detailsKey(match.Kind, match.ID), Details.ttl,
+		fetchDetails(tmdb, match.Kind, match.ID), true)
+	if !ok {
+		return match, nil, true
+	}
+	return match, details.Series, true
 }
 
 // Cast are the people in a title on TMDB, as billed, as Details keep them.
