@@ -130,8 +130,11 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .cast div{flex:none;width:76px;font-size:12px;line-height:1.25;text-align:center}
 .cast img,.cast .nop{display:block;width:56px;height:56px;margin:0 auto 6px;border-radius:50%;object-fit:cover;background:var(--s2)}
 /* Someone without a photo, and the last of the row that leads to them all. */
-.nop{display:grid!important;place-items:center;color:#55555c;font-style:normal}
+.nop{position:relative;display:grid!important;place-items:center;overflow:hidden;color:#55555c;font-style:normal}
 .nop svg{width:60%;height:60%}
+/* The photo over it, faded in once loaded (see photo). */
+.nop img{position:absolute;inset:0;width:100%;height:100%;margin:0;border-radius:50%;object-fit:cover;opacity:0;transition:opacity .3s}
+.nop img.ld{opacity:1}
 .cast button{display:block;width:76px;padding:0;border:0;background:none;color:var(--mu);font-size:12px;cursor:pointer}
 .cast button .nop{color:var(--mu)}
 .dh.more{display:flex;align-items:center;gap:2px;cursor:pointer}
@@ -339,7 +342,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .card img{opacity:0;transition:opacity .35s}
 .card img.ld{opacity:1}
 .sk{display:block;aspect-ratio:2/3;border-radius:12px}
-.sk,.skl,.cast .ph,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
+.sk,.skl,.nop.ph,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
 .skl{display:block;height:12px;margin-top:9px;border-radius:6px}
 .skl+.skl{width:40%}
 .badge.on{animation:bounce .35s ease-out}
@@ -1344,14 +1347,24 @@ function renderInfo(t, x, again) {
   ].filter(Boolean));
 }
 
-// An actor's photo: a placeholder circle until it loads, and if it fails;
-// a silhouette if TMDB has none.
+// An actor's photo over a silhouette: the silhouette shimmers until the
+// photo loads, which then fades in; it stays if TMDB has no photo or it
+// fails to load.
 function photo(src) {
-  if (!src) return el('i', { className: 'nop' }, svgIcon('person'));
-  const img = el('img', { src, alt: '', loading: 'lazy', className: 'ph' });
-  img.onload = () => img.classList.remove('ph');
-  img.onerror = () => img.src = BLANK; // a circle stays
-  return img;
+  const sil = el('i', { className: 'nop' }, svgIcon('person'));
+  if (!src) return sil;
+  const img = el('img', { src, alt: '', loading: 'lazy' });
+  sil.classList.add('ph');
+  img.onload = () => {
+    img.classList.add('ld');
+    sil.classList.remove('ph');
+  };
+  img.onerror = () => {
+    img.remove();
+    sil.classList.remove('ph');
+  };
+  sil.append(img);
+  return sil;
 }
 
 // TMDB's backdrop and logo over the page's top; without them, or should
