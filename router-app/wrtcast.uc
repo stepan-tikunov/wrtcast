@@ -2588,6 +2588,17 @@ const marking = r => ({
 	enabled: !!r?.enabled, key: !!r?.keySet, hint: r?.keyHint || null, error: r?.error || null,
 });
 
+const tmdb = r => ({ key: !!r?.keySet, hint: r?.keyHint || null, error: r?.error || null });
+
+// A key for title-api, as the page sends it: printable ASCII, 512 bytes at
+// most (TMDB's read access token is a JWT of some 250). musl's regular
+// expressions repeat 255 times at most, hence the length apart.
+function api_key(key) {
+	if (length(key) > 512 || !match(key, /^[!-~]*$/))
+		fail(400, 'invalid key');
+	return key;
+}
+
 const routes = {
 	'GET /search': p => {
 		let q = trim(p.q ?? '');
@@ -2632,6 +2643,10 @@ const routes = {
 			actors: r.actors ?? [],
 			ratings: map(r.ratings ?? [], x => ({ source: x.source, value: x.value })),
 			duration: +(r.durationSeconds ?? 0),
+			// The title on TMDB, once title-api has matched it (see /tmdb).
+			tmdb: r.tmdb?.id ? {
+				id: +r.tmdb.id, type: r.tmdb.mediaType == 'MEDIA_TYPE_SERIES' ? 'tv' : 'movie',
+			} : null,
 			// A movie's, marked on a video of duration; an episode's are
 			// with the episode.
 			sections: series ? null : sections(r.sections),
@@ -2742,17 +2757,30 @@ const routes = {
 				fail(400, 'invalid on');
 			body.enabled = p.on == '1';
 		}
-		if (p.key != null) {
-			if (length(p.key) > 256 || !match(p.key, /^[!-~]*$/))
-				fail(400, 'invalid key');
-			body.apiKey = p.key;
-		}
+		if (p.key != null)
+			body.apiKey = api_key(p.key);
 		let r = api_post('/v1/marking', body);
 		if (r.status == 400)
 			fail(400, 'Ключ не подошёл');
 		if (r.status != 200)
 			fail(502, 'title-api request failed' + (r.status ? ` (HTTP ${r.status})` : ''));
 		return marking(json(r.out));
+	},
+
+	// title-api's matching of the titles opened with TMDB: { key, hint,
+	// error }, the key only told whether it is set and by its last
+	// characters.
+	'GET /tmdb': p => tmdb(api('/v1/tmdb')),
+
+	// Sets the TMDB API key or read access token (key), or removes it (key
+	// '').
+	'POST /tmdb': p => {
+		let r = api_post('/v1/tmdb', { apiKey: api_key(p.key ?? '') });
+		if (r.status == 400)
+			fail(400, 'Ключ не подошёл');
+		if (r.status != 200)
+			fail(502, 'title-api request failed' + (r.status ? ` (HTTP ${r.status})` : ''));
+		return tmdb(json(r.out));
 	},
 
 	'POST /cmd': p => {

@@ -205,7 +205,7 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
 |---|---|
 | `GET /api/search?q=` | `{results:[{id,title,year,poster}]}`, `q` — не меньше 3 символов |
 | `GET /api/streams?id=` `season`+`episode`? `device`? | `{streams:[{index,name,url,headers,audio:[{id,name,lang,default}],subs:[{id,name,lang,forced,url}]}]}`; `headers` — нужные CDN заголовки строками `Name: value`. Список запоминается для этого ТВ на 10 минут, и `play` того же тайтла берёт его оттуда |
-| `GET /api/title?id=` | `{id,title,original,year,description,poster,type,quality,countries,genres,directors,actors,ratings:[{source,value}],duration,sections,seasons}`; `type` — `movie` или `series`, `seasons` (`[{season,episodes:[{episode,title,duration,sections}]}]`) у фильмов `null`; `sections` — повтор, заставка и титры фильма (у сериала `null`) или серии, `[{kind,start,end,skip}]`, `kind` — `recap`, `intro` или `credits`, размеченные на видео длительностью `duration`; разделы сайта и годы из `genres` убираются |
+| `GET /api/title?id=` | `{id,title,original,year,description,poster,type,quality,countries,genres,directors,actors,ratings:[{source,value}],duration,sections,seasons}`; `type` — `movie` или `series`, `seasons` (`[{season,episodes:[{episode,title,duration,sections}]}]`) у фильмов `null`; `sections` — повтор, заставка и титры фильма (у сериала `null`) или серии, `[{kind,start,end,skip}]`, `kind` — `recap`, `intro` или `credits`, размеченные на видео длительностью `duration`; разделы сайта и годы из `genres` убираются; `tmdb` — `{id,type}` тайтла на TMDB (`type` — `movie` или `tv`), когда title-api его нашёл, иначе `null` (первое открытие тайтла запускает поиск) |
 | `GET /api/progress` | `{recent:[{id,title,poster,t,season,episode,pos,dur,done}],saved:[…]}` — недавно смотревшиеся тайтлы, последние первыми; у сериала позиция последней серии. `saved` — сохранённые, последние сохранённые первыми, с теми же полями (`t` — когда сохранён; у тех, что не смотрели, `pos` и остальные `null`) |
 | `POST /api/save` `id`, `on`, `title`?, `poster`? | `on=1` сохраняет тайтл (название и постер — для списка), `on=0` убирает; возвращает `{saved}`, как `/progress`. Только что сохранённый сериал роутер передаёт title-api для разметки (см. «Повтор, заставка и титры») |
 | `GET /api/progress?id=` | `{progress,prefs}`: `progress` у фильма `{pos,dur,done}`, у сериала `{last:{season,episode},eps:{"<сезон>:<серия>":{pos,dur,done,t}}}`, `null`, если тайтл не смотрели; `prefs` — `{source,quality,audio,subs}`, с чем его смотрели (см. «Прогресс просмотра»), или `null` |
@@ -214,6 +214,8 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
 | `POST /api/autoskip` `on` | то же для пропуска повтора и заставки |
 | `GET /api/marking` | разметка серий title-api (см. «Повтор, заставка и титры»): `{ enabled, key, hint, error }` — включена ли, задан ли ключ API Claude и его последние символы, ошибка последней разметки |
 | `POST /api/marking` `on`?, `key`? | `on=1`/`0` включает и выключает разметку, `key` задаёт ключ (title-api сперва проверяет его; неподходящий — `400`), пустой `key` удаляет. Ключ уходит в title-api через stdin `uclient-fetch`, не попадая ни в командную строку, ни в `/tmp`; возвращает то же, что `GET` |
+| `GET /api/tmdb` | сопоставление тайтлов title-api с TMDB (см. README title-api): `{ key, hint, error }` — задан ли ключ TMDB и его последние символы, ошибка последнего сопоставления |
+| `POST /api/tmdb` `key` | задаёт ключ API или токен доступа TMDB (title-api сперва проверяет его; неподходящий — `400`), пустой `key` удаляет; ключ уходит в title-api так же, как у `/api/marking`; возвращает то же, что `GET` |
 | `POST /api/cmd` `c`, `arg`? | `pause resume stop quit mute unmute` · `seek ff rew volume` (число) · `audio subs` (id/язык/название/`off`) · `substyle` (`size=…,bg=#RRGGBBAA`, формат `castctl substyle`) |
 | `GET /api/devices` `refresh`? | `{devices:[{id,name,model,host,port}],default}`: `castctl discover`, кэш на 60 с, если не передан `refresh=1`; `default` — id устройства из `cast_host` |
 | `GET /api/status` | `castctl status`; если поток запущен через `/api/play`, добавляет `now:{id,stream,title,poster,season,episode,quality,qualities,source,sources,drc,drc_ok,autonext,autoskip,sections,skipped}` (`drc` — выравнивание включено, `drc_ok` — источник его допускает, `autonext` — следующая серия запустится сама, `autoskip` — повтор и заставка пропускаются сами, `sections` — повтор, заставка и титры на видео, которое играет ТВ, `skipped` — индексы тех из них, что роутер уже пропустил) и к каждой дорожке `label` из title-api; всегда добавляет `device:{id,name}` |
@@ -532,9 +534,11 @@ title-api сообщает у каждого потока, где в серии 
   начнут смотреть, как у кнопки запуска: первой первого сезона, а если
   его уже смотрели — последней начатой или следующей за досмотренной.
   title-api размечает только её; запуск серии затем ставит в очередь её и
-  две следующие. Ключ и переключатель — в шторке «Разметка серий» (кнопка
+  две следующие. Ключ и переключатель — в шторке «Настройки» (кнопка
   с шестерёнкой в шапке), роутер передаёт их в title-api
-  (`/api/marking`). Готовая разметка приходит в тех же `sections`.
+  (`/api/marking`). Готовая разметка приходит в тех же `sections`. Там же
+  — ключ TMDB (`/api/tmdb`), с которым title-api сопоставляет открытые
+  тайтлы с TMDB.
 - `autonext` и `autoskip` — настройки роутера (таблица `settings`, вместе с
   историей копируется на флеш): их меняют `POST /api/autonext` и
   `POST /api/autoskip`, `play` без этих параметров берёт их оттуда, а

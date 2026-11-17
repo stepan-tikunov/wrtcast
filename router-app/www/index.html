@@ -201,13 +201,14 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .sw input::before{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--tx);transition:transform .2s}
 .sw input:checked{background:var(--ac)}
 .sw input:checked::before{transform:translateX(18px)}
-#stop,#mkdel{display:block;margin:4px auto 0;padding:10px 16px;border:0;background:none;color:var(--err);font-size:15px}
+#stop,#mkdel,#tmdel{display:block;margin:4px auto 0;padding:10px 16px;border:0;background:none;color:var(--err);font-size:15px}
 .sw input:disabled{opacity:.4}
 .hint{margin:0 2px 4px;color:var(--mu);font-size:13px;line-height:1.4}
 .hint.err{color:var(--err)}
-#mkkey{flex:1;min-width:0;height:46px;padding:0 14px;border:0;border-radius:14px;background:var(--s2);outline:none;font-size:16px;-webkit-user-select:text;user-select:text}
-#mkkey:focus{box-shadow:0 0 0 2px var(--ac)}
-#mkf .pill{flex:none;height:46px}
+#mkkey,#tmkey{flex:1;min-width:0;height:46px;padding:0 14px;border:0;border-radius:14px;background:var(--s2);outline:none;font-size:16px;-webkit-user-select:text;user-select:text}
+#mkkey:focus,#tmkey:focus{box-shadow:0 0 0 2px var(--ac)}
+#mkf .pill,#tmf .pill{flex:none;height:46px}
+.sheet h3{margin:14px 2px 6px;font-size:15px;font-weight:600}
 .spin{width:14px;height:14px;border:2px solid var(--mu);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -225,7 +226,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 /* A sheet over the player dims the player too. */
 #shade.top{z-index:7}
 /* Long lists scroll inside the sheet instead of pushing it off screen. */
-#optbody,#devlist,#srclist{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+#optbody,#devlist,#srclist,#mkbody{min-height:0;overflow-y:auto;overscroll-behavior:contain}
 #devlist .dev,#srclist .dev{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;padding:8px 4px;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
 .dev span{flex:1;min-width:0}
 .dev b{display:block;font-weight:550}
@@ -369,7 +370,7 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
 
-<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg></button><button class="ib" id="mkbtn" aria-label="Разметка серий"><svg><use href="#i-gear"/></svg></button></header>
+<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg></button><button class="ib" id="mkbtn" aria-label="Настройки"><svg><use href="#i-gear"/></svg></button></header>
 <main id="home">
   <h2 class="sec" id="rtitle" hidden>Недавно смотрели<svg><use href="#i-more"/></svg></h2>
   <div class="grid" id="grid"></div>
@@ -461,12 +462,20 @@ svg.spring{animation:spring .3s ease-out}
 </section>
 <section id="mk" class="sheet" hidden>
   <div class="handle"></div>
-  <h2><span>Разметка серий</span></h2>
+  <h2><span>Настройки</span></h2>
+  <div id="mkbody">
+  <h3>Разметка серий</h3>
   <p class="hint">Повтор, заставку и титры серий, которые источник не разметил, отметит Claude: у сохранённого сериала — серию, с которой начнёте смотреть, а у сериалов, впервые запущенных или сохранённых с этого дня, — текущую серию и две следующие.</p>
   <div class="row"><label class="sw"><span>Размечать в фоне<small id="mkstate"></small></span><input type="checkbox" id="mkon"></label></div>
   <form class="row" id="mkf"><input id="mkkey" type="password" autocomplete="off" spellcheck="false" autocapitalize="off"><button class="pill" id="mksave">Сохранить</button></form>
   <p class="hint err" id="mkerr" hidden></p>
   <button id="mkdel" hidden>Удалить ключ</button>
+  <h3>TMDB</h3>
+  <p class="hint">Каждый тайтл, открытый впервые, сопоставляется с TMDB: по названию и году, а если так не найти — с помощью Claude и поиска в интернете (нужен ключ Claude выше).</p>
+  <form class="row" id="tmf"><input id="tmkey" type="password" autocomplete="off" spellcheck="false" autocapitalize="off"><button class="pill" id="tmsave">Сохранить</button></form>
+  <p class="hint err" id="tmerr" hidden></p>
+  <button id="tmdel" hidden>Удалить ключ</button>
+  </div>
 </section>
 <div id="toast"></div>
 
@@ -2597,10 +2606,36 @@ async function setMarking(body) {
   }
 }
 
+// title-api matches the titles opened with TMDB, once given a key (see
+// /tmdb).
+let tmdb = null; // { key, hint, error } or null while loading
+
+function renderTmdb(error) {
+  const t = tmdb;
+  $('tmkey').placeholder = !t ? 'Загрузка…' : t.key ? `Ключ задан: …${t.hint}` : 'Ключ API или токен доступа TMDB';
+  $('tmdel').hidden = !t?.key;
+  const e = error || (t?.error && 'Последняя ошибка: ' + t.error);
+  $('tmerr').hidden = !e;
+  $('tmerr').textContent = e || '';
+}
+
+async function setTmdb(body) {
+  try {
+    tmdb = await api('tmdb', body);
+    renderTmdb();
+    return true;
+  } catch (e) {
+    renderTmdb(e.message);
+    return false;
+  }
+}
+
 $('mkbtn').onclick = () => {
   openLayer('mk');
   renderMarking();
+  renderTmdb();
   setMarking();
+  setTmdb();
 };
 $('mkon').onchange = e => setMarking({ on: e.target.checked ? '1' : '0' });
 // A key saved turns the marking on.
@@ -2613,6 +2648,15 @@ $('mkf').onsubmit = async e => {
   $('mksave').disabled = false;
 };
 $('mkdel').onclick = () => confirm('Удалить ключ?') && setMarking({ key: '' });
+$('tmf').onsubmit = async e => {
+  e.preventDefault();
+  const key = $('tmkey').value.trim();
+  if (!key) return;
+  $('tmsave').disabled = true;
+  if (await setTmdb({ key })) $('tmkey').value = '';
+  $('tmsave').disabled = false;
+};
+$('tmdel').onclick = () => confirm('Удалить ключ TMDB?') && setTmdb({ key: '' });
 $('devscan').onclick = () => loadDevices(true);
 $('styb').onclick = () => {
   openLayer('sty');
