@@ -1216,9 +1216,10 @@ function showRecent() {
 function markPlaying() {
   const id = st?.media && st.now?.id;
   for (const c of document.querySelectorAll('.card')) {
-    const b = c.querySelector('.badge.on');
-    if (c.dataset.id == id && !b) c.append(el('span', { className: 'badge on' }, 'На ТВ'));
-    if (c.dataset.id != id && b) b.remove();
+    // The last card that leads to a whole list has no id, nor has nothing on.
+    const b = c.querySelector('.badge.on'), on = !!id && c.dataset.id == id;
+    if (on && !b) c.append(el('span', { className: 'badge on' }, 'На ТВ'));
+    if (!on && b) b.remove();
   }
 }
 
