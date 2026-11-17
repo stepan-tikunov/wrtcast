@@ -14,6 +14,8 @@ const (
 	TailSpan = 360.0
 	// A scan shows at most maxFrames frames, at least scanStep apart.
 	scanStep = 2.0
+	// The recap and the intro so close are made to meet.
+	joinGap = 5.0
 )
 
 // Span is a part as a scan found it: the numbers of its first frame and of
@@ -123,16 +125,11 @@ func (m *Marker) Mark(ctx context.Context, video Video, cues []Cue, duration flo
 	}
 
 	head, tail := result.Head, result.Tail
-	joined := head.Recap.Present && head.Intro.Present && head.Recap.After == head.Intro.First
 	if headErr == nil {
 		if head.Recap.Present {
-			what := "where the recap (the montage of earlier episodes) ends: the first frame after its last shot"
-			if joined {
-				what = "where the opening title sequence begins after the recap: the first frame where its first card (such as a network's \"… presents\") or shot becomes visible, the black frames before it not counted"
-			}
-			result.addNear("recap_end", what, headFrames, head.Recap.After)
+			result.addNear("recap_end", "where the recap (the montage of earlier episodes) ends: the first frame after its last shot", headFrames, head.Recap.After)
 		}
-		if head.Intro.Present && !joined {
+		if head.Intro.Present {
 			result.addNear("intro_start", "where the opening title sequence begins: the first frame where its first card (such as a network's \"… presents\") or shot becomes visible, the black frames before it not counted", headFrames, head.Intro.First)
 		}
 		if head.Intro.Present {
@@ -168,10 +165,11 @@ func (m *Marker) Mark(ctx context.Context, video Video, cues []Cue, duration flo
 		}()
 	}
 	wg.Wait()
-	if joined {
-		if t, ok := result.Times["recap_end"]; ok {
-			result.Times["intro_start"] = t
-		}
+	// A few black frames between the recap and the intro belong to both.
+	end, hasEnd := result.Times["recap_end"]
+	start, hasStart := result.Times["intro_start"]
+	if hasEnd && hasStart && start-end >= -joinGap && start-end <= joinGap {
+		result.Times["recap_end"], result.Times["intro_start"] = (end+start)/2, (end+start)/2
 	}
 	return result, nil
 }
