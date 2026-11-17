@@ -12,9 +12,11 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
-// The model that settles a title the search can't, at low effort: it
-// mostly reads search results.
-const model = "claude-opus-5-5"
+// The model that settles a title the search can't, and its effort.
+const (
+	model  = "claude-sonnet-5-5"
+	effort = anthropic.OutputConfigEffortMedium
+)
 
 const (
 	// The turns of the conversation at most, and the web searches.
@@ -86,7 +88,7 @@ func ask(ctx context.Context, claude anthropic.Client, tmdb *client, t Title, ca
 			System:       []anthropic.TextBlockParam{{Text: system}},
 			Messages:     messages,
 			Tools:        tools,
-			OutputConfig: anthropic.OutputConfigParam{Effort: anthropic.OutputConfigEffortLow},
+			OutputConfig: anthropic.OutputConfigParam{Effort: effort},
 		},
 			// A refusal is retried on another model.
 			option.WithHeaderAdd("anthropic-beta", "server-side-fallback-2026-07-01"),
