@@ -1412,11 +1412,21 @@ async function awaitMatch(m, t) {
     const x = await tmdbOf(t);
     if (!x || item != m) return;
     backdropKnown(m.id, !!x.backdrop);
-    showTmdb(m, t, x);
-    renderInfo(t, x, true);
-    renderDetails();
+    keepTop(() => {
+      showTmdb(m, t, x);
+      renderInfo(t, x, true);
+      renderDetails();
+    });
     return;
   }
+}
+
+// Laid out anew, the page is scrolled by the browser to keep what was in
+// view where it was; one not scrolled yet stays at its top.
+function keepTop(draw) {
+  const top = $('det').scrollTop < 8;
+  draw();
+  if (top) $('det').scrollTop = 0;
 }
 
 function showTmdb(m, t, x) {
@@ -1496,9 +1506,11 @@ async function openDetails(m) {
   if (x !== undefined) backdropKnown(m.id, !!x?.backdrop);
   else tm.then(x => {
     if (!x || item != m) return;
-    showTmdb(m, t, x);
-    renderInfo(t, x, true);
-    renderDetails();
+    keepTop(() => {
+      showTmdb(m, t, x);
+      renderInfo(t, x, true);
+      renderDetails();
+    });
   });
   // A saved poster can point at a host the provider has since left.
   if (t.poster && t.poster != m.poster) showPoster(t.poster);
@@ -1507,10 +1519,12 @@ async function openDetails(m) {
   $('dsave').disabled = false;
   $('dposter').hidden = !m.poster;
   $('dtitle').textContent = t.title;
-  $('det').classList.remove('bd'); // as the page opened, which may be wrong
-  if (x) showTmdb(m, t, x);
-  renderInfo(t, x);
-  renderDetails();
+  keepTop(() => {
+    $('det').classList.remove('bd'); // as the page opened, which may be wrong
+    if (x) showTmdb(m, t, x);
+    renderInfo(t, x);
+    renderDetails();
+  });
   if (!t.tmdb) awaitMatch(m, t);
   if (t.type != 'series') return;
   const now = st?.now?.id == m.id ? st.now : null;
@@ -1580,7 +1594,6 @@ function showSeason(s) {
     c.onclick = () => showSeason(x);
     return c;
   }));
-  $('seasons').querySelector('.on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   renderEpisodes(true);
 }
 
