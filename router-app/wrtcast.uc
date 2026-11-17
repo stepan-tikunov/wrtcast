@@ -2770,11 +2770,11 @@ const routes = {
 	// title-api's matching of the titles opened with TMDB: { key, hint,
 	// error }, the key only told whether it is set and by its last
 	// characters.
-	'GET /tmdb': p => tmdb(api('/v1/tmdb')),
+	'GET /tmdb/settings': p => tmdb(api('/v1/tmdb')),
 
 	// Sets the TMDB API key or read access token (key), or removes it (key
 	// '').
-	'POST /tmdb': p => {
+	'POST /tmdb/settings': p => {
 		let r = api_post('/v1/tmdb', { apiKey: api_key(p.key ?? '') });
 		if (r.status == 400)
 			fail(400, 'Ключ не подошёл');

@@ -214,8 +214,8 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
 | `POST /api/autoskip` `on` | то же для пропуска повтора и заставки |
 | `GET /api/marking` | разметка серий title-api (см. «Повтор, заставка и титры»): `{ enabled, key, hint, error }` — включена ли, задан ли ключ API Claude и его последние символы, ошибка последней разметки |
 | `POST /api/marking` `on`?, `key`? | `on=1`/`0` включает и выключает разметку, `key` задаёт ключ (title-api сперва проверяет его; неподходящий — `400`), пустой `key` удаляет. Ключ уходит в title-api через stdin `uclient-fetch`, не попадая ни в командную строку, ни в `/tmp`; возвращает то же, что `GET` |
-| `GET /api/tmdb` | сопоставление тайтлов title-api с TMDB (см. README title-api): `{ key, hint, error }` — задан ли ключ TMDB и его последние символы, ошибка последнего сопоставления |
-| `POST /api/tmdb` `key` | задаёт ключ API или токен доступа TMDB (title-api сперва проверяет его; неподходящий — `400`), пустой `key` удаляет; ключ уходит в title-api так же, как у `/api/marking`; возвращает то же, что `GET` |
+| `GET /api/tmdb/settings` | сопоставление тайтлов title-api с TMDB (см. README title-api): `{ key, hint, error }` — задан ли ключ TMDB и его последние символы, ошибка последнего сопоставления |
+| `POST /api/tmdb/settings` `key` | задаёт ключ API или токен доступа TMDB (title-api сперва проверяет его; неподходящий — `400`), пустой `key` удаляет; ключ уходит в title-api так же, как у `/api/marking`; возвращает то же, что `GET` |
 | `POST /api/cmd` `c`, `arg`? | `pause resume stop quit mute unmute` · `seek ff rew volume` (число) · `audio subs` (id/язык/название/`off`) · `substyle` (`size=…,bg=#RRGGBBAA`, формат `castctl substyle`) |
 | `GET /api/devices` `refresh`? | `{devices:[{id,name,model,host,port}],default}`: `castctl discover`, кэш на 60 с, если не передан `refresh=1`; `default` — id устройства из `cast_host` |
 | `GET /api/status` | `castctl status`; если поток запущен через `/api/play`, добавляет `now:{id,stream,title,poster,season,episode,quality,qualities,source,sources,drc,drc_ok,autonext,autoskip,sections,skipped}` (`drc` — выравнивание включено, `drc_ok` — источник его допускает, `autonext` — следующая серия запустится сама, `autoskip` — повтор и заставка пропускаются сами, `sections` — повтор, заставка и титры на видео, которое играет ТВ, `skipped` — индексы тех из них, что роутер уже пропустил) и к каждой дорожке `label` из title-api; всегда добавляет `device:{id,name}` |
@@ -537,7 +537,7 @@ title-api сообщает у каждого потока, где в серии 
   две следующие. Ключ и переключатель — в шторке «Настройки» (кнопка
   с шестерёнкой в шапке), роутер передаёт их в title-api
   (`/api/marking`). Готовая разметка приходит в тех же `sections`. Там же
-  — ключ TMDB (`/api/tmdb`), с которым title-api сопоставляет открытые
+  — ключ TMDB (`/api/tmdb/settings`), с которым title-api сопоставляет открытые
   тайтлы с TMDB.
 - `autonext` и `autoskip` — настройки роутера (таблица `settings`, вместе с
   историей копируется на флеш): их меняют `POST /api/autonext` и

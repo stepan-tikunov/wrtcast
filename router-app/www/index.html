@@ -2607,7 +2607,7 @@ async function setMarking(body) {
 }
 
 // title-api matches the titles opened with TMDB, once given a key (see
-// /tmdb).
+// /tmdb/settings).
 let tmdb = null; // { key, hint, error } or null while loading
 
 function renderTmdb(error) {
@@ -2621,7 +2621,7 @@ function renderTmdb(error) {
 
 async function setTmdb(body) {
   try {
-    tmdb = await api('tmdb', body);
+    tmdb = await api('tmdb/settings', body);
     renderTmdb();
     return true;
   } catch (e) {
