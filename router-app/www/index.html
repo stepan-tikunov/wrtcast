@@ -152,8 +152,8 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
    wide frames or posters, that scroll. */
 #dmore{padding:0 16px}
 #dmore .dh{margin-top:26px}
-.row{display:flex;gap:10px;overflow-x:auto;margin:0 -16px;padding:0 16px 4px;scrollbar-width:none}
-.row::-webkit-scrollbar{display:none}
+.strip{display:flex;align-items:flex-start;gap:10px;overflow-x:auto;margin:0 -16px;padding:0 16px 4px;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
 .tile{flex:none;width:150px;padding:0;border:0;background:none;color:var(--tx);font-size:13px;line-height:1.3;text-align:left;text-decoration:none;cursor:pointer;transition:transform .12s}
 .tile:active{transform:scale(.96)}
 .tile.tall{width:108px}
@@ -451,7 +451,7 @@ svg.spring{animation:spring .3s ease-out}
   #dinfo{padding:8px var(--dgut) 4px}
   .cast{gap:12px;margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
   #dmore{padding:0 var(--dgut)}
-  .row{gap:14px;margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
+  .strip{gap:14px;margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
   .tile{width:220px;font-size:14px}
   .tile.tall{width:140px}
   .cast div{width:96px;font-size:13px}
@@ -1742,7 +1742,7 @@ function openRelated(r) {
 function renderMore(x) {
   const again = $('dmore').children.length > 0;
   const row = (head, list) => el('section', { className: again ? 'still' : '' },
-    el('h2', { className: 'dh' }, head), el('div', { className: 'row' }, ...list));
+    el('h2', { className: 'dh' }, head), el('div', { className: 'strip' }, ...list));
   const parts = x.collection?.parts ?? [];
   $('dmore').replaceChildren(...[
     x.trailers.length && row('Трейлеры', x.trailers.map(v =>
