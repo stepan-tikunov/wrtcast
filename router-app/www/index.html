@@ -646,7 +646,7 @@ function animateOut(e) {
   };
   e.addEventListener('animationend', end);
 }
-const epShort = n => `${n.season} сез., ${n.episode} сер.`; // 7 сезон 17 серия -> 7 сез., 17 сер.
+const epShort = n => `С${n.season} Э${n.episode}`; // 7 сезон 17 эпизод -> С7 Э17
 const note = text => $('msg').lastChild.textContent = text;
 
 // ---- overlays and the back button ----------------------------------------
@@ -1572,7 +1572,7 @@ function renderDetails() {
   const t = playTarget(item);
   $('dplay').hidden = !t;
   if (!t) return;
-  const series = t.season != null, ep = series ? `С${t.season} Е${t.episode}` : '';
+  const series = t.season != null, ep = series ? epShort(t) : '';
   const p = series ? item.progress?.eps?.[epKey(t)] : item.progress;
   const left = t.resume && p?.dur > t.resume + 30 ? p.dur - t.resume : 0;
   const small = s => el('small', {}, s);
