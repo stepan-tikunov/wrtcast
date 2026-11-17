@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	titlev1 "title-api/api/title/v1"
 	"title-api/internal/marking"
@@ -165,11 +166,37 @@ func (s *Server) GetTitleDetails(
 		response.Seasons = titleDetailsSeasons(seasons)
 	}
 	if s.tmdb != nil {
-		if match, ok := s.tmdb.Match(ctx, metadata.TitleID); ok {
-			response.Tmdb = tmdbRef(match.Kind, match.ID)
-		} else {
-			s.tmdb.Opened(tmdbTitle(metadata))
+		match, ok := s.tmdb.Match(ctx, metadata.TitleID)
+		if !ok {
+			match, ok = s.tmdb.Opened(ctx, tmdbTitle(metadata))
 		}
+		if ok {
+			response.Tmdb = tmdbRef(match.Kind, match.ID)
+		}
+	}
+	return response, nil
+}
+
+// tmdbMatchWait bounds a wait of WaitTmdbMatch, below the router's 20 s
+// for a request of title-api.
+const tmdbMatchWait = 15 * time.Second
+
+func (s *Server) WaitTmdbMatch(
+	ctx context.Context,
+	query *titlev1.WaitTmdbMatchQuery,
+) (*titlev1.TmdbMatch, error) {
+	if query.GetTitleId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "title_id is required")
+	}
+	if s.tmdb == nil {
+		return nil, status.Error(codes.Unimplemented, "TMDB is off")
+	}
+	ctx, cancel := context.WithTimeout(ctx, tmdbMatchWait)
+	defer cancel()
+	match, ok, pending := s.tmdb.WaitMatch(ctx, query.GetTitleId())
+	response := &titlev1.TmdbMatch{Pending: pending}
+	if ok {
+		response.Tmdb = tmdbRef(match.Kind, match.ID)
 	}
 	return response, nil
 }

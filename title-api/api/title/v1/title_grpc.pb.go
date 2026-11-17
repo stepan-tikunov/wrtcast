@@ -29,6 +29,7 @@ const (
 	TitleService_UpdateTmdbSettings_FullMethodName    = "/title.v1.TitleService/UpdateTmdbSettings"
 	TitleService_GetTmdbDetails_FullMethodName        = "/title.v1.TitleService/GetTmdbDetails"
 	TitleService_GetTmdbSeason_FullMethodName         = "/title.v1.TitleService/GetTmdbSeason"
+	TitleService_WaitTmdbMatch_FullMethodName         = "/title.v1.TitleService/WaitTmdbMatch"
 )
 
 // TitleServiceClient is the client API for TitleService service.
@@ -45,6 +46,7 @@ type TitleServiceClient interface {
 	UpdateTmdbSettings(ctx context.Context, in *UpdateTmdbSettingsCommand, opts ...grpc.CallOption) (*TmdbSettings, error)
 	GetTmdbDetails(ctx context.Context, in *GetTmdbDetailsQuery, opts ...grpc.CallOption) (*TmdbDetails, error)
 	GetTmdbSeason(ctx context.Context, in *GetTmdbSeasonQuery, opts ...grpc.CallOption) (*TmdbSeason, error)
+	WaitTmdbMatch(ctx context.Context, in *WaitTmdbMatchQuery, opts ...grpc.CallOption) (*TmdbMatch, error)
 }
 
 type titleServiceClient struct {
@@ -155,6 +157,16 @@ func (c *titleServiceClient) GetTmdbSeason(ctx context.Context, in *GetTmdbSeaso
 	return out, nil
 }
 
+func (c *titleServiceClient) WaitTmdbMatch(ctx context.Context, in *WaitTmdbMatchQuery, opts ...grpc.CallOption) (*TmdbMatch, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TmdbMatch)
+	err := c.cc.Invoke(ctx, TitleService_WaitTmdbMatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TitleServiceServer is the server API for TitleService service.
 // All implementations must embed UnimplementedTitleServiceServer
 // for forward compatibility.
@@ -169,6 +181,7 @@ type TitleServiceServer interface {
 	UpdateTmdbSettings(context.Context, *UpdateTmdbSettingsCommand) (*TmdbSettings, error)
 	GetTmdbDetails(context.Context, *GetTmdbDetailsQuery) (*TmdbDetails, error)
 	GetTmdbSeason(context.Context, *GetTmdbSeasonQuery) (*TmdbSeason, error)
+	WaitTmdbMatch(context.Context, *WaitTmdbMatchQuery) (*TmdbMatch, error)
 	mustEmbedUnimplementedTitleServiceServer()
 }
 
@@ -208,6 +221,9 @@ func (UnimplementedTitleServiceServer) GetTmdbDetails(context.Context, *GetTmdbD
 }
 func (UnimplementedTitleServiceServer) GetTmdbSeason(context.Context, *GetTmdbSeasonQuery) (*TmdbSeason, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTmdbSeason not implemented")
+}
+func (UnimplementedTitleServiceServer) WaitTmdbMatch(context.Context, *WaitTmdbMatchQuery) (*TmdbMatch, error) {
+	return nil, status.Error(codes.Unimplemented, "method WaitTmdbMatch not implemented")
 }
 func (UnimplementedTitleServiceServer) mustEmbedUnimplementedTitleServiceServer() {}
 func (UnimplementedTitleServiceServer) testEmbeddedByValue()                      {}
@@ -410,6 +426,24 @@ func _TitleService_GetTmdbSeason_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TitleService_WaitTmdbMatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WaitTmdbMatchQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TitleServiceServer).WaitTmdbMatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TitleService_WaitTmdbMatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TitleServiceServer).WaitTmdbMatch(ctx, req.(*WaitTmdbMatchQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TitleService_ServiceDesc is the grpc.ServiceDesc for TitleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -456,6 +490,10 @@ var TitleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTmdbSeason",
 			Handler:    _TitleService_GetTmdbSeason_Handler,
+		},
+		{
+			MethodName: "WaitTmdbMatch",
+			Handler:    _TitleService_WaitTmdbMatch_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

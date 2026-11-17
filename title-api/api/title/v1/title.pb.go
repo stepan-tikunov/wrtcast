@@ -179,7 +179,7 @@ func (x Section_Kind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Section_Kind.Descriptor instead.
 func (Section_Kind) EnumDescriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{7, 0}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{9, 0}
 }
 
 type SearchTitlesQuery struct {
@@ -604,6 +604,106 @@ func (x *GetTitleDetailsQueryResponse) GetTmdb() *TmdbTitle {
 	return nil
 }
 
+// The title on TMDB of a title GetTitleDetails told without one, as it is
+// matched in the background: waited for up to 15 s.
+type WaitTmdbMatchQuery struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TitleId       string                 `protobuf:"bytes,1,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WaitTmdbMatchQuery) Reset() {
+	*x = WaitTmdbMatchQuery{}
+	mi := &file_api_title_v1_title_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WaitTmdbMatchQuery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WaitTmdbMatchQuery) ProtoMessage() {}
+
+func (x *WaitTmdbMatchQuery) ProtoReflect() protoreflect.Message {
+	mi := &file_api_title_v1_title_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WaitTmdbMatchQuery.ProtoReflect.Descriptor instead.
+func (*WaitTmdbMatchQuery) Descriptor() ([]byte, []int) {
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *WaitTmdbMatchQuery) GetTitleId() string {
+	if x != nil {
+		return x.TitleId
+	}
+	return ""
+}
+
+type TmdbMatch struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Once it is matched.
+	Tmdb *TmdbTitle `protobuf:"bytes,1,opt,name=tmdb,proto3" json:"tmdb,omitempty"`
+	// Still to be matched, as the wait ended first: to be asked again.
+	Pending       bool `protobuf:"varint,2,opt,name=pending,proto3" json:"pending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TmdbMatch) Reset() {
+	*x = TmdbMatch{}
+	mi := &file_api_title_v1_title_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TmdbMatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TmdbMatch) ProtoMessage() {}
+
+func (x *TmdbMatch) ProtoReflect() protoreflect.Message {
+	mi := &file_api_title_v1_title_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TmdbMatch.ProtoReflect.Descriptor instead.
+func (*TmdbMatch) Descriptor() ([]byte, []int) {
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *TmdbMatch) GetTmdb() *TmdbTitle {
+	if x != nil {
+		return x.Tmdb
+	}
+	return nil
+}
+
+func (x *TmdbMatch) GetPending() bool {
+	if x != nil {
+		return x.Pending
+	}
+	return false
+}
+
 // A title on TMDB: themoviedb.org/<movie or tv>/<id>.
 type TmdbTitle struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -615,7 +715,7 @@ type TmdbTitle struct {
 
 func (x *TmdbTitle) Reset() {
 	*x = TmdbTitle{}
-	mi := &file_api_title_v1_title_proto_msgTypes[6]
+	mi := &file_api_title_v1_title_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -627,7 +727,7 @@ func (x *TmdbTitle) String() string {
 func (*TmdbTitle) ProtoMessage() {}
 
 func (x *TmdbTitle) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[6]
+	mi := &file_api_title_v1_title_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -640,7 +740,7 @@ func (x *TmdbTitle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbTitle.ProtoReflect.Descriptor instead.
 func (*TmdbTitle) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{6}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TmdbTitle) GetId() uint64 {
@@ -672,7 +772,7 @@ type Section struct {
 
 func (x *Section) Reset() {
 	*x = Section{}
-	mi := &file_api_title_v1_title_proto_msgTypes[7]
+	mi := &file_api_title_v1_title_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -684,7 +784,7 @@ func (x *Section) String() string {
 func (*Section) ProtoMessage() {}
 
 func (x *Section) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[7]
+	mi := &file_api_title_v1_title_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -697,7 +797,7 @@ func (x *Section) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Section.ProtoReflect.Descriptor instead.
 func (*Section) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{7}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Section) GetKind() Section_Kind {
@@ -746,7 +846,7 @@ type MediaStream struct {
 
 func (x *MediaStream) Reset() {
 	*x = MediaStream{}
-	mi := &file_api_title_v1_title_proto_msgTypes[8]
+	mi := &file_api_title_v1_title_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -758,7 +858,7 @@ func (x *MediaStream) String() string {
 func (*MediaStream) ProtoMessage() {}
 
 func (x *MediaStream) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[8]
+	mi := &file_api_title_v1_title_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -771,7 +871,7 @@ func (x *MediaStream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream.ProtoReflect.Descriptor instead.
 func (*MediaStream) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{8}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *MediaStream) GetMasterPlaylistUrl() string {
@@ -831,7 +931,7 @@ type GetMarkingSettingsQuery struct {
 
 func (x *GetMarkingSettingsQuery) Reset() {
 	*x = GetMarkingSettingsQuery{}
-	mi := &file_api_title_v1_title_proto_msgTypes[9]
+	mi := &file_api_title_v1_title_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -843,7 +943,7 @@ func (x *GetMarkingSettingsQuery) String() string {
 func (*GetMarkingSettingsQuery) ProtoMessage() {}
 
 func (x *GetMarkingSettingsQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[9]
+	mi := &file_api_title_v1_title_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -856,7 +956,7 @@ func (x *GetMarkingSettingsQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMarkingSettingsQuery.ProtoReflect.Descriptor instead.
 func (*GetMarkingSettingsQuery) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{9}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{11}
 }
 
 // How title-api marks the recap, the intro and the credits of the episodes
@@ -876,7 +976,7 @@ type MarkingSettings struct {
 
 func (x *MarkingSettings) Reset() {
 	*x = MarkingSettings{}
-	mi := &file_api_title_v1_title_proto_msgTypes[10]
+	mi := &file_api_title_v1_title_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -888,7 +988,7 @@ func (x *MarkingSettings) String() string {
 func (*MarkingSettings) ProtoMessage() {}
 
 func (x *MarkingSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[10]
+	mi := &file_api_title_v1_title_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -901,7 +1001,7 @@ func (x *MarkingSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkingSettings.ProtoReflect.Descriptor instead.
 func (*MarkingSettings) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{10}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *MarkingSettings) GetEnabled() bool {
@@ -943,7 +1043,7 @@ type UpdateMarkingSettingsCommand struct {
 
 func (x *UpdateMarkingSettingsCommand) Reset() {
 	*x = UpdateMarkingSettingsCommand{}
-	mi := &file_api_title_v1_title_proto_msgTypes[11]
+	mi := &file_api_title_v1_title_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -955,7 +1055,7 @@ func (x *UpdateMarkingSettingsCommand) String() string {
 func (*UpdateMarkingSettingsCommand) ProtoMessage() {}
 
 func (x *UpdateMarkingSettingsCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[11]
+	mi := &file_api_title_v1_title_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -968,7 +1068,7 @@ func (x *UpdateMarkingSettingsCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMarkingSettingsCommand.ProtoReflect.Descriptor instead.
 func (*UpdateMarkingSettingsCommand) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{11}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UpdateMarkingSettingsCommand) GetEnabled() bool {
@@ -1000,7 +1100,7 @@ type MarkEpisodeCommand struct {
 
 func (x *MarkEpisodeCommand) Reset() {
 	*x = MarkEpisodeCommand{}
-	mi := &file_api_title_v1_title_proto_msgTypes[12]
+	mi := &file_api_title_v1_title_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1012,7 +1112,7 @@ func (x *MarkEpisodeCommand) String() string {
 func (*MarkEpisodeCommand) ProtoMessage() {}
 
 func (x *MarkEpisodeCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[12]
+	mi := &file_api_title_v1_title_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1025,7 +1125,7 @@ func (x *MarkEpisodeCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkEpisodeCommand.ProtoReflect.Descriptor instead.
 func (*MarkEpisodeCommand) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{12}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *MarkEpisodeCommand) GetTitleId() string {
@@ -1057,7 +1157,7 @@ type MarkEpisodeCommandResponse struct {
 
 func (x *MarkEpisodeCommandResponse) Reset() {
 	*x = MarkEpisodeCommandResponse{}
-	mi := &file_api_title_v1_title_proto_msgTypes[13]
+	mi := &file_api_title_v1_title_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1069,7 +1169,7 @@ func (x *MarkEpisodeCommandResponse) String() string {
 func (*MarkEpisodeCommandResponse) ProtoMessage() {}
 
 func (x *MarkEpisodeCommandResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[13]
+	mi := &file_api_title_v1_title_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1082,7 +1182,7 @@ func (x *MarkEpisodeCommandResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkEpisodeCommandResponse.ProtoReflect.Descriptor instead.
 func (*MarkEpisodeCommandResponse) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{13}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{15}
 }
 
 type GetTmdbSettingsQuery struct {
@@ -1093,7 +1193,7 @@ type GetTmdbSettingsQuery struct {
 
 func (x *GetTmdbSettingsQuery) Reset() {
 	*x = GetTmdbSettingsQuery{}
-	mi := &file_api_title_v1_title_proto_msgTypes[14]
+	mi := &file_api_title_v1_title_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1105,7 +1205,7 @@ func (x *GetTmdbSettingsQuery) String() string {
 func (*GetTmdbSettingsQuery) ProtoMessage() {}
 
 func (x *GetTmdbSettingsQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[14]
+	mi := &file_api_title_v1_title_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1118,7 +1218,7 @@ func (x *GetTmdbSettingsQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTmdbSettingsQuery.ProtoReflect.Descriptor instead.
 func (*GetTmdbSettingsQuery) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{14}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{16}
 }
 
 // How title-api matches its titles with TMDB: in the background, each
@@ -1139,7 +1239,7 @@ type TmdbSettings struct {
 
 func (x *TmdbSettings) Reset() {
 	*x = TmdbSettings{}
-	mi := &file_api_title_v1_title_proto_msgTypes[15]
+	mi := &file_api_title_v1_title_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1151,7 +1251,7 @@ func (x *TmdbSettings) String() string {
 func (*TmdbSettings) ProtoMessage() {}
 
 func (x *TmdbSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[15]
+	mi := &file_api_title_v1_title_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1164,7 +1264,7 @@ func (x *TmdbSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbSettings.ProtoReflect.Descriptor instead.
 func (*TmdbSettings) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{15}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *TmdbSettings) GetKeySet() bool {
@@ -1199,7 +1299,7 @@ type UpdateTmdbSettingsCommand struct {
 
 func (x *UpdateTmdbSettingsCommand) Reset() {
 	*x = UpdateTmdbSettingsCommand{}
-	mi := &file_api_title_v1_title_proto_msgTypes[16]
+	mi := &file_api_title_v1_title_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1211,7 +1311,7 @@ func (x *UpdateTmdbSettingsCommand) String() string {
 func (*UpdateTmdbSettingsCommand) ProtoMessage() {}
 
 func (x *UpdateTmdbSettingsCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[16]
+	mi := &file_api_title_v1_title_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1224,7 +1324,7 @@ func (x *UpdateTmdbSettingsCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTmdbSettingsCommand.ProtoReflect.Descriptor instead.
 func (*UpdateTmdbSettingsCommand) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{16}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *UpdateTmdbSettingsCommand) GetApiKey() string {
@@ -1249,7 +1349,7 @@ type GetTmdbDetailsQuery struct {
 
 func (x *GetTmdbDetailsQuery) Reset() {
 	*x = GetTmdbDetailsQuery{}
-	mi := &file_api_title_v1_title_proto_msgTypes[17]
+	mi := &file_api_title_v1_title_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1261,7 +1361,7 @@ func (x *GetTmdbDetailsQuery) String() string {
 func (*GetTmdbDetailsQuery) ProtoMessage() {}
 
 func (x *GetTmdbDetailsQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[17]
+	mi := &file_api_title_v1_title_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1274,7 +1374,7 @@ func (x *GetTmdbDetailsQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTmdbDetailsQuery.ProtoReflect.Descriptor instead.
 func (*GetTmdbDetailsQuery) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{17}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetTmdbDetailsQuery) GetMediaType() string {
@@ -1343,7 +1443,7 @@ type TmdbDetails struct {
 
 func (x *TmdbDetails) Reset() {
 	*x = TmdbDetails{}
-	mi := &file_api_title_v1_title_proto_msgTypes[18]
+	mi := &file_api_title_v1_title_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1355,7 +1455,7 @@ func (x *TmdbDetails) String() string {
 func (*TmdbDetails) ProtoMessage() {}
 
 func (x *TmdbDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[18]
+	mi := &file_api_title_v1_title_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1368,7 +1468,7 @@ func (x *TmdbDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbDetails.ProtoReflect.Descriptor instead.
 func (*TmdbDetails) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{18}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *TmdbDetails) GetTitle() *TmdbTitle {
@@ -1580,7 +1680,7 @@ type TmdbEpisodeRef struct {
 
 func (x *TmdbEpisodeRef) Reset() {
 	*x = TmdbEpisodeRef{}
-	mi := &file_api_title_v1_title_proto_msgTypes[19]
+	mi := &file_api_title_v1_title_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1592,7 +1692,7 @@ func (x *TmdbEpisodeRef) String() string {
 func (*TmdbEpisodeRef) ProtoMessage() {}
 
 func (x *TmdbEpisodeRef) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[19]
+	mi := &file_api_title_v1_title_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1605,7 +1705,7 @@ func (x *TmdbEpisodeRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbEpisodeRef.ProtoReflect.Descriptor instead.
 func (*TmdbEpisodeRef) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{19}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *TmdbEpisodeRef) GetSeasonNumber() int32 {
@@ -1648,7 +1748,7 @@ type TmdbSeasonRef struct {
 
 func (x *TmdbSeasonRef) Reset() {
 	*x = TmdbSeasonRef{}
-	mi := &file_api_title_v1_title_proto_msgTypes[20]
+	mi := &file_api_title_v1_title_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1660,7 +1760,7 @@ func (x *TmdbSeasonRef) String() string {
 func (*TmdbSeasonRef) ProtoMessage() {}
 
 func (x *TmdbSeasonRef) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[20]
+	mi := &file_api_title_v1_title_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1673,7 +1773,7 @@ func (x *TmdbSeasonRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbSeasonRef.ProtoReflect.Descriptor instead.
 func (*TmdbSeasonRef) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{20}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *TmdbSeasonRef) GetSeasonNumber() int32 {
@@ -1715,7 +1815,7 @@ type TmdbPerson struct {
 
 func (x *TmdbPerson) Reset() {
 	*x = TmdbPerson{}
-	mi := &file_api_title_v1_title_proto_msgTypes[21]
+	mi := &file_api_title_v1_title_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1727,7 +1827,7 @@ func (x *TmdbPerson) String() string {
 func (*TmdbPerson) ProtoMessage() {}
 
 func (x *TmdbPerson) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[21]
+	mi := &file_api_title_v1_title_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1740,7 +1840,7 @@ func (x *TmdbPerson) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbPerson.ProtoReflect.Descriptor instead.
 func (*TmdbPerson) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{21}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *TmdbPerson) GetName() string {
@@ -1778,7 +1878,7 @@ type TmdbVideo struct {
 
 func (x *TmdbVideo) Reset() {
 	*x = TmdbVideo{}
-	mi := &file_api_title_v1_title_proto_msgTypes[22]
+	mi := &file_api_title_v1_title_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1790,7 +1890,7 @@ func (x *TmdbVideo) String() string {
 func (*TmdbVideo) ProtoMessage() {}
 
 func (x *TmdbVideo) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[22]
+	mi := &file_api_title_v1_title_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1803,7 +1903,7 @@ func (x *TmdbVideo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbVideo.ProtoReflect.Descriptor instead.
 func (*TmdbVideo) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{22}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *TmdbVideo) GetYoutubeKey() string {
@@ -1847,7 +1947,7 @@ type TmdbCollection struct {
 
 func (x *TmdbCollection) Reset() {
 	*x = TmdbCollection{}
-	mi := &file_api_title_v1_title_proto_msgTypes[23]
+	mi := &file_api_title_v1_title_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1859,7 +1959,7 @@ func (x *TmdbCollection) String() string {
 func (*TmdbCollection) ProtoMessage() {}
 
 func (x *TmdbCollection) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[23]
+	mi := &file_api_title_v1_title_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1872,7 +1972,7 @@ func (x *TmdbCollection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbCollection.ProtoReflect.Descriptor instead.
 func (*TmdbCollection) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{23}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *TmdbCollection) GetId() uint64 {
@@ -1912,7 +2012,7 @@ type TmdbRelated struct {
 
 func (x *TmdbRelated) Reset() {
 	*x = TmdbRelated{}
-	mi := &file_api_title_v1_title_proto_msgTypes[24]
+	mi := &file_api_title_v1_title_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1924,7 +2024,7 @@ func (x *TmdbRelated) String() string {
 func (*TmdbRelated) ProtoMessage() {}
 
 func (x *TmdbRelated) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[24]
+	mi := &file_api_title_v1_title_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1937,7 +2037,7 @@ func (x *TmdbRelated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbRelated.ProtoReflect.Descriptor instead.
 func (*TmdbRelated) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{24}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *TmdbRelated) GetTitle() *TmdbTitle {
@@ -2002,7 +2102,7 @@ type GetTmdbSeasonQuery struct {
 
 func (x *GetTmdbSeasonQuery) Reset() {
 	*x = GetTmdbSeasonQuery{}
-	mi := &file_api_title_v1_title_proto_msgTypes[25]
+	mi := &file_api_title_v1_title_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2014,7 +2114,7 @@ func (x *GetTmdbSeasonQuery) String() string {
 func (*GetTmdbSeasonQuery) ProtoMessage() {}
 
 func (x *GetTmdbSeasonQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[25]
+	mi := &file_api_title_v1_title_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2027,7 +2127,7 @@ func (x *GetTmdbSeasonQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTmdbSeasonQuery.ProtoReflect.Descriptor instead.
 func (*GetTmdbSeasonQuery) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{25}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetTmdbSeasonQuery) GetTmdbId() uint64 {
@@ -2053,7 +2153,7 @@ type TmdbSeason struct {
 
 func (x *TmdbSeason) Reset() {
 	*x = TmdbSeason{}
-	mi := &file_api_title_v1_title_proto_msgTypes[26]
+	mi := &file_api_title_v1_title_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2065,7 +2165,7 @@ func (x *TmdbSeason) String() string {
 func (*TmdbSeason) ProtoMessage() {}
 
 func (x *TmdbSeason) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[26]
+	mi := &file_api_title_v1_title_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2078,7 +2178,7 @@ func (x *TmdbSeason) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbSeason.ProtoReflect.Descriptor instead.
 func (*TmdbSeason) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{26}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *TmdbSeason) GetEpisodes() []*TmdbEpisode {
@@ -2106,7 +2206,7 @@ type TmdbEpisode struct {
 
 func (x *TmdbEpisode) Reset() {
 	*x = TmdbEpisode{}
-	mi := &file_api_title_v1_title_proto_msgTypes[27]
+	mi := &file_api_title_v1_title_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2118,7 +2218,7 @@ func (x *TmdbEpisode) String() string {
 func (*TmdbEpisode) ProtoMessage() {}
 
 func (x *TmdbEpisode) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[27]
+	mi := &file_api_title_v1_title_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2131,7 +2231,7 @@ func (x *TmdbEpisode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TmdbEpisode.ProtoReflect.Descriptor instead.
 func (*TmdbEpisode) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{27}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *TmdbEpisode) GetEpisodeNumber() int32 {
@@ -2195,7 +2295,7 @@ type SearchTitlesQueryResponse_SearchResult struct {
 
 func (x *SearchTitlesQueryResponse_SearchResult) Reset() {
 	*x = SearchTitlesQueryResponse_SearchResult{}
-	mi := &file_api_title_v1_title_proto_msgTypes[28]
+	mi := &file_api_title_v1_title_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2207,7 +2307,7 @@ func (x *SearchTitlesQueryResponse_SearchResult) String() string {
 func (*SearchTitlesQueryResponse_SearchResult) ProtoMessage() {}
 
 func (x *SearchTitlesQueryResponse_SearchResult) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[28]
+	mi := &file_api_title_v1_title_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2261,7 +2361,7 @@ type GetTitleDetailsQueryResponse_Rating struct {
 
 func (x *GetTitleDetailsQueryResponse_Rating) Reset() {
 	*x = GetTitleDetailsQueryResponse_Rating{}
-	mi := &file_api_title_v1_title_proto_msgTypes[29]
+	mi := &file_api_title_v1_title_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2273,7 +2373,7 @@ func (x *GetTitleDetailsQueryResponse_Rating) String() string {
 func (*GetTitleDetailsQueryResponse_Rating) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Rating) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[29]
+	mi := &file_api_title_v1_title_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2313,7 +2413,7 @@ type GetTitleDetailsQueryResponse_Season struct {
 
 func (x *GetTitleDetailsQueryResponse_Season) Reset() {
 	*x = GetTitleDetailsQueryResponse_Season{}
-	mi := &file_api_title_v1_title_proto_msgTypes[30]
+	mi := &file_api_title_v1_title_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2325,7 +2425,7 @@ func (x *GetTitleDetailsQueryResponse_Season) String() string {
 func (*GetTitleDetailsQueryResponse_Season) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Season) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[30]
+	mi := &file_api_title_v1_title_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2368,7 +2468,7 @@ type GetTitleDetailsQueryResponse_Season_Episode struct {
 
 func (x *GetTitleDetailsQueryResponse_Season_Episode) Reset() {
 	*x = GetTitleDetailsQueryResponse_Season_Episode{}
-	mi := &file_api_title_v1_title_proto_msgTypes[31]
+	mi := &file_api_title_v1_title_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2380,7 +2480,7 @@ func (x *GetTitleDetailsQueryResponse_Season_Episode) String() string {
 func (*GetTitleDetailsQueryResponse_Season_Episode) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Season_Episode) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[31]
+	mi := &file_api_title_v1_title_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2434,7 +2534,7 @@ type MediaStream_ProxyHeader struct {
 
 func (x *MediaStream_ProxyHeader) Reset() {
 	*x = MediaStream_ProxyHeader{}
-	mi := &file_api_title_v1_title_proto_msgTypes[32]
+	mi := &file_api_title_v1_title_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2446,7 +2546,7 @@ func (x *MediaStream_ProxyHeader) String() string {
 func (*MediaStream_ProxyHeader) ProtoMessage() {}
 
 func (x *MediaStream_ProxyHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[32]
+	mi := &file_api_title_v1_title_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2459,7 +2559,7 @@ func (x *MediaStream_ProxyHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream_ProxyHeader.ProtoReflect.Descriptor instead.
 func (*MediaStream_ProxyHeader) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{8, 0}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{10, 0}
 }
 
 func (x *MediaStream_ProxyHeader) GetName() string {
@@ -2489,7 +2589,7 @@ type MediaStream_AudioTrack struct {
 
 func (x *MediaStream_AudioTrack) Reset() {
 	*x = MediaStream_AudioTrack{}
-	mi := &file_api_title_v1_title_proto_msgTypes[33]
+	mi := &file_api_title_v1_title_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2501,7 +2601,7 @@ func (x *MediaStream_AudioTrack) String() string {
 func (*MediaStream_AudioTrack) ProtoMessage() {}
 
 func (x *MediaStream_AudioTrack) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[33]
+	mi := &file_api_title_v1_title_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2514,7 +2614,7 @@ func (x *MediaStream_AudioTrack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream_AudioTrack.ProtoReflect.Descriptor instead.
 func (*MediaStream_AudioTrack) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{8, 1}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{10, 1}
 }
 
 func (x *MediaStream_AudioTrack) GetId() string {
@@ -2565,7 +2665,7 @@ type MediaStream_SubtitleTrack struct {
 
 func (x *MediaStream_SubtitleTrack) Reset() {
 	*x = MediaStream_SubtitleTrack{}
-	mi := &file_api_title_v1_title_proto_msgTypes[34]
+	mi := &file_api_title_v1_title_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2577,7 +2677,7 @@ func (x *MediaStream_SubtitleTrack) String() string {
 func (*MediaStream_SubtitleTrack) ProtoMessage() {}
 
 func (x *MediaStream_SubtitleTrack) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[34]
+	mi := &file_api_title_v1_title_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2590,7 +2690,7 @@ func (x *MediaStream_SubtitleTrack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaStream_SubtitleTrack.ProtoReflect.Descriptor instead.
 func (*MediaStream_SubtitleTrack) Descriptor() ([]byte, []int) {
-	return file_api_title_v1_title_proto_rawDescGZIP(), []int{8, 2}
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{10, 2}
 }
 
 func (x *MediaStream_SubtitleTrack) GetId() string {
@@ -2686,7 +2786,12 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\x0eepisode_number\x18\x01 \x01(\tR\repisodeNumber\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12)\n" +
 	"\x10duration_seconds\x18\x03 \x01(\x04R\x0fdurationSeconds\x12-\n" +
-	"\bsections\x18\x04 \x03(\v2\x11.title.v1.SectionR\bsections\"O\n" +
+	"\bsections\x18\x04 \x03(\v2\x11.title.v1.SectionR\bsections\"/\n" +
+	"\x12WaitTmdbMatchQuery\x12\x19\n" +
+	"\btitle_id\x18\x01 \x01(\tR\atitleId\"N\n" +
+	"\tTmdbMatch\x12'\n" +
+	"\x04tmdb\x18\x01 \x01(\v2\x13.title.v1.TmdbTitleR\x04tmdb\x12\x18\n" +
+	"\apending\x18\x02 \x01(\bR\apending\"O\n" +
 	"\tTmdbTitle\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x122\n" +
 	"\n" +
@@ -2850,7 +2955,7 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\x15TMDB_STATUS_RETURNING\x10\x01\x12\x15\n" +
 	"\x11TMDB_STATUS_ENDED\x10\x02\x12\x18\n" +
 	"\x14TMDB_STATUS_CANCELED\x10\x03\x12\x15\n" +
-	"\x11TMDB_STATUS_OTHER\x10\x042\x8f\t\n" +
+	"\x11TMDB_STATUS_OTHER\x10\x042\xf7\t\n" +
 	"\fTitleService\x12d\n" +
 	"\fSearchTitles\x12\x1b.title.v1.SearchTitlesQuery\x1a#.title.v1.SearchTitlesQueryResponse\"\x12\x82\xd3\xe4\x93\x02\f\x12\n" +
 	"/v1/search\x12\x92\x01\n" +
@@ -2863,7 +2968,8 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\x12\b/v1/tmdb\x12f\n" +
 	"\x12UpdateTmdbSettings\x12#.title.v1.UpdateTmdbSettingsCommand\x1a\x16.title.v1.TmdbSettings\"\x13\x82\xd3\xe4\x93\x02\r:\x01*\"\b/v1/tmdb\x12o\n" +
 	"\x0eGetTmdbDetails\x12\x1d.title.v1.GetTmdbDetailsQuery\x1a\x15.title.v1.TmdbDetails\"'\x82\xd3\xe4\x93\x02!\x12\x1f/v1/tmdb/{media_type}/{tmdb_id}\x12z\n" +
-	"\rGetTmdbSeason\x12\x1c.title.v1.GetTmdbSeasonQuery\x1a\x14.title.v1.TmdbSeason\"5\x82\xd3\xe4\x93\x02/\x12-/v1/tmdb/tv/{tmdb_id}/seasons/{season_number}B Z\x1etitle-api/api/title/v1;titlev1b\x06proto3"
+	"\rGetTmdbSeason\x12\x1c.title.v1.GetTmdbSeasonQuery\x1a\x14.title.v1.TmdbSeason\"5\x82\xd3\xe4\x93\x02/\x12-/v1/tmdb/tv/{tmdb_id}/seasons/{season_number}\x12f\n" +
+	"\rWaitTmdbMatch\x12\x1c.title.v1.WaitTmdbMatchQuery\x1a\x13.title.v1.TmdbMatch\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/v1/titles/{title_id}/tmdbB Z\x1etitle-api/api/title/v1;titlev1b\x06proto3"
 
 var (
 	file_api_title_v1_title_proto_rawDescOnce sync.Once
@@ -2878,7 +2984,7 @@ func file_api_title_v1_title_proto_rawDescGZIP() []byte {
 }
 
 var file_api_title_v1_title_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_api_title_v1_title_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_api_title_v1_title_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_api_title_v1_title_proto_goTypes = []any{
 	(MediaType)(0),                                      // 0: title.v1.MediaType
 	(TmdbStatus)(0),                                     // 1: title.v1.TmdbStatus
@@ -2889,89 +2995,94 @@ var file_api_title_v1_title_proto_goTypes = []any{
 	(*GetPlaybackStreamsQueryResponse)(nil),             // 6: title.v1.GetPlaybackStreamsQueryResponse
 	(*GetTitleDetailsQuery)(nil),                        // 7: title.v1.GetTitleDetailsQuery
 	(*GetTitleDetailsQueryResponse)(nil),                // 8: title.v1.GetTitleDetailsQueryResponse
-	(*TmdbTitle)(nil),                                   // 9: title.v1.TmdbTitle
-	(*Section)(nil),                                     // 10: title.v1.Section
-	(*MediaStream)(nil),                                 // 11: title.v1.MediaStream
-	(*GetMarkingSettingsQuery)(nil),                     // 12: title.v1.GetMarkingSettingsQuery
-	(*MarkingSettings)(nil),                             // 13: title.v1.MarkingSettings
-	(*UpdateMarkingSettingsCommand)(nil),                // 14: title.v1.UpdateMarkingSettingsCommand
-	(*MarkEpisodeCommand)(nil),                          // 15: title.v1.MarkEpisodeCommand
-	(*MarkEpisodeCommandResponse)(nil),                  // 16: title.v1.MarkEpisodeCommandResponse
-	(*GetTmdbSettingsQuery)(nil),                        // 17: title.v1.GetTmdbSettingsQuery
-	(*TmdbSettings)(nil),                                // 18: title.v1.TmdbSettings
-	(*UpdateTmdbSettingsCommand)(nil),                   // 19: title.v1.UpdateTmdbSettingsCommand
-	(*GetTmdbDetailsQuery)(nil),                         // 20: title.v1.GetTmdbDetailsQuery
-	(*TmdbDetails)(nil),                                 // 21: title.v1.TmdbDetails
-	(*TmdbEpisodeRef)(nil),                              // 22: title.v1.TmdbEpisodeRef
-	(*TmdbSeasonRef)(nil),                               // 23: title.v1.TmdbSeasonRef
-	(*TmdbPerson)(nil),                                  // 24: title.v1.TmdbPerson
-	(*TmdbVideo)(nil),                                   // 25: title.v1.TmdbVideo
-	(*TmdbCollection)(nil),                              // 26: title.v1.TmdbCollection
-	(*TmdbRelated)(nil),                                 // 27: title.v1.TmdbRelated
-	(*GetTmdbSeasonQuery)(nil),                          // 28: title.v1.GetTmdbSeasonQuery
-	(*TmdbSeason)(nil),                                  // 29: title.v1.TmdbSeason
-	(*TmdbEpisode)(nil),                                 // 30: title.v1.TmdbEpisode
-	(*SearchTitlesQueryResponse_SearchResult)(nil),      // 31: title.v1.SearchTitlesQueryResponse.SearchResult
-	(*GetTitleDetailsQueryResponse_Rating)(nil),         // 32: title.v1.GetTitleDetailsQueryResponse.Rating
-	(*GetTitleDetailsQueryResponse_Season)(nil),         // 33: title.v1.GetTitleDetailsQueryResponse.Season
-	(*GetTitleDetailsQueryResponse_Season_Episode)(nil), // 34: title.v1.GetTitleDetailsQueryResponse.Season.Episode
-	(*MediaStream_ProxyHeader)(nil),                     // 35: title.v1.MediaStream.ProxyHeader
-	(*MediaStream_AudioTrack)(nil),                      // 36: title.v1.MediaStream.AudioTrack
-	(*MediaStream_SubtitleTrack)(nil),                   // 37: title.v1.MediaStream.SubtitleTrack
+	(*WaitTmdbMatchQuery)(nil),                          // 9: title.v1.WaitTmdbMatchQuery
+	(*TmdbMatch)(nil),                                   // 10: title.v1.TmdbMatch
+	(*TmdbTitle)(nil),                                   // 11: title.v1.TmdbTitle
+	(*Section)(nil),                                     // 12: title.v1.Section
+	(*MediaStream)(nil),                                 // 13: title.v1.MediaStream
+	(*GetMarkingSettingsQuery)(nil),                     // 14: title.v1.GetMarkingSettingsQuery
+	(*MarkingSettings)(nil),                             // 15: title.v1.MarkingSettings
+	(*UpdateMarkingSettingsCommand)(nil),                // 16: title.v1.UpdateMarkingSettingsCommand
+	(*MarkEpisodeCommand)(nil),                          // 17: title.v1.MarkEpisodeCommand
+	(*MarkEpisodeCommandResponse)(nil),                  // 18: title.v1.MarkEpisodeCommandResponse
+	(*GetTmdbSettingsQuery)(nil),                        // 19: title.v1.GetTmdbSettingsQuery
+	(*TmdbSettings)(nil),                                // 20: title.v1.TmdbSettings
+	(*UpdateTmdbSettingsCommand)(nil),                   // 21: title.v1.UpdateTmdbSettingsCommand
+	(*GetTmdbDetailsQuery)(nil),                         // 22: title.v1.GetTmdbDetailsQuery
+	(*TmdbDetails)(nil),                                 // 23: title.v1.TmdbDetails
+	(*TmdbEpisodeRef)(nil),                              // 24: title.v1.TmdbEpisodeRef
+	(*TmdbSeasonRef)(nil),                               // 25: title.v1.TmdbSeasonRef
+	(*TmdbPerson)(nil),                                  // 26: title.v1.TmdbPerson
+	(*TmdbVideo)(nil),                                   // 27: title.v1.TmdbVideo
+	(*TmdbCollection)(nil),                              // 28: title.v1.TmdbCollection
+	(*TmdbRelated)(nil),                                 // 29: title.v1.TmdbRelated
+	(*GetTmdbSeasonQuery)(nil),                          // 30: title.v1.GetTmdbSeasonQuery
+	(*TmdbSeason)(nil),                                  // 31: title.v1.TmdbSeason
+	(*TmdbEpisode)(nil),                                 // 32: title.v1.TmdbEpisode
+	(*SearchTitlesQueryResponse_SearchResult)(nil),      // 33: title.v1.SearchTitlesQueryResponse.SearchResult
+	(*GetTitleDetailsQueryResponse_Rating)(nil),         // 34: title.v1.GetTitleDetailsQueryResponse.Rating
+	(*GetTitleDetailsQueryResponse_Season)(nil),         // 35: title.v1.GetTitleDetailsQueryResponse.Season
+	(*GetTitleDetailsQueryResponse_Season_Episode)(nil), // 36: title.v1.GetTitleDetailsQueryResponse.Season.Episode
+	(*MediaStream_ProxyHeader)(nil),                     // 37: title.v1.MediaStream.ProxyHeader
+	(*MediaStream_AudioTrack)(nil),                      // 38: title.v1.MediaStream.AudioTrack
+	(*MediaStream_SubtitleTrack)(nil),                   // 39: title.v1.MediaStream.SubtitleTrack
 }
 var file_api_title_v1_title_proto_depIdxs = []int32{
-	31, // 0: title.v1.SearchTitlesQueryResponse.results:type_name -> title.v1.SearchTitlesQueryResponse.SearchResult
-	11, // 1: title.v1.GetPlaybackStreamsQueryResponse.streams:type_name -> title.v1.MediaStream
+	33, // 0: title.v1.SearchTitlesQueryResponse.results:type_name -> title.v1.SearchTitlesQueryResponse.SearchResult
+	13, // 1: title.v1.GetPlaybackStreamsQueryResponse.streams:type_name -> title.v1.MediaStream
 	0,  // 2: title.v1.GetTitleDetailsQueryResponse.media_type:type_name -> title.v1.MediaType
-	32, // 3: title.v1.GetTitleDetailsQueryResponse.ratings:type_name -> title.v1.GetTitleDetailsQueryResponse.Rating
-	33, // 4: title.v1.GetTitleDetailsQueryResponse.seasons:type_name -> title.v1.GetTitleDetailsQueryResponse.Season
-	10, // 5: title.v1.GetTitleDetailsQueryResponse.sections:type_name -> title.v1.Section
-	9,  // 6: title.v1.GetTitleDetailsQueryResponse.tmdb:type_name -> title.v1.TmdbTitle
-	0,  // 7: title.v1.TmdbTitle.media_type:type_name -> title.v1.MediaType
-	2,  // 8: title.v1.Section.kind:type_name -> title.v1.Section.Kind
-	36, // 9: title.v1.MediaStream.audio_tracks:type_name -> title.v1.MediaStream.AudioTrack
-	37, // 10: title.v1.MediaStream.subtitles:type_name -> title.v1.MediaStream.SubtitleTrack
-	35, // 11: title.v1.MediaStream.proxy_headers:type_name -> title.v1.MediaStream.ProxyHeader
-	10, // 12: title.v1.MediaStream.sections:type_name -> title.v1.Section
-	9,  // 13: title.v1.TmdbDetails.title:type_name -> title.v1.TmdbTitle
-	1,  // 14: title.v1.TmdbDetails.status:type_name -> title.v1.TmdbStatus
-	22, // 15: title.v1.TmdbDetails.next_episode:type_name -> title.v1.TmdbEpisodeRef
-	22, // 16: title.v1.TmdbDetails.last_episode:type_name -> title.v1.TmdbEpisodeRef
-	24, // 17: title.v1.TmdbDetails.cast:type_name -> title.v1.TmdbPerson
-	25, // 18: title.v1.TmdbDetails.videos:type_name -> title.v1.TmdbVideo
-	26, // 19: title.v1.TmdbDetails.collection:type_name -> title.v1.TmdbCollection
-	27, // 20: title.v1.TmdbDetails.recommendations:type_name -> title.v1.TmdbRelated
-	23, // 21: title.v1.TmdbDetails.seasons:type_name -> title.v1.TmdbSeasonRef
-	27, // 22: title.v1.TmdbCollection.parts:type_name -> title.v1.TmdbRelated
-	9,  // 23: title.v1.TmdbRelated.title:type_name -> title.v1.TmdbTitle
-	30, // 24: title.v1.TmdbSeason.episodes:type_name -> title.v1.TmdbEpisode
-	34, // 25: title.v1.GetTitleDetailsQueryResponse.Season.episodes:type_name -> title.v1.GetTitleDetailsQueryResponse.Season.Episode
-	10, // 26: title.v1.GetTitleDetailsQueryResponse.Season.Episode.sections:type_name -> title.v1.Section
-	3,  // 27: title.v1.TitleService.SearchTitles:input_type -> title.v1.SearchTitlesQuery
-	5,  // 28: title.v1.TitleService.GetPlaybackStreams:input_type -> title.v1.GetPlaybackStreamsQuery
-	7,  // 29: title.v1.TitleService.GetTitleDetails:input_type -> title.v1.GetTitleDetailsQuery
-	12, // 30: title.v1.TitleService.GetMarkingSettings:input_type -> title.v1.GetMarkingSettingsQuery
-	14, // 31: title.v1.TitleService.UpdateMarkingSettings:input_type -> title.v1.UpdateMarkingSettingsCommand
-	15, // 32: title.v1.TitleService.MarkEpisode:input_type -> title.v1.MarkEpisodeCommand
-	17, // 33: title.v1.TitleService.GetTmdbSettings:input_type -> title.v1.GetTmdbSettingsQuery
-	19, // 34: title.v1.TitleService.UpdateTmdbSettings:input_type -> title.v1.UpdateTmdbSettingsCommand
-	20, // 35: title.v1.TitleService.GetTmdbDetails:input_type -> title.v1.GetTmdbDetailsQuery
-	28, // 36: title.v1.TitleService.GetTmdbSeason:input_type -> title.v1.GetTmdbSeasonQuery
-	4,  // 37: title.v1.TitleService.SearchTitles:output_type -> title.v1.SearchTitlesQueryResponse
-	6,  // 38: title.v1.TitleService.GetPlaybackStreams:output_type -> title.v1.GetPlaybackStreamsQueryResponse
-	8,  // 39: title.v1.TitleService.GetTitleDetails:output_type -> title.v1.GetTitleDetailsQueryResponse
-	13, // 40: title.v1.TitleService.GetMarkingSettings:output_type -> title.v1.MarkingSettings
-	13, // 41: title.v1.TitleService.UpdateMarkingSettings:output_type -> title.v1.MarkingSettings
-	16, // 42: title.v1.TitleService.MarkEpisode:output_type -> title.v1.MarkEpisodeCommandResponse
-	18, // 43: title.v1.TitleService.GetTmdbSettings:output_type -> title.v1.TmdbSettings
-	18, // 44: title.v1.TitleService.UpdateTmdbSettings:output_type -> title.v1.TmdbSettings
-	21, // 45: title.v1.TitleService.GetTmdbDetails:output_type -> title.v1.TmdbDetails
-	29, // 46: title.v1.TitleService.GetTmdbSeason:output_type -> title.v1.TmdbSeason
-	37, // [37:47] is the sub-list for method output_type
-	27, // [27:37] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	34, // 3: title.v1.GetTitleDetailsQueryResponse.ratings:type_name -> title.v1.GetTitleDetailsQueryResponse.Rating
+	35, // 4: title.v1.GetTitleDetailsQueryResponse.seasons:type_name -> title.v1.GetTitleDetailsQueryResponse.Season
+	12, // 5: title.v1.GetTitleDetailsQueryResponse.sections:type_name -> title.v1.Section
+	11, // 6: title.v1.GetTitleDetailsQueryResponse.tmdb:type_name -> title.v1.TmdbTitle
+	11, // 7: title.v1.TmdbMatch.tmdb:type_name -> title.v1.TmdbTitle
+	0,  // 8: title.v1.TmdbTitle.media_type:type_name -> title.v1.MediaType
+	2,  // 9: title.v1.Section.kind:type_name -> title.v1.Section.Kind
+	38, // 10: title.v1.MediaStream.audio_tracks:type_name -> title.v1.MediaStream.AudioTrack
+	39, // 11: title.v1.MediaStream.subtitles:type_name -> title.v1.MediaStream.SubtitleTrack
+	37, // 12: title.v1.MediaStream.proxy_headers:type_name -> title.v1.MediaStream.ProxyHeader
+	12, // 13: title.v1.MediaStream.sections:type_name -> title.v1.Section
+	11, // 14: title.v1.TmdbDetails.title:type_name -> title.v1.TmdbTitle
+	1,  // 15: title.v1.TmdbDetails.status:type_name -> title.v1.TmdbStatus
+	24, // 16: title.v1.TmdbDetails.next_episode:type_name -> title.v1.TmdbEpisodeRef
+	24, // 17: title.v1.TmdbDetails.last_episode:type_name -> title.v1.TmdbEpisodeRef
+	26, // 18: title.v1.TmdbDetails.cast:type_name -> title.v1.TmdbPerson
+	27, // 19: title.v1.TmdbDetails.videos:type_name -> title.v1.TmdbVideo
+	28, // 20: title.v1.TmdbDetails.collection:type_name -> title.v1.TmdbCollection
+	29, // 21: title.v1.TmdbDetails.recommendations:type_name -> title.v1.TmdbRelated
+	25, // 22: title.v1.TmdbDetails.seasons:type_name -> title.v1.TmdbSeasonRef
+	29, // 23: title.v1.TmdbCollection.parts:type_name -> title.v1.TmdbRelated
+	11, // 24: title.v1.TmdbRelated.title:type_name -> title.v1.TmdbTitle
+	32, // 25: title.v1.TmdbSeason.episodes:type_name -> title.v1.TmdbEpisode
+	36, // 26: title.v1.GetTitleDetailsQueryResponse.Season.episodes:type_name -> title.v1.GetTitleDetailsQueryResponse.Season.Episode
+	12, // 27: title.v1.GetTitleDetailsQueryResponse.Season.Episode.sections:type_name -> title.v1.Section
+	3,  // 28: title.v1.TitleService.SearchTitles:input_type -> title.v1.SearchTitlesQuery
+	5,  // 29: title.v1.TitleService.GetPlaybackStreams:input_type -> title.v1.GetPlaybackStreamsQuery
+	7,  // 30: title.v1.TitleService.GetTitleDetails:input_type -> title.v1.GetTitleDetailsQuery
+	14, // 31: title.v1.TitleService.GetMarkingSettings:input_type -> title.v1.GetMarkingSettingsQuery
+	16, // 32: title.v1.TitleService.UpdateMarkingSettings:input_type -> title.v1.UpdateMarkingSettingsCommand
+	17, // 33: title.v1.TitleService.MarkEpisode:input_type -> title.v1.MarkEpisodeCommand
+	19, // 34: title.v1.TitleService.GetTmdbSettings:input_type -> title.v1.GetTmdbSettingsQuery
+	21, // 35: title.v1.TitleService.UpdateTmdbSettings:input_type -> title.v1.UpdateTmdbSettingsCommand
+	22, // 36: title.v1.TitleService.GetTmdbDetails:input_type -> title.v1.GetTmdbDetailsQuery
+	30, // 37: title.v1.TitleService.GetTmdbSeason:input_type -> title.v1.GetTmdbSeasonQuery
+	9,  // 38: title.v1.TitleService.WaitTmdbMatch:input_type -> title.v1.WaitTmdbMatchQuery
+	4,  // 39: title.v1.TitleService.SearchTitles:output_type -> title.v1.SearchTitlesQueryResponse
+	6,  // 40: title.v1.TitleService.GetPlaybackStreams:output_type -> title.v1.GetPlaybackStreamsQueryResponse
+	8,  // 41: title.v1.TitleService.GetTitleDetails:output_type -> title.v1.GetTitleDetailsQueryResponse
+	15, // 42: title.v1.TitleService.GetMarkingSettings:output_type -> title.v1.MarkingSettings
+	15, // 43: title.v1.TitleService.UpdateMarkingSettings:output_type -> title.v1.MarkingSettings
+	18, // 44: title.v1.TitleService.MarkEpisode:output_type -> title.v1.MarkEpisodeCommandResponse
+	20, // 45: title.v1.TitleService.GetTmdbSettings:output_type -> title.v1.TmdbSettings
+	20, // 46: title.v1.TitleService.UpdateTmdbSettings:output_type -> title.v1.TmdbSettings
+	23, // 47: title.v1.TitleService.GetTmdbDetails:output_type -> title.v1.TmdbDetails
+	31, // 48: title.v1.TitleService.GetTmdbSeason:output_type -> title.v1.TmdbSeason
+	10, // 49: title.v1.TitleService.WaitTmdbMatch:output_type -> title.v1.TmdbMatch
+	39, // [39:50] is the sub-list for method output_type
+	28, // [28:39] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_api_title_v1_title_proto_init() }
@@ -2980,14 +3091,14 @@ func file_api_title_v1_title_proto_init() {
 		return
 	}
 	file_api_title_v1_title_proto_msgTypes[2].OneofWrappers = []any{}
-	file_api_title_v1_title_proto_msgTypes[11].OneofWrappers = []any{}
+	file_api_title_v1_title_proto_msgTypes[13].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_title_v1_title_proto_rawDesc), len(file_api_title_v1_title_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   35,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

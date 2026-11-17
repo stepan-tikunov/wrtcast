@@ -69,6 +69,12 @@ service TitleService {
       get: "/v1/tmdb/tv/{tmdb_id}/seasons/{season_number}"
     };
   }
+
+  rpc WaitTmdbMatch(WaitTmdbMatchQuery) returns (TmdbMatch) {
+    option (google.api.http) = {
+      get: "/v1/titles/{title_id}/tmdb"
+    };
+  }
 }
 
 enum MediaType {
@@ -149,6 +155,19 @@ message GetTitleDetailsQueryResponse {
   repeated Section sections = 16;
   // The title on TMDB, once it is matched (see TmdbSettings).
   TmdbTitle tmdb = 17;
+}
+
+// The title on TMDB of a title GetTitleDetails told without one, as it is
+// matched in the background: waited for up to 15 s.
+message WaitTmdbMatchQuery {
+  string title_id = 1;
+}
+
+message TmdbMatch {
+  // Once it is matched.
+  TmdbTitle tmdb = 1;
+  // Still to be matched, as the wait ended first: to be asked again.
+  bool pending = 2;
 }
 
 // A title on TMDB: themoviedb.org/<movie or tv>/<id>.

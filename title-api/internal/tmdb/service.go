@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,9 @@ const (
 	queueLimit = 20
 	// How long matching a title may take.
 	matchTimeout = 5 * time.Minute
+	// How long a title opened is looked for by name before its details are
+	// told without it.
+	quickTimeout = 2 * time.Second
 	// A title that failed is tried again, opened so much later, four times
 	// as late each time, maxAttempts times in all.
 	retryAfter  = 30 * time.Minute
@@ -55,6 +59,9 @@ type Service struct {
 	mu    sync.Mutex
 	queue []Title
 	wake  chan struct{}
+	// The title being matched, and what is closed once it is.
+	current string
+	changed chan struct{}
 }
 
 func New(ctx context.Context, db *sql.DB, claudeKey func(context.Context) (string, error)) (*Service, error) {
@@ -66,7 +73,7 @@ func New(ctx context.Context, db *sql.DB, claudeKey func(context.Context) (strin
 	transport.Proxy = nil
 	return &Service{
 		store: store, cache: newCache(db), http: &http.Client{Transport: transport}, baseURL: apiURL,
-		claudeKey: claudeKey, wake: make(chan struct{}, 1),
+		claudeKey: claudeKey, wake: make(chan struct{}, 1), changed: make(chan struct{}),
 	}, nil
 }
 
@@ -112,6 +119,7 @@ func (s *Service) Update(ctx context.Context, key string) (Settings, error) {
 	if key == "" {
 		s.mu.Lock()
 		s.queue = nil
+		s.notify()
 		s.mu.Unlock()
 	}
 	return s.Settings(ctx)
@@ -129,12 +137,17 @@ func (s *Service) Match(ctx context.Context, title string) (Match, bool) {
 	return Match{ID: kept.id, Kind: kept.kind}, true
 }
 
-// Opened tells of a title whose details were asked for: it is matched in
-// the background, unless it was, while there is a key.
-func (s *Service) Opened(t Title) {
-	ctx := context.Background()
-	if key, err := s.store.setting(ctx, "key"); err != nil || key == "" || !s.due(ctx, t.ID) {
-		return
+// Opened tells of a title whose details were asked for, while there is a
+// key and unless it was matched: TMDB's search is asked for it at once, for
+// quickTimeout at most, so that its details tell it when its name and year
+// settle it; else it is matched in the background (see WaitMatch).
+func (s *Service) Opened(ctx context.Context, t Title) (Match, bool) {
+	key, err := s.store.setting(ctx, "key")
+	if err != nil || key == "" || !s.due(ctx, t.ID) {
+		return Match{}, false
+	}
+	if found, ok := s.quick(ctx, key, t); ok {
+		return found, true
 	}
 	s.mu.Lock()
 	queue := []Title{t}
@@ -149,6 +162,54 @@ func (s *Service) Opened(t Title) {
 	case s.wake <- struct{}{}:
 	default:
 	}
+	return Match{}, false
+}
+
+// quick matches a title by name alone, if TMDB's search settles it soon.
+func (s *Service) quick(ctx context.Context, key string, t Title) (Match, bool) {
+	ctx, cancel := context.WithTimeout(ctx, quickTimeout)
+	defer cancel()
+	started := time.Now()
+	candidates, err := s.tmdb(key).candidates(ctx, t)
+	if err != nil {
+		return Match{}, false // the background tells why
+	}
+	found, ok := exact(t, candidates)
+	if !ok {
+		return Match{}, false
+	}
+	if err := s.store.matched(context.WithoutCancel(ctx), t.ID, found.ID, found.Kind, byName, "", 0); err != nil {
+		log.Printf("tmdb %s %q: %v", t.ID, t.Title, err)
+		return Match{}, false
+	}
+	log.Printf("tmdb %s %q: %s/%d %q (%s) by %s at once in %s", t.ID, t.Title, found.Kind, found.ID,
+		found.Title, found.Year(), byName, time.Since(started).Round(time.Millisecond))
+	return Match{ID: found.ID, Kind: found.Kind}, true
+}
+
+// WaitMatch waits for a title queued or being matched to be, until ctx is
+// done: its match, if it is matched, and whether it is still to be.
+func (s *Service) WaitMatch(ctx context.Context, title string) (Match, bool, bool) {
+	for {
+		s.mu.Lock()
+		pending := s.current == title || slices.ContainsFunc(s.queue, func(t Title) bool { return t.ID == title })
+		changed := s.changed
+		s.mu.Unlock()
+		if match, ok := s.Match(ctx, title); ok || !pending {
+			return match, ok, false
+		}
+		select {
+		case <-ctx.Done():
+			return Match{}, false, true
+		case <-changed:
+		}
+	}
+}
+
+// notify wakes those waiting for a title to be matched; s.mu is held.
+func (s *Service) notify() {
+	close(s.changed)
+	s.changed = make(chan struct{})
 }
 
 // due tells whether a title is to be matched: it was not tried, or failed
@@ -170,6 +231,7 @@ func (s *Service) Run(ctx context.Context) {
 		queued := len(s.queue) > 0
 		if queued {
 			t, s.queue = s.queue[0], s.queue[1:]
+			s.current = t.ID
 		}
 		s.mu.Unlock()
 		if !queued {
@@ -181,6 +243,10 @@ func (s *Service) Run(ctx context.Context) {
 			continue
 		}
 		s.matchTitle(ctx, t)
+		s.mu.Lock()
+		s.current = ""
+		s.notify()
+		s.mu.Unlock()
 	}
 }
 

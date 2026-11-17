@@ -211,6 +211,13 @@ func (gatewayTestService) GetTmdbSeason(
 	}}}, nil
 }
 
+func (gatewayTestService) WaitTmdbMatch(
+	_ context.Context,
+	query *titlev1.WaitTmdbMatchQuery,
+) (*titlev1.TmdbMatch, error) {
+	return &titlev1.TmdbMatch{Tmdb: &titlev1.TmdbTitle{Id: 1405, MediaType: titlev1.MediaType_MEDIA_TYPE_SERIES}, Pending: query.GetTitleId() == "wait"}, nil
+}
+
 func TestTmdbHTTPAnnotations(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct{ path, field, want string }{
@@ -218,6 +225,8 @@ func TestTmdbHTTPAnnotations(t *testing.T) {
 		{"/v1/tmdb/movie/550", "title", "map[id:550 mediaType:MEDIA_TYPE_MOVIE]"},
 		{"/v1/tmdb/movie/550", "logoAspect", "2.085"},
 		{"/v1/tmdb/tv/1405", "name", "tv"},
+		{"/v1/titles/64aee42620222/tmdb", "tmdb", "map[id:1405 mediaType:MEDIA_TYPE_SERIES]"},
+		{"/v1/titles/wait/tmdb", "pending", "true"},
 		{"/v1/tmdb/tv/1405/seasons/2", "episodes", "[map[airDate: episodeNumber:2 name:Пилот overview: runtimeMinutes:0 stillPath:x.jpg upcoming:true]]"},
 	} {
 		request := httptest.NewRequest(http.MethodGet, test.path, nil)

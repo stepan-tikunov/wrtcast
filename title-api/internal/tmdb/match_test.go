@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -107,5 +108,70 @@ func TestMatchByName(t *testing.T) {
 	}
 	if service.due(ctx, title.ID) {
 		t.Fatal("a matched title is due")
+	}
+}
+
+// A title opened that TMDB's search settles is matched at once; one it
+// doesn't goes to the background, where WaitMatch waits for it.
+func TestOpened(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		results := []item{}
+		switch r.URL.Query().Get("query") {
+		case "Fight Club":
+			results = append(results, item{ID: 550, Title: "Бойцовский клуб", OriginalTitle: "Fight Club", ReleaseDate: "1999-10-15"})
+		case "Офис":
+			results = append(results,
+				item{ID: 2316, Name: "Офис", OriginalName: "The Office", FirstAirDate: "2005-03-24"},
+				item{ID: 2996, Name: "Офис", OriginalName: "The Office", FirstAirDate: "2001-07-09"})
+		}
+		json.NewEncoder(w).Encode(map[string]any{"results": results})
+	}))
+	defer server.Close()
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// No Claude key: what the search can't settle stays unmatched.
+	service, err := New(ctx, db, func(context.Context) (string, error) { return "", nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.baseURL = server.URL
+	if _, ok := service.Opened(ctx, Title{ID: "fight", Title: "Бойцовский клуб", OriginalTitle: "Fight Club", Year: "1999", Kind: KindMovie}); ok {
+		t.Fatal("matched with no key")
+	}
+	if err := service.store.setSetting(ctx, "key", "key"); err != nil {
+		t.Fatal(err)
+	}
+
+	match, ok := service.Opened(ctx, Title{ID: "fight", Title: "Бойцовский клуб", OriginalTitle: "Fight Club", Year: "1999", Kind: KindMovie})
+	if !ok || match.ID != 550 || match.Kind != KindMovie {
+		t.Fatalf("Opened = %+v, %v", match, ok)
+	}
+	if match, ok := service.Match(ctx, "fight"); !ok || match.ID != 550 {
+		t.Fatalf("Match = %+v, %v", match, ok)
+	}
+
+	office := Title{ID: "office", Title: "Офис", Kind: KindTV}
+	if _, ok := service.Opened(ctx, office); ok {
+		t.Fatal("two Офис matched by name")
+	}
+	wait, stop := context.WithTimeout(ctx, 20*time.Millisecond)
+	defer stop()
+	if _, ok, pending := service.WaitMatch(wait, "office"); ok || !pending {
+		t.Fatalf("WaitMatch before Run = %v, %v", ok, pending)
+	}
+	go service.Run(ctx)
+	wait, stop = context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	if _, ok, pending := service.WaitMatch(wait, "office"); ok || pending {
+		t.Fatalf("WaitMatch = %v, %v", ok, pending)
+	}
+	if _, ok, pending := service.WaitMatch(ctx, "never opened"); ok || pending {
+		t.Fatalf("WaitMatch of a title not opened = %v, %v", ok, pending)
 	}
 }

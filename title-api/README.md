@@ -119,9 +119,12 @@ grpcurl -plaintext \
 ### TMDB
 
 Сервис сопоставляет свои тайтлы с TMDB, по одному тайтлу на TMDB
-(`internal/tmdb`): в фоне, каждый тайтл — при первом `GetTitleDetails`.
-Найденный тайтл приходит в следующих ответах как
-`tmdb: {id, mediaType}` (страница `themoviedb.org/<movie|tv>/<id>`).
+(`internal/tmdb`), каждый тайтл — при первом `GetTitleDetails`. Найденный
+тайтл приходит в ответах как `tmdb: {id, mediaType}` (страница
+`themoviedb.org/<movie|tv>/<id>`). Первый `GetTitleDetails` до 2 с ждёт
+поиска TMDB и, если тот решает тайтл, отдаёт его сразу; иначе тайтл
+сопоставляется в фоне, и `WaitTmdbMatch` (`GET /v1/titles/{id}/tmdb`) ждёт
+этого до 15 с: `{tmdb, pending}`, `pending` — ещё не сопоставлен.
 Включается это ключом API TMDB или токеном доступа (v4):
 `UpdateTmdbSettings` (`POST /v1/tmdb`, `{"apiKey":"…"}`). Ключ перед
 сохранением проверяется запросом `/authentication`, хранится в базе
