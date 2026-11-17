@@ -61,6 +61,15 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .card .all+span{display:block;margin-top:7px}
 .still .card{animation:none}
 #list{position:fixed;inset:0;z-index:3;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+/* The page of a title's cast, over the title's. */
+#cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+.lhead h1 small{display:block;overflow:hidden;color:var(--mu);font-size:13px;font-weight:400;white-space:nowrap;text-overflow:ellipsis}
+.lhead h1{min-width:0}
+.person{display:flex;align-items:center;gap:14px;padding:8px 16px;animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 18ms)}
+.person img,.person .nop{flex:none;width:56px;height:56px;border-radius:50%;object-fit:cover;background:var(--s2)}
+.person div{min-width:0;overflow-wrap:anywhere}
+.person b{display:block;font-weight:550}
+.person span{color:var(--mu);font-size:14px}
 .lhead{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:4px;padding:max(8px,env(safe-area-inset-top)) 12px 8px 4px;background:linear-gradient(var(--bg) 70%,#0e0e1000)}
 .lhead h1{margin:0;font-size:20px}
 .pw{position:relative}
@@ -119,7 +128,14 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .cast{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px 4px;scrollbar-width:none}
 .cast::-webkit-scrollbar{display:none}
 .cast div{flex:none;width:76px;font-size:12px;line-height:1.25;text-align:center}
-.cast img{display:block;width:56px;height:56px;margin:0 auto 6px;border-radius:50%;object-fit:cover;background:var(--s2)}
+.cast img,.cast .nop{display:block;width:56px;height:56px;margin:0 auto 6px;border-radius:50%;object-fit:cover;background:var(--s2)}
+/* Someone without a photo, and the last of the row that leads to them all. */
+.nop{display:grid!important;place-items:center;color:#55555c;font-style:normal}
+.nop svg{width:60%;height:60%}
+.cast button{display:block;width:76px;padding:0;border:0;background:none;color:var(--mu);font-size:12px;cursor:pointer}
+.cast button .nop{color:var(--mu)}
+.dh.more{display:flex;align-items:center;gap:2px;cursor:pointer}
+.dh svg{width:20px;height:20px;color:var(--mu)}
 /* Two lines at most each; a long word (a nickname as a role) breaks. */
 .cast b,.cast span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .cast b{font-weight:550}
@@ -327,12 +343,12 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .skl{display:block;height:12px;margin-top:9px;border-radius:6px}
 .skl+.skl{width:40%}
 .badge.on{animation:bounce .35s ease-out}
-#det,#list{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
-#det.out,#list.out{animation:slideout .2s ease-in forwards}
+#det,#list,#cast{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
+#det.out,#list.out,#cast.out{animation:slideout .2s ease-in forwards}
 #dposter{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards}
 #dinfo>*,.rt,#dlogo,#dacts>*{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
 /* Drawn again as TMDB answers, what was there doesn't pop up anew. */
-#det .still{animation:none}
+#det .still,.person.still{animation:none}
 #det h1,#dmeta,#dplay{animation:pop .4s .1s cubic-bezier(.2,.8,.2,1) backwards}
 #dposter.loading{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards,shim 1.2s linear infinite}
 #det.loading #dplay{opacity:1;color:transparent;animation:pop .4s .1s cubic-bezier(.2,.8,.2,1) backwards,shim 1.2s linear infinite}
@@ -391,10 +407,12 @@ svg.spring{animation:spring .3s ease-out}
   #dinfo{padding:8px var(--dgut) 4px}
   .cast{gap:12px;margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
   .cast div{width:96px;font-size:13px}
-  .cast img{width:80px;height:80px}
+  .cast img,.cast .nop{width:80px;height:80px}
+  .cast button{width:96px;font-size:13px}
   .tag{font-size:16px}
   .news{max-width:760px}
   #dattr{margin:36px var(--dgut) 0}
+  #clist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));padding:0 calc(var(--gut) - 16px)}
   #ddesc{max-width:760px;-webkit-line-clamp:6;font-size:16px}
   #seasons{flex-wrap:wrap;padding:20px var(--dgut) 10px}
   #eps{padding:0 var(--dgut)}
@@ -440,6 +458,7 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-film" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm6 4v6l5-3z"/></symbol>
   <symbol id="i-restart" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
 
@@ -465,6 +484,11 @@ svg.spring{animation:spring .3s ease-out}
   <div id="seasons"></div>
   <div id="eps"></div>
   <p class="attr" id="dattr" hidden><b>TMDB</b>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+</section>
+
+<section id="cast" hidden>
+  <div class="lhead"><button class="ib" id="cback" aria-label="Назад"><svg><use href="#i-back"/></svg></button><h1>В ролях<small id="ctitle"></small></h1></div>
+  <div id="clist"></div>
 </section>
 
 <section id="list" hidden>
@@ -670,7 +694,7 @@ function showLayer(name, on) {
     e.style.transform = e.style.opacity = ''; // left by a pull (see pullSheet)
     e.hidden = false;
   };
-  const page = name == 'det' || name == 'list';
+  const page = name == 'det' || name == 'list' || name == 'cast';
   const e = $(page ? name : 'shade');
   // The shade is shared by the player and the sheets.
   if (on) show(e);
@@ -949,17 +973,20 @@ function closeLayer() {
     loadRecent(); // what was just watched moves to the front
   }
   if (name == 'list') listShown = null;
+  if (name == 'cast') castShown = null;
 }
 
 // ---- addresses ----------------------------------------------------------
 //
 // / is the watch history, /search?q=<query> a search, /recent and /saved
 // the page of all the titles of a section of the main page (see openList),
-// /title/<id> a title's page over any of them.
+// /title/<id> a title's page over any of them, /title/<id>/cast the page
+// of its cast over it.
 
 const titleUrl = id => '/title/' + encodeURIComponent(id);
 const searchUrl = q => '/search?q=' + encodeURIComponent(q);
-const urlTitle = () => /^\/title\/([^/]+)$/.exec(location.pathname)?.[1];
+const urlTitle = () => /^\/title\/([^/]+)(\/cast)?$/.exec(location.pathname)?.[1];
+const urlCast = () => /^\/title\/[^/]+\/cast$/.test(location.pathname);
 const urlList = () => /^\/(recent|saved)$/.exec(location.pathname)?.[1];
 const urlQuery = () => location.pathname == '/search' && new URLSearchParams(location.search).get('q') || '';
 
@@ -981,6 +1008,15 @@ function route() {
     layers.push('det');
     showLayer('det', true);
   }
+  // The cast over the title's page.
+  const cast = !!id && urlCast();
+  if (!cast) while (layers.includes('cast')) closeLayer();
+  if (cast && !layers.includes('cast')) {
+    while (layers.at(-1) != 'det') closeLayer();
+    layers.push('cast');
+    showLayer('cast', true);
+  }
+  if (cast && castShown != decodeURIComponent(id)) showCast(decodeURIComponent(id));
   if (kind && !layers.includes('list')) {
     while (layers.length) closeLayer();
     layers.push('list');
@@ -1287,8 +1323,8 @@ function renderInfo(t, x, again) {
     ...(t.ratings.length ? [el('div', { className: 'rt' + still }, ...t.ratings.map(r =>
       el('span', {}, (RATINGS[r.source] || r.source) + ' ', el('b', {}, r.value.toFixed(1)))))] : []),
     ...(t.genres.length ? [el('div', { className: 'gen' }, t.genres.slice(0, 4).join(' • '))] : []));
-  // TMDB's cast has photos; a row of them takes the place of the names.
-  const cast = x?.cast?.length >= 4 ? x.cast : null;
+  // TMDB's cast, with photos, takes the place of the names.
+  const cast = x?.cast?.length ? x.cast : null, more = cast && x.cast_total - cast.length;
   const facts = [['Режиссёр', (t.directors.length ? t.directors : x?.directors ?? []).slice(0, 2)],
     ['Создатель', x?.creators?.slice(0, 2) ?? []], ['В ролях', cast ? [] : t.actors.slice(0, 6)]]
     .filter(([, v]) => v.length);
@@ -1301,14 +1337,17 @@ function renderInfo(t, x, again) {
     x?.tagline && el('p', { className: 'tag' }, x.tagline),
     desc,
     el('div', { className: 'facts' + still }, ...facts.map(([k, v]) => el('div', {}, el('b', {}, k + ': '), v.join(', ')))),
-    cast && el('h2', { className: 'dh' }, 'В ролях'),
+    cast && el('h2', { className: 'dh more', onclick: openCast }, 'В ролях', svgIcon('more')),
     cast && el('div', { className: 'cast' }, ...cast.map(c => el('div', {},
-      photo(c.photo), el('b', {}, c.name), ...(c.character ? [el('span', {}, c.character)] : [])))),
+      photo(c.photo), el('b', {}, c.name), ...(c.character ? [el('span', {}, c.character)] : []))),
+      ...(more > 0 ? [el('button', { onclick: openCast }, el('i', { className: 'nop' }, svgIcon('more')), 'ещё ' + more)] : [])),
   ].filter(Boolean));
 }
 
-// An actor's photo: a placeholder circle until it loads, and if it fails.
+// An actor's photo: a placeholder circle until it loads, and if it fails;
+// a silhouette if TMDB has none.
 function photo(src) {
+  if (!src) return el('i', { className: 'nop' }, svgIcon('person'));
   const img = el('img', { src, alt: '', loading: 'lazy', className: 'ph' });
   img.onload = () => img.classList.remove('ph');
   img.onerror = () => img.src = BLANK; // a circle stays
@@ -1615,6 +1654,48 @@ $('dplay').onclick = () => start(playTarget(item));
 $('dfrom0').onclick = () => start({ ...playTarget(item), start: 0 });
 $('dback').onclick = closeTop;
 $('dsave').onclick = () => item && toggleSave(item);
+
+// ---- cast ---------------------------------------------------------------
+
+let castShown = null;   // the title whose cast is on its page of its own
+const casts = {};       // /tmdb/cast answers by type and TMDB ID
+
+function openCast() {
+  if (!item?.tm) return;
+  showCast(item.id);
+  openLayer('cast', titleUrl(item.id) + '/cast');
+}
+
+// The cast of a title, all of it as TMDB bills it: the first ones the
+// title's page has at once, the rest as they come.
+async function showCast(id) {
+  castShown = id;
+  $('cast').scrollTop = 0;
+  $('ctitle').textContent = titles[id]?.title || '';
+  $('clist').replaceChildren();
+  if (item?.id == id && item.tm) renderCast(item.tm.cast);
+  try {
+    const t = await title(id), k = t.tmdb && t.tmdb.type + t.tmdb.id;
+    if (k && !(k in casts)) casts[k] = await api(`tmdb/cast?type=${t.tmdb.type}&id=${t.tmdb.id}`);
+    if (castShown != id) return;
+    $('ctitle').textContent = t.title;
+    renderCast(k && casts[k]?.cast || []);
+  } catch (e) {
+    if (castShown == id) toast(e);
+  }
+}
+
+function renderCast(list) {
+  const shown = $('clist').children.length;
+  $('clist').replaceChildren(...list.map((c, i) => {
+    const row = el('div', { className: 'person' + (i < shown ? ' still' : '') }, photo(c.photo),
+      el('div', {}, el('b', {}, c.name), ...(c.character ? [el('span', {}, c.character)] : [])));
+    row.style.setProperty('--i', Math.min(i - shown, 20));
+    return row;
+  }));
+  if (!list.length) $('clist').replaceChildren(el('p', { className: 'note' }, 'TMDB не знает, кто здесь снимался'));
+}
+$('cback').onclick = closeTop;
 
 // ---- playback -----------------------------------------------------------
 

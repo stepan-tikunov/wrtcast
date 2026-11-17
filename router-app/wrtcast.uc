@@ -2609,6 +2609,11 @@ const tmdb_episode = e => e?.episodeNumber ? {
 	season: e.seasonNumber, episode: e.episodeNumber, date: e.airDate || null, title: e.name || null,
 } : null;
 
+// Someone in a title; photo null if TMDB has none.
+const tmdb_person = c => ({
+	name: c.name, character: c.character || null, photo: tmdb_img(c.profilePath, 'w185'),
+});
+
 // A title of a collection or of the recommendations.
 const tmdb_related = r => ({
 	id: +r.title?.id, type: tmdb_type(r.title?.mediaType), title_id: r.titleId || null,
@@ -2643,9 +2648,9 @@ function tmdb_details(type, id, r) {
 			season: s.seasonNumber ?? 0, episodes: s.episodeCount ?? 0,
 			date: s.airDate || null, title: s.name || null,
 		})),
-		cast: map(r.cast ?? [], c => ({
-			name: c.name, character: c.character || null, photo: tmdb_img(c.profilePath, 'w185'),
-		})),
+		cast: map(r.cast ?? [], tmdb_person),
+		// The cast /tmdb/cast tells, of which cast are the first.
+		cast_total: +(r.castTotal ?? 0),
 		trailers: map(r.videos ?? [], v => ({
 			name: v.name, lang: v.language || null, kind: v.kind,
 			url: 'https://www.youtube.com/watch?v=' + v.youtubeKey,
@@ -2877,6 +2882,14 @@ const routes = {
 			tmdb: r.tmdb?.id ? { id: +r.tmdb.id, type: tmdb_type(r.tmdb.mediaType) } : null,
 			pending: !!r.pending,
 		};
+	},
+
+	// Who is in a title on TMDB, all of them as billed; null as /tmdb/title.
+	'GET /tmdb/cast': p => {
+		if (!match(p.type ?? '', /^(movie|tv)$/))
+			fail(400, 'invalid type');
+		let r = api(`/v1/tmdb/${p.type}/${tmdb_id(p)}/cast`, [400, 404]);
+		return r ? { cast: map(r.cast ?? [], tmdb_person) } : null;
 	},
 
 	// The episodes of a season of a series on TMDB (id its TMDB ID); null
