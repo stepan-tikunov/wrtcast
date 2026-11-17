@@ -78,14 +78,53 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #det .hero>div{flex:1}
 #dposter{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--s2);box-shadow:0 8px 24px #0008}
 #det h1{margin:0 0 4px;font-size:22px;line-height:1.2}
+/* Visually hidden, still read out: the title under its logo. */
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 #dmeta{color:#c8c8cc;font-size:14px}
 #dmeta .orig{margin-bottom:2px;color:var(--mu)}
+.age{display:inline-block;padding:0 5px;border:1px solid #ffffff59;border-radius:4px;font-size:.8em;font-weight:600;line-height:1.45;vertical-align:1px}
+#dmeta .gen{margin-top:8px;color:var(--mu)}
+/* TMDB's backdrop (#det.bd): the picture across the top, the logo or the
+   title over its faded lower edge; the blurred poster shows until it loads. */
+#dbd{display:none}
+#det.bd #dbd{position:relative;display:block;margin:calc(-1 * max(8px,env(safe-area-inset-top))) -16px 0;aspect-ratio:16/10}
+#dbd img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s}
+#dbd.ld img{opacity:1}
+#dbd::after{content:'';position:absolute;inset:0;background:linear-gradient(#0e0e1099,#0e0e1000 30%,#0e0e1000 50%,var(--bg))}
+#dbg{transition:opacity .4s}
+#det.bd:has(#dbd.ld) #dbg{opacity:0}
+#det.bd .nav{position:absolute;z-index:1;top:max(8px,env(safe-area-inset-top));left:8px;margin:0}
+#det.bd #dback{background:#0008}
+#det.bd #dposter{display:none}
+#det.bd .hero{display:block;margin-top:-44px;text-align:center}
+#det.bd .rt{justify-content:center}
+/* A logo is as high as --lh unless that makes it wider than 72 %. */
+#dlogo{--lh:84px;display:block;width:min(72%,calc(var(--lh) * var(--a,3)));aspect-ratio:var(--a,3);margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 2px 12px #0009)}
+#det:not(.bd) #dlogo{--lh:52px;margin:0 0 8px;width:min(100%,calc(var(--lh) * var(--a,3)))}
 .rt{display:flex;gap:6px;margin-top:8px}
 .rt span{padding:3px 8px;border-radius:7px;background:#ffffff1f;font-size:12px;font-weight:600}
 .rt b{color:var(--ac)}
 #dinfo{padding:4px 16px 4px}
 #ddesc{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;margin:4px 0 10px;color:#c8c8cc;font-size:15px;line-height:1.45;cursor:pointer}
 #ddesc.full{-webkit-line-clamp:unset}
+.tag{margin:4px 0 6px;color:#e8e8ea;font-size:15px;font-style:italic}
+/* What a series has coming: its next season or episode. */
+.news{display:flex;align-items:center;gap:12px;margin:4px 0 14px;padding:10px 12px;border:1px solid #ffb02040;border-radius:12px;background:#ffb0201a}
+.news svg{color:var(--ac)}
+.news b{display:block;color:var(--ac);font-size:15px;font-weight:600}
+.news span{color:#c8c8cc;font-size:13px}
+.dh{margin:20px 0 10px;font-size:17px}
+.cast{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px 4px;scrollbar-width:none}
+.cast::-webkit-scrollbar{display:none}
+.cast div{flex:none;width:76px;font-size:12px;line-height:1.25;text-align:center}
+.cast img{display:block;width:56px;height:56px;margin:0 auto 6px;border-radius:50%;object-fit:cover;background:var(--s2)}
+.cast b{display:block;font-weight:550}
+.cast span{display:block;margin-top:2px;color:var(--mu)}
+/* TMDB's attribution, under a page drawn with it and with the key. */
+.attr{display:flex;align-items:center;gap:8px;color:#6b6b72;font-size:11px;line-height:1.3}
+.attr b{flex:none;padding:2px 6px;border-radius:4px;background:linear-gradient(90deg,#90cea1,#01b4e4);color:#0d253f;font-size:11px}
+#dattr{margin:28px 16px 0;padding-top:12px;border-top:1px solid var(--s2)}
+#mk .attr{margin:10px 2px 0}
 .facts{color:var(--mu);font-size:14px}
 .facts div{margin:4px 0}
 .facts b{color:var(--tx);font-weight:500}
@@ -98,11 +137,22 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .facts .skl{max-width:50em}
 .pill{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;padding:0 20px;border:0;border-radius:26px;background:var(--s2);font-weight:600}
 .pill.ac{background:var(--ac);color:#111}
-.acts{position:relative;display:flex;gap:10px;margin-top:18px}
-#dplay{flex:1;min-width:0}
-#dsave{position:relative;top:auto;right:auto;flex:none;width:52px;height:52px}
+.acts{position:relative;display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:18px}
+/* The play button shows how far the movie or the episode it goes on with
+   was watched. */
+#dplay{position:relative;flex:1 1 100%;min-width:0;overflow:hidden}
+#dplay small{font-weight:600;opacity:.7}
+#dpbar{position:absolute;left:0;bottom:0;width:0;height:3px;background:#111a}
+/* Under it, buttons with their names: save, the trailer, from the start. */
+#dacts{display:flex;justify-content:space-around;width:100%}
+.act{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:84px;padding:6px 4px;border:0;border-radius:12px;background:none;color:#c8c8cc;font-size:12px;text-decoration:none;transition:transform .12s}
+.act svg{color:var(--tx)}
+.act:active{transform:scale(.94)}
+#dsave{top:auto;right:auto;width:auto;height:auto}
+#dsave::before{display:none}
 #dsave svg{width:24px;height:24px}
-#dfrom0{position:relative;width:100%;height:44px;margin-top:10px;background:#ffffff1f}
+#dsave.on{color:#c8c8cc}
+#dsave.on svg{color:var(--ac)}
 #seasons{display:flex;gap:8px;overflow-x:auto;padding:16px 16px 8px;scrollbar-width:none}
 #seasons::-webkit-scrollbar{display:none}
 .chip{flex:none;height:36px;padding:0 16px;border:0;border-radius:18px;background:var(--s2);font-size:15px}
@@ -276,7 +326,9 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 #det,#list{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
 #det.out,#list.out{animation:slideout .2s ease-in forwards}
 #dposter{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards}
-#dinfo>*,.rt{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
+#dinfo>*,.rt,#dlogo,#dacts>*{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
+/* Drawn again as TMDB answers, what was there doesn't pop up anew. */
+#det .still{animation:none}
 #det h1,#dmeta,#dplay{animation:pop .4s .1s cubic-bezier(.2,.8,.2,1) backwards}
 #dposter.loading{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards,shim 1.2s linear infinite}
 #det.loading #dplay{opacity:1;color:transparent;animation:pop .4s .1s cubic-bezier(.2,.8,.2,1) backwards,shim 1.2s linear infinite}
@@ -322,9 +374,23 @@ svg.spring{animation:spring .3s ease-out}
   #det h1{font-size:34px}
   #dmeta{font-size:15px}
   .acts{margin-top:24px}
+  .acts{flex-wrap:nowrap;align-items:center}
   #dplay{flex:none;min-width:260px}
-  #dfrom0{width:auto;min-width:260px}
+  #dacts{width:auto;gap:4px}
+  #det.bd .top{display:flex;flex-direction:column;justify-content:flex-end;min-height:min(44vw,640px)}
+  #det.bd #dbd{position:absolute;inset:0 0 0 auto;width:72%;margin:0;aspect-ratio:auto}
+  #dbd::after{background:linear-gradient(90deg,var(--bg),#0e0e10cc 22%,#0e0e1000 55%),linear-gradient(#0e0e1000 65%,var(--bg))}
+  #det.bd .nav{top:24px;left:calc(var(--dgut) - 12px)}
+  #det.bd .hero{max-width:560px;margin-top:72px;text-align:left}
+  #det.bd .rt{justify-content:flex-start}
+  #det.bd #dlogo{--lh:120px;width:min(100%,calc(var(--lh) * var(--a,3)));margin:0 0 16px}
   #dinfo{padding:8px var(--dgut) 4px}
+  .cast{gap:12px;margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
+  .cast div{width:96px;font-size:13px}
+  .cast img{width:80px;height:80px}
+  .tag{font-size:16px}
+  .news{max-width:760px}
+  #dattr{margin:36px var(--dgut) 0}
   #ddesc{max-width:760px;-webkit-line-clamp:6;font-size:16px}
   #seasons{flex-wrap:wrap;padding:20px var(--dgut) 10px}
   #eps{padding:0 var(--dgut)}
@@ -367,6 +433,9 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-mark" viewBox="0 0 24 24"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2zm0 15-5-2.18L7 18V5h10v13z"/></symbol>
   <symbol id="i-marked" viewBox="0 0 24 24"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></symbol>
   <symbol id="i-more" viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm6 4v6l5-3z"/></symbol>
+  <symbol id="i-restart" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
 
@@ -382,14 +451,16 @@ svg.spring{animation:spring .3s ease-out}
 <section id="det" hidden>
   <div class="top">
     <div id="dbg"></div>
+    <div id="dbd"><img alt=""></div>
     <div class="nav"><button class="ib" id="dback" aria-label="Назад"><svg><use href="#i-back"/></svg></button></div>
-    <div class="hero"><img id="dposter" alt=""><div><h1 id="dtitle"></h1><div id="dmeta"></div></div></div>
-    <div class="acts"><button class="pill ac" id="dplay"><svg><use href="#i-play"/></svg><span>Смотреть на ТВ</span></button><button class="sv" id="dsave"><svg><use href="#i-mark"/></svg></button></div>
-    <button class="pill" id="dfrom0" hidden>Смотреть с начала</button>
+    <div class="hero"><img id="dposter" alt=""><div><img id="dlogo" alt="" hidden><h1 id="dtitle"></h1><div id="dmeta"></div></div></div>
+    <div class="acts"><button class="pill ac" id="dplay"><svg><use href="#i-play"/></svg><span id="dplab">Смотреть на ТВ</span><i id="dpbar"></i></button>
+      <div id="dacts"><button class="sv act" id="dsave"><svg><use href="#i-mark"/></svg><span>Сохранить</span></button><a class="act" id="dtrailer" target="_blank" rel="noopener" hidden><svg><use href="#i-film"/></svg><span>Трейлер</span></a><button class="act" id="dfrom0" hidden><svg><use href="#i-restart"/></svg><span>С начала</span></button></div></div>
   </div>
   <div id="dinfo"></div>
   <div id="seasons"></div>
   <div id="eps"></div>
+  <p class="attr" id="dattr" hidden><b>TMDB</b>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
 </section>
 
 <section id="list" hidden>
@@ -475,6 +546,7 @@ svg.spring{animation:spring .3s ease-out}
   <form class="row" id="tmf"><input id="tmkey" type="password" autocomplete="off" spellcheck="false" autocapitalize="off"><button class="pill" id="tmsave">Сохранить</button></form>
   <p class="hint err" id="tmerr" hidden></p>
   <button id="tmdel" hidden>Удалить ключ</button>
+  <p class="attr"><b>TMDB</b>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
   </div>
 </section>
 <div id="toast"></div>
@@ -488,6 +560,7 @@ let item = null;        // movie or series shown on the details page
 let season = null;
 let pollError = '';
 const titles = {};      // /title answers by id
+const tmdbs = {};       // /tmdb/title answers by type and TMDB ID; null where TMDB has none
 const layers = [];      // open overlays; the back button closes the last one
 let plOpen = false;     // the player is open; not an overlay, history leaves it be
 let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF default
@@ -992,6 +1065,8 @@ function showSaved(b) {
   b.classList.toggle('on', on);
   b.setAttribute('aria-label', on ? 'Убрать из сохранённых' : 'Сохранить');
   b.firstChild.firstChild.setAttribute('href', on ? '#i-marked' : '#i-mark');
+  const name = b.querySelector('span'); // the details page's has its name under it
+  if (name) name.textContent = on ? 'Сохранён' : 'Сохранить';
 }
 
 // Shows a change of the saved titles at once, the router's answer after.
@@ -1172,18 +1247,113 @@ async function title(id) {
 const RATINGS = { kinopoisk: 'КП', imdb: 'IMDb' };
 const duration = s => !s ? '' : (s >= 3600 ? Math.floor(s / 3600) + ' ч ' : '') + Math.round(s % 3600 / 60) + ' мин';
 
-function renderInfo(t) {
+const plural = (n, one, few, many) =>
+  n % 10 == 1 && n % 100 != 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many;
+
+// A date of TMDB (2026-01-16) as "16 января", with the year when it is
+// not soon.
+function day(date) {
+  const d = new Date(date + 'T00:00'), o = { day: 'numeric', month: 'long' };
+  if (d.getFullYear() != new Date().getFullYear() && d - Date.now() > 180 * 864e5) o.year = 'numeric';
+  return d.toLocaleDateString('ru-RU', o).replace(/ г\.$/, '');
+}
+const today = () => new Date().toLocaleDateString('sv'); // 2026-11-18
+
+// What a series has coming, if TMDB knows when: its next season or episode.
+function news(x) {
+  const e = x?.status == 'returning' && x.next;
+  if (!e?.date || e.date < today()) return null;
+  return e.episode == 1 ? { head: `Сезон ${e.season} — ${day(e.date)}` } :
+    { head: `Новая серия ${day(e.date)}`, sub: [`${e.season} сезон, ${e.episode} серия`, e.title].filter(Boolean).join(' · ') };
+}
+
+// The title as the provider has it (t), with what TMDB adds (x) once it
+// answers; again: drawn anew with x, what was there doesn't pop up again.
+function renderInfo(t, x, again) {
+  const still = again ? ' still' : '', n = t.seasons?.length;
+  const line = [t.year || x?.year,
+    x?.age && el('span', { className: 'age' }, x.age),
+    t.type == 'series' ? (n ? `${n} ${plural(n, 'сезон', 'сезона', 'сезонов')}` : 'Сериал') : duration(t.duration || x?.runtime * 60),
+    (t.countries.length ? t.countries : x?.countries ?? []).slice(0, 2).join(', ')].filter(Boolean);
   $('dmeta').replaceChildren(
     ...(t.original && t.original != t.title ? [el('div', { className: 'orig' }, t.original)] : []),
-    el('div', {}, [t.year, t.countries.slice(0, 2).join(', '), t.type == 'series' ? 'Сериал' : duration(t.duration)].filter(Boolean).join(' · ')),
-    ...(t.ratings.length ? [el('div', { className: 'rt' }, ...t.ratings.map(r =>
-      el('span', {}, (RATINGS[r.source] || r.source) + ' ', el('b', {}, r.value.toFixed(1)))))] : []));
-  const facts = [['Жанр', t.genres.slice(0, 4)], ['Режиссёр', t.directors.slice(0, 2)], ['В ролях', t.actors.slice(0, 6)]]
+    el('div', {}, ...line.flatMap((p, i) => i ? [' · ', p] : [p])),
+    ...(t.ratings.length ? [el('div', { className: 'rt' + still }, ...t.ratings.map(r =>
+      el('span', {}, (RATINGS[r.source] || r.source) + ' ', el('b', {}, r.value.toFixed(1)))))] : []),
+    ...(t.genres.length ? [el('div', { className: 'gen' }, t.genres.slice(0, 4).join(' • '))] : []));
+  // TMDB's cast has photos; a row of them takes the place of the names.
+  const cast = x?.cast?.length >= 4 ? x.cast : null;
+  const facts = [['Режиссёр', (t.directors.length ? t.directors : x?.directors ?? []).slice(0, 2)],
+    ['Создатель', x?.creators?.slice(0, 2) ?? []], ['В ролях', cast ? [] : t.actors.slice(0, 6)]]
     .filter(([, v]) => v.length);
-  const desc = el('p', { id: 'ddesc' }, t.description || '');
-  desc.onclick = () => desc.classList.toggle('full');
-  $('dinfo').replaceChildren(...(t.description ? [desc] : []),
-    el('div', { className: 'facts' }, ...facts.map(([k, v]) => el('div', {}, el('b', {}, k + ': '), v.join(', ')))));
+  const text = t.description || x?.overview, soon = news(x);
+  const desc = text && el('p', { id: 'ddesc', className: t.description ? still : '' }, text);
+  if (desc) desc.onclick = () => desc.classList.toggle('full');
+  $('dinfo').replaceChildren(...[
+    soon && el('div', { className: 'news' }, svgIcon('bell'),
+      el('div', {}, el('b', {}, soon.head), ...(soon.sub ? [el('span', {}, soon.sub)] : []))),
+    x?.tagline && el('p', { className: 'tag' }, x.tagline),
+    desc,
+    el('div', { className: 'facts' + still }, ...facts.map(([k, v]) => el('div', {}, el('b', {}, k + ': '), v.join(', ')))),
+    cast && el('h2', { className: 'dh' }, 'В ролях'),
+    cast && el('div', { className: 'cast' }, ...cast.map(c => el('div', {},
+      el('img', { src: c.photo, alt: '', loading: 'lazy' }), el('b', {}, c.name), ...(c.character ? [el('span', {}, c.character)] : [])))),
+  ].filter(Boolean));
+}
+
+// TMDB's backdrop and logo over the page's top; without them, or should
+// they fail to load, the top stays as the provider's poster has it.
+function renderArt(t, x) {
+  const bd = $('dbd').firstChild, logo = $('dlogo');
+  if (x.backdrop) {
+    bd.sizes = '(min-width:900px) 72vw, 100vw';
+    bd.srcset = `${x.backdrop.w780} 780w, ${x.backdrop.w1280} 1280w`;
+    bd.src = x.backdrop.w780;
+    $('det').classList.add('bd');
+  }
+  if (x.logo) {
+    logo.style.setProperty('--a', x.logo.aspect || 3);
+    logo.alt = t.title;
+    logo.src = x.logo.url;
+    logo.hidden = false;
+    $('dtitle').classList.add('vh');
+  }
+}
+$('dbd').firstChild.onload = e => e.target.getAttribute('src') && $('dbd').classList.add('ld');
+$('dbd').firstChild.onerror = e => e.target.getAttribute('src') && $('det').classList.remove('bd');
+$('dlogo').onerror = () => {
+  $('dlogo').hidden = true;
+  $('dtitle').classList.remove('vh');
+};
+
+// The page without TMDB's, as it opens.
+function clearArt() {
+  $('det').classList.remove('bd');
+  $('dbd').classList.remove('ld');
+  for (const a of ['srcset', 'src']) $('dbd').firstChild.removeAttribute(a);
+  $('dlogo').hidden = true;
+  $('dlogo').removeAttribute('src');
+  $('dtitle').classList.remove('vh');
+  $('dattr').hidden = $('dtrailer').hidden = true;
+}
+
+// What TMDB has of a title, once title-api has matched it (t.tmdb): drawn
+// over the page as it comes, the page staying as it is if TMDB has none or
+// fails.
+async function loadTmdb(m, t) {
+  const k = t.tmdb.type + t.tmdb.id, kept = k in tmdbs;
+  try {
+    if (!(k in tmdbs)) tmdbs[k] = await api(`tmdb/title?type=${t.tmdb.type}&id=${t.tmdb.id}`);
+  } catch {
+    return;
+  }
+  const x = tmdbs[k];
+  if (item != m || !x) return;
+  m.tm = x;
+  renderArt(t, x);
+  renderInfo(t, x, !kept); // kept, it comes with the page
+  renderDetails();
+  $('dattr').hidden = false;
 }
 
 // Placeholder lines of the given widths, in %.
@@ -1213,7 +1383,10 @@ async function openDetails(m) {
   $('dposter').hidden = false;
   $('dplay').hidden = false;
   $('dplay').disabled = true;
-  $('dplay').lastChild.textContent = 'Смотреть на ТВ'; // the width of the button on desktop
+  $('dplab').textContent = 'Смотреть на ТВ'; // the width of the button on desktop
+  $('dpbar').style.width = 0;
+  clearArt();
+  m.tm = null;
   $('dsave').dataset.id = m.id;
   $('dsave').disabled = true; // until its name is known, for the saved list
   showSaved($('dsave'));
@@ -1254,6 +1427,7 @@ async function openDetails(m) {
   $('dtitle').textContent = t.title;
   renderInfo(t);
   renderDetails();
+  if (t.tmdb) loadTmdb(m, t);
   if (t.type != 'series') return;
   const now = st?.now?.id == m.id ? st.now : null;
   const cont = continueAt(m);
@@ -1288,22 +1462,30 @@ function playTarget(m) {
   return c && { ...base, ...c };
 }
 
-// Play button; grey and off while the title is on.
+// Play button, with how far what it goes on with was watched; grey and off
+// while the title is on. The buttons under it.
 function renderDetails() {
   if (!item?.type) return;
+  const trailer = item.tm?.trailers?.[0];
+  $('dtrailer').hidden = !trailer;
+  if (trailer) $('dtrailer').href = trailer.url;
   const on = st?.media && st.now?.id == item.id;
   const starting = pending?.id == item.id || asking?.id == item.id;
   const t = playTarget(item);
   $('dplay').hidden = !t;
   if (!t) return;
-  const series = t.season != null;
-  $('dplay').lastChild.textContent = starting ? 'Запускаю…' : on ? 'Воспроизводится' :
-    series ? `${t.season} сезон, ${t.episode} серия` + (t.resume ? ', ' + fmt(t.resume) : '') :
-    t.resume ? 'Продолжить с ' + fmt(t.resume) : 'Смотреть на ТВ';
+  const series = t.season != null, ep = series ? `С${t.season} Е${t.episode}` : '';
+  const p = series ? item.progress?.eps?.[epKey(t)] : item.progress;
+  const left = t.resume && p?.dur > t.resume + 30 ? p.dur - t.resume : 0;
+  const small = s => el('small', {}, s);
+  $('dplab').replaceChildren(...starting ? ['Запускаю…'] : on ? ['Воспроизводится'] :
+    t.resume ? ['Продолжить ', small([ep, left ? 'ещё ' + duration(left) : 'с ' + fmt(t.resume)].filter(Boolean).join(' · '))] :
+    series ? ['Смотреть ', small(ep)] : ['Смотреть на ТВ']);
+  $('dpbar').style.width = t.resume && p?.dur && !on && !starting ? 100 * Math.min(1, t.resume / p.dur) + '%' : 0;
   $('dplay').disabled = $('dfrom0').disabled = !!pending || !!asking;
   $('dplay').classList.toggle('ac', !on || starting);
   if (on && !starting) $('dplay').disabled = true;
-  $('dfrom0').hidden = !t.resume || on || starting || t.season != null; // movies only
+  $('dfrom0').hidden = !t.resume || on || starting;
 }
 
 function showSeason(s) {
