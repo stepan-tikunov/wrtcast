@@ -719,46 +719,6 @@ function title_id(p) {
 	return p.id;
 }
 
-// Streams of a movie, or of an episode when season is given. A series
-// never watched, or saved to watch, is told to title-api as played first:
-// it marks the episodes of those (see /marking).
-function streams(id, season, episode) {
-	let first = !title_row(id) || !!sql_row('SELECT 1 AS x FROM saved WHERE id = ?', id);
-	let r = api(`/v1/titles/${id}/playback-streams` + (season == null ? '' :
-		`?season_number=${season}&episode_number=${urlenc(episode)}` +
-		(first ? '&first_play=true' : '')));
-	return map(r.streams ?? [], (s, i) => ({
-		index: i,
-		name: s.name || `Плеер ${i + 1}`,
-		url: s.masterPlaylistUrl,
-		// Headers the CDN requires (e.g. Origin), as "Name: value" lines.
-		headers: join('\n', map(s.proxyHeaders ?? [], h => `${h.name}: ${h.value}`)),
-		audio: map(s.audioTracks ?? [], a => ({
-			id: a.id, name: a.name, lang: a.language, default: !!a.default,
-		})),
-		// Provider names end with the track number ("Рус. полные - 5").
-		subs: map(s.subtitles ?? [], t => ({
-			id: t.id, name: replace(t.name ?? '', / +- +[0-9]+$/, ''),
-			lang: t.language, forced: !!t.forced, url: t.playlistUrl,
-		})),
-		// Marked on a video of sdur seconds (see sections_of).
-		sections: sections(s.sections), sdur: +(s.sectionsDurationSeconds ?? 0),
-	}));
-}
-
-// The streams of a title, remembered per TV for 10 minutes: the UI lists the
-// sources before playing and may retry with another, all from one provider
-// request. force asks the provider again.
-function title_streams(dev, id, season, episode, force) {
-	let key = state_key(dev), c = tv_get(key, 'list');
-	if (!force && c?.streams && c.id == id && c.season == season &&
-	    c.episode == episode && time() - c.fetched < 600)
-		return c;
-	c = { id, season, episode, streams: streams(id, season, episode), fetched: time() };
-	tv_set(key, 'list', c);
-	return c;
-}
-
 // ---- sections --------------------------------------------------------------
 //
 // title-api tells the recap, the intro and the credits of a movie or an
@@ -1095,6 +1055,46 @@ function progress_row(id, ep) {
 	if (x)
 		x.done = !!x.done;
 	return x;
+}
+
+// Streams of a movie, or of an episode when season is given. A series
+// never watched, or saved to watch, is told to title-api as played first:
+// it marks the episodes of those (see /marking).
+function streams(id, season, episode) {
+	let first = !title_row(id) || !!sql_row('SELECT 1 AS x FROM saved WHERE id = ?', id);
+	let r = api(`/v1/titles/${id}/playback-streams` + (season == null ? '' :
+		`?season_number=${season}&episode_number=${urlenc(episode)}` +
+		(first ? '&first_play=true' : '')));
+	return map(r.streams ?? [], (s, i) => ({
+		index: i,
+		name: s.name || `Плеер ${i + 1}`,
+		url: s.masterPlaylistUrl,
+		// Headers the CDN requires (e.g. Origin), as "Name: value" lines.
+		headers: join('\n', map(s.proxyHeaders ?? [], h => `${h.name}: ${h.value}`)),
+		audio: map(s.audioTracks ?? [], a => ({
+			id: a.id, name: a.name, lang: a.language, default: !!a.default,
+		})),
+		// Provider names end with the track number ("Рус. полные - 5").
+		subs: map(s.subtitles ?? [], t => ({
+			id: t.id, name: replace(t.name ?? '', / +- +[0-9]+$/, ''),
+			lang: t.language, forced: !!t.forced, url: t.playlistUrl,
+		})),
+		// Marked on a video of sdur seconds (see sections_of).
+		sections: sections(s.sections), sdur: +(s.sectionsDurationSeconds ?? 0),
+	}));
+}
+
+// The streams of a title, remembered per TV for 10 minutes: the UI lists the
+// sources before playing and may retry with another, all from one provider
+// request. force asks the provider again.
+function title_streams(dev, id, season, episode, force) {
+	let key = state_key(dev), c = tv_get(key, 'list');
+	if (!force && c?.streams && c.id == id && c.season == season &&
+	    c.episode == episode && time() - c.fetched < 600)
+		return c;
+	c = { id, season, episode, streams: streams(id, season, episode), fetched: time() };
+	tv_set(key, 'list', c);
+	return c;
 }
 
 // Copies the history to flash, into a new file renamed over KEEP, so a cut
