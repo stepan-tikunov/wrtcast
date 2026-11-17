@@ -332,6 +332,13 @@ func (s *Service) match(ctx context.Context, tmdb *client, t Title) (Candidate, 
 	if found, ok := exact(t, candidates); ok {
 		return found, byName, "", 0, nil
 	}
+	return s.ask(ctx, tmdb, t, candidates)
+}
+
+// ask has Claude find the TMDB title of a title TMDB's search found the
+// candidates of and didn't settle, or none (ID 0); why, and the dollars it
+// cost.
+func (s *Service) ask(ctx context.Context, tmdb *client, t Title, candidates []Candidate) (Candidate, string, string, float64, error) {
 	key, err := s.claudeKey(ctx)
 	if err != nil {
 		return Candidate{}, "", "", 0, err

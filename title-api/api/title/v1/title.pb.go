@@ -759,8 +759,8 @@ func (x *TmdbMatch) GetPending() bool {
 
 // A title on TMDB to be looked for on the provider: what the provider's
 // search finds by its Russian name and its original one, three titles at
-// most, of its year or one off, is matched with TMDB as the titles opened
-// are, in the background; waited for up to 15 s. A title not found is
+// most, of its year or one off, is matched with TMDB by name all at once,
+// then by Claude one at a time, in the background; waited for up to 15 s. A title not found is
 // looked for again a week later, one whose lookup failed half an hour
 // later. FAILED_PRECONDITION with no TMDB key.
 type LookupTmdbTitleCommand struct {

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 )
@@ -219,9 +220,12 @@ func (s *Service) lookUp(ctx context.Context, provider Provider, l lookup) {
 }
 
 // find is the provider's title of a TMDB title, or none: of what the
-// provider's search finds by its Russian name and its original one, those
-// of its year, the likeliest first, are matched with TMDB as titles opened
-// are, until one is matched with it; how that one was.
+// provider's search finds by its Russian name and its original one (both
+// asked at once), those of its year, the likeliest first, are opened and
+// matched by name with TMDB, all at once; the first matched with it is
+// found, unless one likelier is still being. Those TMDB's search can't
+// settle are then settled by Claude, one at a time, the likeliest first,
+// until one is matched with it. How it was.
 func (s *Service) find(ctx context.Context, provider Provider, l lookup) (string, string, error) {
 	tmdb, err := s.keyed(ctx)
 	if err != nil {
@@ -231,36 +235,99 @@ func (s *Service) find(ctx context.Context, provider Provider, l lookup) (string
 	if err != nil {
 		return "", "", err
 	}
-	var found []Found
-	seen := map[string]bool{}
-	for _, query := range []string{details.Name, details.OriginalName} {
-		query = strings.TrimSpace(query)
-		if utf8.RuneCountInString(query) < 3 || seen["query "+normalize(query)] {
+	found, err := search(ctx, provider, details.Name, details.OriginalName)
+	if err != nil {
+		return "", "", err
+	}
+	likely := likeliest(details, found)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	type result struct {
+		i     int
+		match Match
+		how   string
+		open  *opened
+		err   error
+	}
+	results := make(chan result, len(likely))
+	for i, x := range likely {
+		go func() {
+			match, how, open, err := s.byName(ctx, tmdb, provider, x)
+			results <- result{i, match, how, open, err}
+		}()
+	}
+	got := make([]*result, len(likely))
+	for range likely {
+		r := <-results
+		got[r.i] = &r
+		if r.err != nil {
+			log.Printf("tmdb lookup %s: %s %q: %v", l, likely[r.i].ID, likely[r.i].Title, r.err)
+		}
+		// The likeliest matched with it, those likelier than it done.
+		for _, r := range got {
+			if r == nil {
+				break
+			}
+			if r.match.ID == l.id && r.match.Kind == l.kind {
+				return likely[r.i].ID, r.how, nil
+			}
+		}
+	}
+	for i, r := range got {
+		if r.open == nil {
 			continue
 		}
-		seen["query "+normalize(query)] = true
-		results, err := provider.Search(ctx, query)
+		match, how, err := s.byClaude(ctx, tmdb, *r.open)
 		if err != nil {
-			return "", "", fmt.Errorf("search %q: %w", query, err)
+			log.Printf("tmdb lookup %s: %s %q: %v", l, likely[i].ID, likely[i].Title, err)
+			continue
 		}
-		for _, x := range results {
+		if match.ID == l.id && match.Kind == l.kind {
+			return likely[i].ID, how, nil
+		}
+	}
+	return "", "", nil
+}
+
+// search is what the provider's search finds by the names, asked at once,
+// each title once, by the first name first.
+func search(ctx context.Context, provider Provider, names ...string) ([]Found, error) {
+	var queries []string
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if utf8.RuneCountInString(name) >= 3 && !slices.ContainsFunc(queries, func(q string) bool { return normalize(q) == normalize(name) }) {
+			queries = append(queries, name)
+		}
+	}
+	results := make([][]Found, len(queries))
+	errs := make([]error, len(queries))
+	var wg sync.WaitGroup
+	for i, query := range queries {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results[i], errs[i] = provider.Search(ctx, query)
+			if errs[i] != nil {
+				errs[i] = fmt.Errorf("search %q: %w", query, errs[i])
+			}
+		}()
+	}
+	wg.Wait()
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	var found []Found
+	seen := map[string]bool{}
+	for _, list := range results {
+		for _, x := range list {
 			if !seen[x.ID] {
 				seen[x.ID] = true
 				found = append(found, x)
 			}
 		}
 	}
-	for _, x := range likeliest(details, found) {
-		title, how, err := s.matchFound(ctx, tmdb, provider, x)
-		if err != nil {
-			log.Printf("tmdb lookup %s: %s %q: %v", l, x.ID, x.Title, err)
-			continue
-		}
-		if title.ID == l.id && title.Kind == l.kind {
-			return x.ID, how, nil
-		}
-	}
-	return "", "", nil
+	return found, nil
 }
 
 // likeliest are the titles found that may be a TMDB title, lookupCandidates
@@ -290,31 +357,56 @@ func likeliest(details Details, found []Found) []Found {
 	return result[:min(len(result), lookupCandidates)]
 }
 
-// matchFound is the TMDB title of a title the provider's search found (ID
-// 0 if none), as kept if it was matched, else matched as one opened is and
-// kept; how it was matched.
-func (s *Service) matchFound(ctx context.Context, tmdb *client, provider Provider, x Found) (Match, string, error) {
+// opened is a title the provider's search found, opened, that TMDB's
+// search didn't settle: to be settled by Claude.
+type opened struct {
+	title      Title
+	candidates []Candidate
+}
+
+// byName is the TMDB title of a title the provider's search found (ID 0 if
+// none), as kept if it was matched, else as TMDB's search settles it by its
+// name and year, kept; how it was matched. One TMDB's search can't settle
+// is told opened.
+func (s *Service) byName(ctx context.Context, tmdb *client, provider Provider, x Found) (Match, string, *opened, error) {
 	kept, ok, err := s.store.title(ctx, x.ID)
 	if err != nil {
-		return Match{}, "", err
+		return Match{}, "", nil, err
 	}
 	switch {
 	case ok && kept.state == stateMatched:
-		return Match{ID: kept.id, Kind: kept.kind}, "its match", nil
+		return Match{ID: kept.id, Kind: kept.kind}, "its match", nil, nil
 	case ok && kept.state == stateNone:
-		return Match{}, "", nil
+		return Match{}, "", nil, nil
 	}
 	t, err := provider.Title(ctx, x.ID)
 	if err != nil {
-		return Match{}, "", err
+		return Match{}, "", nil, err
 	}
 	t.ID = x.ID
-	found, how, reason, cost, err := s.match(ctx, tmdb, t)
+	candidates, err := tmdb.candidates(ctx, t)
+	if err != nil {
+		return Match{}, "", nil, err
+	}
+	found, ok := exact(t, candidates)
+	if !ok {
+		return Match{}, "", &opened{t, candidates}, nil
+	}
+	if err := s.store.matched(context.WithoutCancel(ctx), t.ID, found.ID, found.Kind, byName, "", 0); err != nil {
+		return Match{}, "", nil, err
+	}
+	return Match{ID: found.ID, Kind: found.Kind}, byName, nil, nil
+}
+
+// byClaude is the TMDB title of a title opened, as Claude settles it (ID 0
+// if none), kept.
+func (s *Service) byClaude(ctx context.Context, tmdb *client, o opened) (Match, string, error) {
+	found, _, reason, cost, err := s.ask(ctx, tmdb, o.title, o.candidates)
 	if err != nil {
 		return Match{}, "", err
 	}
-	if err := s.store.matched(context.WithoutCancel(ctx), t.ID, found.ID, found.Kind, how, reason, cost); err != nil {
+	if err := s.store.matched(context.WithoutCancel(ctx), o.title.ID, found.ID, found.Kind, byClaude, reason, cost); err != nil {
 		return Match{}, "", err
 	}
-	return Match{ID: found.ID, Kind: found.Kind}, how, nil
+	return Match{ID: found.ID, Kind: found.Kind}, byClaude, nil
 }

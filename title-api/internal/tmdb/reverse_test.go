@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +21,8 @@ type fakeProvider struct {
 	found  map[string][]Found
 	titles map[string]Title
 	fail   bool
+	// How long a title's page takes to open.
+	slow map[string]time.Duration
 
 	mu       sync.Mutex
 	searches []string
@@ -36,7 +39,12 @@ func (p *fakeProvider) Search(_ context.Context, query string) ([]Found, error) 
 	return p.found[query], nil
 }
 
-func (p *fakeProvider) Title(_ context.Context, id string) (Title, error) {
+func (p *fakeProvider) Title(ctx context.Context, id string) (Title, error) {
+	select {
+	case <-time.After(p.slow[id]):
+	case <-ctx.Done():
+		return Title{}, ctx.Err()
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.opened = append(p.opened, id)
@@ -84,6 +92,7 @@ func lookupService(t *testing.T, provider *fakeProvider) (*Service, context.Cont
 	if err != nil {
 		t.Fatal(err)
 	}
+	db.SetMaxOpenConns(1) // as title-api's state database
 	t.Cleanup(func() { db.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -109,7 +118,7 @@ func TestLookupFound(t *testing.T) {
 	provider := &fakeProvider{
 		found: map[string][]Found{
 			// Both names find the same title; the sequel is found by the
-			// Russian one, named otherwise, so it is tried after.
+			// Russian one, named otherwise: opened as well, at once.
 			"Бойцовский клуб": {{ID: "sequel", Title: "Бойцовский клуб 2", Year: "2000"}, {ID: "fight", Title: "Бойцовский клуб", Year: "1999"}},
 			"Fight Club":      {{ID: "fight", Title: "Бойцовский клуб", Year: "1999"}},
 		},
@@ -124,7 +133,7 @@ func TestLookupFound(t *testing.T) {
 		t.Fatalf("Lookup = %s, %q, %v", state, title, err)
 	}
 	searches, opened := provider.requests()
-	if searches != 2 || len(opened) != 1 || opened[0] != "fight" {
+	if slices.Sort(opened); searches != 2 || !slices.Equal(opened, []string{"fight", "sequel"}) {
 		t.Errorf("%d searches, opened %v", searches, opened)
 	}
 	if match, ok := service.Match(ctx, "fight"); !ok || match.ID != 550 {
@@ -139,6 +148,24 @@ func TestLookupFound(t *testing.T) {
 	}
 	if details, err := service.Details(ctx, KindMovie, 550); err != nil || details.TitleID != "fight" {
 		t.Errorf("Details = %q, %v", details.TitleID, err)
+	}
+}
+
+func TestLookupLikeliest(t *testing.T) {
+	t.Parallel()
+	// Two of the provider's titles are Fight Club: the one the search names
+	// as it is found, though the other is matched first.
+	provider := &fakeProvider{
+		found: map[string][]Found{"Fight Club": {
+			{ID: "copy", Title: "Бойцовский клуб (копия)", Year: "1999"},
+			{ID: "fight", Title: "Бойцовский клуб", Year: "1999"},
+		}},
+		titles: map[string]Title{"fight": fightClub(""), "copy": fightClub("")},
+		slow:   map[string]time.Duration{"fight": 200 * time.Millisecond},
+	}
+	service, ctx := lookupService(t, provider)
+	if state, title, err := service.Lookup(ctx, KindMovie, 550); state != LookupFound || title != "fight" || err != nil {
+		t.Fatalf("Lookup = %s, %q, %v", state, title, err)
 	}
 }
 
@@ -213,13 +240,14 @@ func TestLookupFailed(t *testing.T) {
 	if state, _, _ := service.Lookup(ctx, KindMovie, 550); state != LookupNotFound {
 		t.Fatalf("Lookup again = %s", state)
 	}
-	if searches, _ := provider.requests(); searches != 1 {
+	// Both names asked at once.
+	if searches, _ := provider.requests(); searches != 2 {
 		t.Errorf("%d searches", searches)
 	}
 	// Sooner than one not found.
 	now = now.Add(failedAgain)
 	service.Lookup(ctx, KindMovie, 550)
-	if searches, _ := provider.requests(); searches != 2 {
+	if searches, _ := provider.requests(); searches != 4 {
 		t.Errorf("%d searches half an hour later", searches)
 	}
 }
