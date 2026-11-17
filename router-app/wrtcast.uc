@@ -2663,7 +2663,7 @@ const routes = {
 			body.enabled = p.on == '1';
 		}
 		if (p.key != null) {
-			if (!match(p.key, /^[!-~]{0,256}$/))
+			if (length(p.key) > 256 || !match(p.key, /^[!-~]*$/))
 				fail(400, 'invalid key');
 			body.apiKey = p.key;
 		}
