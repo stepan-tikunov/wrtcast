@@ -17,7 +17,8 @@ button{cursor:pointer;touch-action:manipulation}
 button:disabled{opacity:.45;pointer-events:none}
 svg{width:24px;height:24px;fill:currentColor;flex:none}
 .ib{display:grid;place-items:center;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:none}
-.ib:active,.pill:active,.card:active,.ep:active{transform:scale(.96)}
+.ib:active,.pill:active,.ep:active{transform:scale(.96)}
+.card:has(>.open:active){transform:scale(.96)}
 .ib,.pill,.card,.ep{transition:transform .12s}
 
 header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));background:linear-gradient(var(--bg) 70%,#0e0e1000)}
@@ -31,15 +32,37 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #qx{position:absolute;right:0;top:0;width:46px;height:46px;color:var(--mu)}
 #qx svg{position:static;width:22px;height:22px}
 
-#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:16px 12px;padding:4px 12px 120px}
-.card{position:relative;display:block;align-self:start;padding:0;border:0;background:none;text-align:left}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:16px 12px;padding:4px 12px 0}
+#home{padding-bottom:120px}
+.card{position:relative;align-self:start}
+.card .open{display:block;width:100%;padding:0;border:0;background:none;text-align:left}
 .card img,.card i{display:block;width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--s2)}
 .card i{display:grid;place-items:center;color:#55555c;font:600 40px system-ui;font-style:normal}
 .card b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:7px;font-size:14px;font-weight:550}
 .card span{color:var(--mu);font-size:13px}
 .badge{position:absolute;top:6px;left:6px;padding:2px 7px;border-radius:6px;background:#000c;color:#ddd!important;font-size:11px!important;font-weight:600}
-.badge.on{left:auto;right:6px;background:var(--ac);color:#111!important}
-#rtitle{margin:0;padding:4px 12px 10px;font-size:17px}
+.badge.on{background:var(--ac);color:#111!important}
+/* Saves the title to watch, over a poster's corner and next to a title's
+   play button; lit while saved. */
+.sv{position:absolute;top:6px;right:6px;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#000c;color:#fff;transition:transform .12s}
+.sv::before{content:'';position:absolute;inset:-6px}
+.sv svg{width:18px;height:18px}
+.sv.on{color:var(--ac)}
+.sv:active{transform:scale(.88)}
+/* A section of the main page; with more than fits, its heading leads to
+   the page of them all, as the last card does. */
+.sec{display:flex;align-items:center;gap:2px;margin:0;padding:4px 12px 10px;font-size:17px}
+.sec svg{display:none;width:20px;height:20px;color:var(--mu)}
+.sec.more{cursor:pointer}
+.sec.more svg{display:block}
+#stitle{padding-top:24px}
+.card .all{color:var(--mu)}
+.card .all svg{width:36px;height:36px}
+.card .all+span{display:block;margin-top:7px}
+.still .card{animation:none}
+#list{position:fixed;inset:0;z-index:3;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+.lhead{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:4px;padding:max(8px,env(safe-area-inset-top)) 12px 8px 4px;background:linear-gradient(var(--bg) 70%,#0e0e1000)}
+.lhead h1{margin:0;font-size:20px}
 .pw{position:relative}
 .pw .bar{position:absolute;left:6px;right:6px;bottom:6px;height:4px;border-radius:2px;background:#000a;overflow:hidden}
 .pw .bar div{height:100%;background:var(--ac)}
@@ -75,7 +98,10 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .facts .skl{max-width:50em}
 .pill{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;padding:0 20px;border:0;border-radius:26px;background:var(--s2);font-weight:600}
 .pill.ac{background:var(--ac);color:#111}
-#dplay{position:relative;width:100%;margin-top:18px}
+.acts{position:relative;display:flex;gap:10px;margin-top:18px}
+#dplay{flex:1;min-width:0}
+#dsave{position:relative;top:auto;right:auto;flex:none;width:52px;height:52px}
+#dsave svg{width:24px;height:24px}
 #dfrom0{position:relative;width:100%;height:44px;margin-top:10px;background:#ffffff1f}
 #seasons{display:flex;gap:8px;overflow-x:auto;padding:16px 16px 8px;scrollbar-width:none}
 #seasons::-webkit-scrollbar{display:none}
@@ -246,8 +272,8 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .skl{display:block;height:12px;margin-top:9px;border-radius:6px}
 .skl+.skl{width:40%}
 .badge.on{animation:bounce .35s ease-out}
-#det{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
-#det.out{animation:slideout .2s ease-in forwards}
+#det,#list{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
+#det.out,#list.out{animation:slideout .2s ease-in forwards}
 #dposter{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards}
 #dinfo>*,.rt{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
 #det h1,#dmeta,#dplay{animation:pop .4s .1s cubic-bezier(.2,.8,.2,1) backwards}
@@ -282,15 +308,20 @@ svg.spring{animation:spring .3s ease-out}
   :root{--gut:max(32px,calc((100vw - 1180px) / 2));--dgut:max(40px,calc((100vw - 980px) / 2))}
   header{justify-content:center;padding:20px var(--gut) 16px}
   #f{max-width:640px}
-  #grid{grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:28px 22px;padding:8px var(--gut) 140px}
-  #rtitle{padding:8px var(--gut) 14px;font-size:20px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:28px 22px;padding:8px var(--gut) 0}
+  #home,#list{padding-bottom:140px}
+  .sec{padding:8px var(--gut) 14px;font-size:20px}
+  #stitle{padding-top:32px}
+  .lhead{padding:20px var(--gut) 12px calc(var(--gut) - 12px)}
+  .lhead h1{font-size:24px}
   .card b{font-size:15px}
   #det .top{padding:24px var(--dgut) 36px}
   #det .hero{gap:28px}
   #dposter{width:210px;border-radius:14px}
   #det h1{font-size:34px}
   #dmeta{font-size:15px}
-  #dplay{width:auto;min-width:260px;margin-top:24px}
+  .acts{margin-top:24px}
+  #dplay{flex:none;min-width:260px}
   #dfrom0{width:auto;min-width:260px}
   #dinfo{padding:8px var(--dgut) 4px}
   #ddesc{max-width:760px;-webkit-line-clamp:6;font-size:16px}
@@ -332,12 +363,19 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/></symbol>
+  <symbol id="i-mark" viewBox="0 0 24 24"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2zm0 15-5-2.18L7 18V5h10v13z"/></symbol>
+  <symbol id="i-marked" viewBox="0 0 24 24"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
 
 <header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg></button><button class="ib" id="mkbtn" aria-label="Разметка серий"><svg><use href="#i-gear"/></svg></button></header>
-<h2 id="rtitle" hidden>Недавно смотрели</h2>
-<main id="grid"></main>
+<main id="home">
+  <h2 class="sec" id="rtitle" hidden>Недавно смотрели<svg><use href="#i-more"/></svg></h2>
+  <div class="grid" id="grid"></div>
+  <h2 class="sec" id="stitle" hidden>Сохранённые<svg><use href="#i-more"/></svg></h2>
+  <div class="grid" id="sgrid" hidden></div>
+</main>
 <p class="note" id="msg"><svg><use href="#i-tv"/></svg><span>Найдите фильм или сериал и запустите его на ТВ</span></p>
 
 <section id="det" hidden>
@@ -345,12 +383,18 @@ svg.spring{animation:spring .3s ease-out}
     <div id="dbg"></div>
     <div class="nav"><button class="ib" id="dback" aria-label="Назад"><svg><use href="#i-back"/></svg></button></div>
     <div class="hero"><img id="dposter" alt=""><div><h1 id="dtitle"></h1><div id="dmeta"></div></div></div>
-    <button class="pill ac" id="dplay"><svg><use href="#i-play"/></svg><span>Смотреть на ТВ</span></button>
+    <div class="acts"><button class="pill ac" id="dplay"><svg><use href="#i-play"/></svg><span>Смотреть на ТВ</span></button><button class="sv" id="dsave"><svg><use href="#i-mark"/></svg></button></div>
     <button class="pill" id="dfrom0" hidden>Смотреть с начала</button>
   </div>
   <div id="dinfo"></div>
   <div id="seasons"></div>
   <div id="eps"></div>
+</section>
+
+<section id="list" hidden>
+  <div class="lhead"><button class="ib" id="lback" aria-label="Назад"><svg><use href="#i-back"/></svg></button><h1 id="ltitle"></h1></div>
+  <div class="grid" id="lgrid"></div>
+  <p class="note" id="lmsg" hidden>Здесь пока пусто</p>
 </section>
 
 <div id="shade" hidden></div>
@@ -418,7 +462,7 @@ svg.spring{animation:spring .3s ease-out}
 <section id="mk" class="sheet" hidden>
   <div class="handle"></div>
   <h2><span>Разметка серий</span></h2>
-  <p class="hint">Повтор, заставку и титры серий, которые источник не разметил, отметит Claude: у сериалов, впервые запущенных с этого дня, — текущую серию и две следующие.</p>
+  <p class="hint">Повтор, заставку и титры серий, которые источник не разметил, отметит Claude: у сохранённого сериала — серию, с которой начнёте смотреть, а у сериалов, впервые запущенных или сохранённых с этого дня, — текущую серию и две следующие.</p>
   <div class="row"><label class="sw"><span>Размечать в фоне<small id="mkstate"></small></span><input type="checkbox" id="mkon"></label></div>
   <form class="row" id="mkf"><input id="mkkey" type="password" autocomplete="off" spellcheck="false" autocapitalize="off"><button class="pill" id="mksave">Сохранить</button></form>
   <p class="hint err" id="mkerr" hidden></p>
@@ -443,6 +487,9 @@ let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null 
 localStorage.removeItem('subStyle'); // older format with colors
 const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs', mk: 'mk' }; // layer name -> bottom sheet
 let recent = [];        // /progress list: recently watched titles, latest first
+let saved = [];         // and the titles saved to watch, latest saved first
+let listShown = null;   // the list on a page of its own (see openList): 'recent', 'saved' or null
+let listsLoaded = false; // /progress has answered once
 let searching = 0;      // number of the search shown; 0 = the recent titles are
 let query = '';         // query of the search shown
 localStorage.removeItem('last'); // searches are no longer restored
@@ -536,10 +583,11 @@ function showLayer(name, on) {
     e.style.transform = e.style.opacity = ''; // left by a pull (see pullSheet)
     e.hidden = false;
   };
-  const e = $(name == 'det' ? 'det' : 'shade');
+  const page = name == 'det' || name == 'list';
+  const e = $(page ? name : 'shade');
   // The shade is shared by the player and the sheets.
   if (on) show(e);
-  else if (name == 'det' || !plOpen && !layers.some(l => l in SHEETS)) animateOut(e);
+  else if (page || !plOpen && !layers.some(l => l in SHEETS)) animateOut(e);
   if (name in SHEETS) on ? show($(SHEETS[name])) : animateOut($(SHEETS[name]));
   $('shade').classList.toggle('top', layers.some(l => l in SHEETS));
 }
@@ -813,16 +861,19 @@ function closeLayer() {
     item = null;
     loadRecent(); // what was just watched moves to the front
   }
+  if (name == 'list') listShown = null;
 }
 
 // ---- addresses ----------------------------------------------------------
 //
-// / is the watch history, /search?q=<query> a search, /title/<id> a title's
-// page over either of them.
+// / is the watch history, /search?q=<query> a search, /recent and /saved
+// the page of all the titles of a section of the main page (see openList),
+// /title/<id> a title's page over any of them.
 
 const titleUrl = id => '/title/' + encodeURIComponent(id);
 const searchUrl = q => '/search?q=' + encodeURIComponent(q);
 const urlTitle = () => /^\/title\/([^/]+)$/.exec(location.pathname)?.[1];
+const urlList = () => /^\/(recent|saved)$/.exec(location.pathname)?.[1];
 const urlQuery = () => location.pathname == '/search' && new URLSearchParams(location.search).get('q') || '';
 
 // Brings the page in line with the address and the history entry: after
@@ -832,15 +883,23 @@ function route() {
   // way back would bring them back.
   const caughtUp = backs > 0;
   if (caughtUp && --backs) return;
-  const depth = history.state?.depth || 0, id = urlTitle();
+  const depth = history.state?.depth || 0, id = urlTitle(), kind = urlList();
   while (layers.length > depth) closeLayer();
-  // Forward to a title, or a reload, leaves the page to open again.
-  if (!id && layers.includes('det')) while (layers.length) closeLayer();
-  if (id && !layers.includes('det')) {
+  // Forward to a title or a list, or a reload, leaves the page to open
+  // again; a title opens over the list it was opened from.
+  if (!id && layers.includes('det') || !id && !kind && layers.includes('list'))
     while (layers.length) closeLayer();
+  if (id && !layers.includes('det')) {
+    while (layers.length && layers.at(-1) != 'list') closeLayer();
     layers.push('det');
     showLayer('det', true);
   }
+  if (kind && !layers.includes('list')) {
+    while (layers.length) closeLayer();
+    layers.push('list');
+    showLayer('list', true);
+  }
+  if (kind && listShown != kind) showList(kind);
   if (id && item?.id != decodeURIComponent(id)) openDetails({ id: decodeURIComponent(id) });
   // Overlays forward of here are not brought back.
   if (depth != layers.length) history.replaceState({ ...history.state, depth: layers.length }, '');
@@ -859,18 +918,13 @@ window.addEventListener('popstate', route);
 function renderResults(results) {
   $('msg').hidden = results.length > 0;
   note('Ничего не найдено');
-  $('grid').replaceChildren(...results.map((m, i) => {
-    const b = el('button', { className: 'card' }, poster(m), el('b', {}, m.title), el('span', {}, m.year));
-    b.style.setProperty('--i', i);
-    b.dataset.id = m.id;
-    b.onclick = () => openDetails(m);
-    return b;
-  }));
+  $('grid').classList.remove('still');
+  $('grid').replaceChildren(...results.map((m, i) => card(m, i, m.year)));
   markPlaying();
 }
 
 // Poster of a card, with a placeholder for titles without one or when it
-// fails to load.
+// fails to load. One the browser has already shows at once.
 function poster(m) {
   const ph = () => el('i', {}, (m.title || '?')[0]);
   const img = m.poster
@@ -878,21 +932,107 @@ function poster(m) {
     : ph();
   img.onerror = () => img.replaceWith(ph());
   img.onload = () => img.classList.add('ld');
+  if (img.complete && img.naturalWidth) img.classList.add('ld');
   return img;
+}
+
+const svgIcon = name => {
+  const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg'), use = document.createElementNS(ns, 'use');
+  use.setAttribute('href', '#i-' + name);
+  svg.append(use);
+  return svg;
+};
+
+// A title's card: its poster, with how far it was watched (part, 0..1) if
+// given, its name and a line under it; it opens the title's page, and the
+// button over the poster's corner saves it (see saveButton).
+function card(m, i, under, part) {
+  const p = poster(m);
+  const open = el('button', { className: 'open' },
+    part != null ? el('div', { className: 'pw' }, p, el('div', { className: 'bar' }, el('div', { style: `width:${100 * part}%` }))) : p,
+    el('b', {}, m.title || ''), el('span', {}, under || ''));
+  open.onclick = () => openDetails({ id: m.id, title: m.title, poster: m.poster, year: m.year });
+  const c = el('div', { className: 'card' }, open, saveButton(m));
+  c.style.setProperty('--i', i);
+  c.dataset.id = m.id;
+  return c;
+}
+
+// ---- saved titles -------------------------------------------------------
+//
+// Any title can be saved to watch by the button over its poster or next to
+// its play button; the router keeps them (see /save), and a series saved
+// has the episode it would start with marked (see "Разметка серий").
+
+const isSaved = id => saved.some(x => x.id == id);
+
+function saveButton(m) {
+  const b = el('button', { className: 'sv' });
+  b.append(svgIcon('mark'));
+  b.dataset.id = m.id;
+  b.onclick = e => {
+    e.stopPropagation();
+    toggleSave(m);
+  };
+  showSaved(b);
+  return b;
+}
+
+function showSaved(b) {
+  const on = isSaved(b.dataset.id);
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-label', on ? 'Убрать из сохранённых' : 'Сохранить');
+  b.firstChild.firstChild.setAttribute('href', on ? '#i-marked' : '#i-mark');
+}
+
+// Shows a change of the saved titles at once, the router's answer after.
+function savedChanged() {
+  document.querySelectorAll('.sv').forEach(showSaved);
+  if (!searching) {
+    $('msg').hidden = recent.length + saved.length > 0;
+    renderSection('saved', false);
+  }
+  if (listShown == 'saved') renderList();
+  markPlaying();
+}
+
+let saving = 0; // the toggle last sent; an earlier answer is stale
+async function toggleSave(m) {
+  const on = !isSaved(m.id), n = ++saving;
+  saved = on ? [{ id: m.id, title: m.title, poster: m.poster, t: Date.now() / 1000 }, ...saved] : saved.filter(x => x.id != m.id);
+  savedChanged();
+  const req = { id: m.id, on: on ? '1' : '0' };
+  if (m.title) req.title = m.title;
+  if (m.poster) req.poster = m.poster;
+  try {
+    const r = await api('save', req);
+    if (n != saving) return;
+    saved = r.saved;
+    savedChanged();
+  } catch (e) {
+    toast(e);
+    if (n == saving) loadRecent(); // back to what the router has
+  }
 }
 
 // ---- recently watched ---------------------------------------------------
 //
-// The main page lists the watch history until something is searched for;
-// clearing the query brings it back.
+// The main page lists the watch history, and the saved titles under it,
+// until something is searched for; clearing the query brings them back.
 
 async function loadRecent() {
+  let r;
   try {
-    recent = (await api('progress')).recent;
+    r = await api('progress');
   } catch {
     return; // the list is a convenience; search still works
   }
+  recent = r.recent;
+  saved = r.saved || [];
+  listsLoaded = true;
   if (!searching) renderRecent();
+  renderList();
+  document.querySelectorAll('.sv').forEach(showSaved);
 }
 
 // "7s17e" for a series, plus "просмотрено" once the episode is watched or
@@ -905,24 +1045,79 @@ function recentNote(r) {
 
 const recentPart = r => r.done ? 1 : r.dur ? Math.min(1, r.pos / r.dur) : 0;
 
-function renderRecent() {
-  $('rtitle').hidden = !recent.length;
-  $('msg').hidden = recent.length > 0;
+// A card of the history or of the saved titles; a saved one never
+// watched has no progress.
+const rowCard = (r, i) => card(r, i, recentNote(r), r.pos != null ? recentPart(r) : null);
+
+function renderRecent(anim = true) {
+  $('msg').hidden = recent.length + saved.length > 0;
   note('Найдите фильм или сериал и запустите его на ТВ');
-  $('grid').replaceChildren(...recent.map((r, i) => {
-    const b = el('button', { className: 'card' },
-      el('div', { className: 'pw' }, poster(r),
-        el('div', { className: 'bar' }, el('div', { style: `width:${100 * recentPart(r)}%` }))),
-      el('b', {}, r.title), el('span', {}, recentNote(r)));
-    b.style.setProperty('--i', i);
-    b.dataset.id = r.id;
-    b.onclick = () => openDetails({ id: r.id, title: r.title, poster: r.poster });
-    return b;
-  }));
+  renderSection('recent', anim);
+  renderSection('saved', anim);
   markPlaying();
 }
 
+// The columns of a grid as laid out now.
+const columns = g => Math.max(1, getComputedStyle(g).gridTemplateColumns.split(' ').length);
+let shownColumns = 0;
+
+// A section of the main page: two rows of cards at most. When more don't
+// fit, the last of them leads to the page of them all (see openList), and
+// so does the heading, which shows an arrow.
+const SECTIONS = { recent: ['rtitle', 'grid', 'Недавно смотрели'], saved: ['stitle', 'sgrid', 'Сохранённые'] };
+function renderSection(kind, anim) {
+  const [head, id] = SECTIONS[kind], g = $(id), list = kind == 'recent' ? recent : saved;
+  $(head).hidden = g.hidden = !list.length;
+  if (!list.length) return g.replaceChildren();
+  const fit = 2 * (shownColumns = columns(g)), more = list.length > fit;
+  $(head).classList.toggle('more', more);
+  g.classList.toggle('still', !anim);
+  const cards = (more ? list.slice(0, fit - 1) : list).map(rowCard);
+  if (more) {
+    const b = el('button', { className: 'open', ariaLabel: 'Все' },
+      el('i', { className: 'all' }, svgIcon('more')), el('span', {}, 'ещё ' + (list.length - fit + 1)));
+    b.onclick = () => openList(kind);
+    const c = el('div', { className: 'card' }, b);
+    c.style.setProperty('--i', cards.length);
+    cards.push(c);
+  }
+  g.replaceChildren(...cards);
+}
+for (const kind in SECTIONS) {
+  const head = $(SECTIONS[kind][0]);
+  head.onclick = () => head.classList.contains('more') && openList(kind);
+}
+// Two rows hold more or fewer cards as the window changes.
+addEventListener('resize', () => {
+  const g = [$('grid'), $('sgrid')].find(g => !g.hidden);
+  if (!searching && g && columns(g) != shownColumns) renderRecent(false);
+});
+
+// The page of all the titles of a section, latest first.
+function openList(kind) {
+  showList(kind);
+  openLayer('list', '/' + kind);
+}
+
+function showList(kind) {
+  listShown = kind;
+  $('ltitle').textContent = SECTIONS[kind][2];
+  $('list').scrollTop = 0;
+  renderList(true);
+}
+
+function renderList(anim) {
+  if (!listShown) return;
+  const list = listShown == 'recent' ? recent : saved;
+  $('lgrid').classList.toggle('still', !anim);
+  $('lgrid').replaceChildren(...list.map(rowCard));
+  $('lmsg').hidden = list.length > 0 || !listsLoaded;
+  markPlaying();
+}
+$('lback').onclick = closeTop;
+
 function showRecent() {
+  $('grid').hidden = false; // the results' grid, laid out to count its columns
   searching = 0;
   query = '';
   $('q').value = '';
@@ -933,7 +1128,7 @@ function showRecent() {
 // Marks the cards of whatever is on the TV now.
 function markPlaying() {
   const id = st?.media && st.now?.id;
-  for (const c of $('grid').children) {
+  for (const c of document.querySelectorAll('.card')) {
     const b = c.querySelector('.badge.on');
     if (c.dataset.id == id && !b) c.append(el('span', { className: 'badge on' }, 'На ТВ'));
     if (c.dataset.id != id && b) b.remove();
@@ -943,7 +1138,8 @@ function markPlaying() {
 async function search(q) {
   const n = searching = Date.now();
   query = q;
-  $('msg').hidden = $('rtitle').hidden = true;
+  $('msg').hidden = $('rtitle').hidden = $('stitle').hidden = $('sgrid').hidden = true;
+  $('grid').hidden = false;
   $('grid').replaceChildren(...Array.from({ length: 9 }, () =>
     el('div', {}, el('span', { className: 'sk' }), el('span', { className: 'skl' }), el('span', { className: 'skl' }))));
   try {
@@ -1009,6 +1205,9 @@ async function openDetails(m) {
   $('dplay').hidden = false;
   $('dplay').disabled = true;
   $('dplay').lastChild.textContent = 'Смотреть на ТВ'; // the width of the button on desktop
+  $('dsave').dataset.id = m.id;
+  $('dsave').disabled = true; // until its name is known, for the saved list
+  showSaved($('dsave'));
   $('dfrom0').hidden = true;
   $('seasons').replaceChildren();
   $('eps').replaceChildren();
@@ -1041,6 +1240,7 @@ async function openDetails(m) {
   if (t.poster && t.poster != m.poster) showPoster(t.poster);
   Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: t.poster || m.poster });
   $('det').classList.remove('loading');
+  $('dsave').disabled = false;
   $('dposter').hidden = !m.poster;
   $('dtitle').textContent = t.title;
   renderInfo(t);
@@ -1142,6 +1342,7 @@ function renderEpisodes(force) {
 $('dplay').onclick = () => start(playTarget(item));
 $('dfrom0').onclick = () => start({ ...playTarget(item), start: 0 });
 $('dback').onclick = closeTop;
+$('dsave').onclick = () => item && toggleSave(item);
 
 // ---- playback -----------------------------------------------------------
 
@@ -2436,8 +2637,9 @@ $('qx').onclick = () => {
   clearSearch();
   $('q').focus();
 };
-// Opened by a title's address, back leads to the history underneath.
-if (urlTitle() && !history.state) {
+// Opened by a title's or a list's address, back leads to the history
+// underneath.
+if ((urlTitle() || urlList()) && !history.state) {
   const url = location.href;
   history.replaceState({ depth: 0 }, '', '/');
   history.pushState({ depth: 1 }, '', url);

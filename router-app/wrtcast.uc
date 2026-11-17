@@ -98,17 +98,19 @@ function load(f) {
 // (played); per title-api media, its CDN headers, the position the TV told
 // and the bytes of its segments streamed (media, segments); the playlists of
 // the volume leveler (drc); the devices found (kv); and the watch history
-// (titles, progress). Only the history outlives a reboot: it is copied to
+// (titles, progress) with the titles saved to watch (saved). Only the
+// history outlives a reboot: it is copied to
 // flash every few minutes (see keep) and back on the first request after a
 // boot. Files are left for the leveler's segments and fetches' stderr.
 
-const SCHEMA = 3;
+const SCHEMA = 4;
 
 // The history tables in schema s: per title, when it was last watched, its
 // name and poster for the recently watched list, a series' last episode and
 // what it was watched with (see watched_with); the position in a movie (ep
-// '') or in each episode ("season:episode"); and the settings (see
-// setting).
+// '') or in each episode ("season:episode"); the settings (see setting);
+// and the titles saved to watch, with when they were saved.
+const SAVED = s => `CREATE TABLE ${s}.saved (id TEXT PRIMARY KEY, title TEXT, poster TEXT, t INTEGER NOT NULL)`;
 const HISTORY = s => `
 	CREATE TABLE ${s}.titles (
 		id TEXT PRIMARY KEY, title TEXT, poster TEXT,
@@ -118,7 +120,8 @@ const HISTORY = s => `
 		id TEXT NOT NULL, ep TEXT NOT NULL, pos REAL NOT NULL, dur REAL NOT NULL,
 		done INTEGER NOT NULL, t INTEGER NOT NULL, PRIMARY KEY (id, ep)
 	);
-	CREATE TABLE ${s}.settings (key TEXT PRIMARY KEY, value TEXT);`;
+	CREATE TABLE ${s}.settings (key TEXT PRIMARY KEY, value TEXT);
+	${SAVED(s)};`;
 const TITLE_COLS = 'id, title, poster, season, episode, prefs, t';
 const PROGRESS_COLS = 'id, ep, pos, dur, done, t';
 
@@ -179,8 +182,9 @@ function import_json(P) {
 // from flash, or from the JSON file of the wrtcast before the database.
 // Another request may be doing the same: the one that gets the write lock
 // first does it. A database of schema 1 (before the settings) gets the
-// settings table, and one before the segment cache its table; a copy on
-// flash of schema 1 has no settings.
+// settings table, one before the segment cache its table and one before
+// the saved titles theirs; a copy on flash of schema 1 has no settings,
+// and one before schema 4 no saved titles.
 function init() {
 	let exec = q => db.exec(q) ?? db_fail();
 	let version = () => (db.query('PRAGMA user_version') ?? db_fail())[0].user_version;
@@ -203,10 +207,15 @@ function init() {
 			exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)');
 		if (v < 3)
 			exec(CACHE_TABLE);
+		if (v < 4)
+			exec(SAVED('main'));
 	}
 	if (v != SCHEMA) {
-		if (v < 2 && keep && length(db.query("SELECT 1 FROM keep.sqlite_master WHERE name = 'settings'") ?? []))
+		let kept = name => keep && length(db.query('SELECT 1 FROM keep.sqlite_master WHERE name = ?', name) ?? []);
+		if (v < 2 && kept('settings'))
 			exec('INSERT OR REPLACE INTO settings (key, value) SELECT key, value FROM keep.settings');
+		if (v < 4 && kept('saved'))
+			exec('INSERT OR REPLACE INTO saved (id, title, poster, t) SELECT id, title, poster, t FROM keep.saved');
 		exec(`PRAGMA user_version = ${SCHEMA}`);
 	}
 	exec('COMMIT');
@@ -711,12 +720,13 @@ function title_id(p) {
 }
 
 // Streams of a movie, or of an episode when season is given. A series
-// never watched is told to title-api as played first: it marks the
-// episodes of those (see /marking).
+// never watched, or saved to watch, is told to title-api as played first:
+// it marks the episodes of those (see /marking).
 function streams(id, season, episode) {
+	let first = !title_row(id) || !!sql_row('SELECT 1 AS x FROM saved WHERE id = ?', id);
 	let r = api(`/v1/titles/${id}/playback-streams` + (season == null ? '' :
 		`?season_number=${season}&episode_number=${urlenc(episode)}` +
-		(title_row(id) ? '' : '&first_play=true')));
+		(first ? '&first_play=true' : '')));
 	return map(r.streams ?? [], (s, i) => ({
 		index: i,
 		name: s.name || `Плеер ${i + 1}`,
@@ -1096,6 +1106,7 @@ function keep() {
 		INSERT INTO keep.titles (${TITLE_COLS}) SELECT ${TITLE_COLS} FROM titles;
 		INSERT INTO keep.progress (${PROGRESS_COLS}) SELECT ${PROGRESS_COLS} FROM progress;
 		INSERT INTO keep.settings (key, value) SELECT key, value FROM settings;
+		INSERT INTO keep.saved (id, title, poster, t) SELECT id, title, poster, t FROM saved;
 		COMMIT`) != null;
 	if (!ok)
 		d.exec('ROLLBACK');
@@ -2056,6 +2067,10 @@ function public_base() {
 
 // Poster images sit behind the provider's anti-bot page; title-api fetches
 // them with its session.
+// A poster the page sent back: only our own proxy paths, so the UI never
+// loads arbitrary URLs; else null.
+const own_poster = u => length(u ?? '') <= 4096 && match(u ?? '', /^\/api\/p\/[^ ]+$/) ? u : null;
+
 function poster(u) {
 	if (!u)
 		return null;
@@ -2265,9 +2280,7 @@ function start(dev, r) {
 		sections: r.s.sections ?? [], sdur: r.s.sdur ?? 0,
 		style: p.style ?? null,
 		streams: r.list, fetched: r.fetched, started: time(),
-		// Only our own proxy paths, so the UI never loads arbitrary URLs.
-		poster: length(p.poster ?? '') <= 4096 &&
-			match(p.poster ?? '', /^\/api\/p\/[^ ]+$/) ? p.poster : null,
+		poster: own_poster(p.poster),
 	};
 	let put_back = () => {
 		now_set(key, last);
@@ -2515,6 +2528,62 @@ function wake(key, token) {
 	}
 }
 
+// The titles saved to watch, latest saved first, with the position of
+// those watched as in the recently watched list.
+function saved_rows() {
+	return map(sql_rows(`SELECT s.id, coalesce(s.title, t.title) AS title,
+		coalesce(s.poster, t.poster) AS poster, s.t, t.season, t.episode, p.pos, p.dur, p.done
+		FROM saved s LEFT JOIN titles t ON t.id = s.id LEFT JOIN progress p
+		ON p.id = s.id AND p.ep = CASE WHEN t.season IS NULL THEN ''
+		ELSE t.season || ':' || t.episode END ORDER BY s.t DESC`), r => ({ ...r, done: !!r.done }));
+}
+
+function recent_rows() {
+	return map(sql_rows(`SELECT t.id, t.title, t.poster, t.t, t.season,
+		t.episode, p.pos, p.dur, p.done FROM titles t JOIN progress p
+		ON p.id = t.id AND p.ep = CASE WHEN t.season IS NULL THEN ''
+		ELSE t.season || ':' || t.episode END
+		WHERE t.title IS NOT NULL ORDER BY t.t DESC`), r => ({ ...r, done: !!r.done }));
+}
+
+// ---- saved titles ------------------------------------------------------------
+//
+// Titles saved to watch are listed under the recently watched ones and
+// kept on flash with the history, until removed. A series saved has
+// title-api mark the episode it would start with, which the provider may
+// leave unmarked (see /marking), as a process of its own: title-api loads
+// the provider's pages for it.
+
+// The episode a series would start with, as the page's play button has it:
+// the last one watched, or the one after it once that is watched or left
+// past 90 %, else the first; { season, episode }, or null after the last.
+function start_episode(id, S) {
+	let all = [], e = title_row(id), i = -1;
+	for (let x in S)
+		for (let y in x.episodes ?? [])
+			push(all, { season: +x.seasonNumber, episode: `${y.episodeNumber}` });
+	if (e?.season != null)
+		for (let j, x in all)
+			if (x.season == e.season && x.episode == e.episode)
+				i = j;
+	if (i < 0)
+		return all[0];
+	let x = progress_row(id, ep_key(e.season, e.episode));
+	return x && (x.done || x.dur > 0 && x.pos >= x.dur * 0.9) ? all[i + 1] : all[i];
+}
+
+// Has title-api mark the episode a series saved would start with, while
+// the marking is on (wrtcast mark).
+function mark_saved(id) {
+	let m = api_try('/v1/marking');
+	if (!m?.enabled || !m.keySet)
+		return;
+	let r = api(`/v1/titles/${id}`);
+	let e = r.mediaType == 'MEDIA_TYPE_SERIES' ? start_episode(id, r.seasons ?? []) : null;
+	if (e)
+		api_post(`/v1/titles/${id}/marking`, { seasonNumber: e.season, episodeNumber: e.episode });
+}
+
 const marking = r => ({
 	enabled: !!r?.enabled, key: !!r?.keySet, hint: r?.keyHint || null, error: r?.error || null,
 });
@@ -2581,16 +2650,11 @@ const routes = {
 	// episode and eps by "season:episode" of a series; null if never watched.
 	// prefs: what it was watched with (see watched_with).
 	// Without id: the recently watched titles, latest first, each with the
-	// position of the movie or of the last episode.
+	// position of the movie or of the last episode, and the titles saved to
+	// watch, latest saved first, with the same of those watched.
 	'GET /progress': p => {
 		if (p.id == null)
-			return {
-				recent: map(sql_rows(`SELECT t.id, t.title, t.poster, t.t, t.season,
-					t.episode, p.pos, p.dur, p.done FROM titles t JOIN progress p
-					ON p.id = t.id AND p.ep = CASE WHEN t.season IS NULL THEN ''
-					ELSE t.season || ':' || t.episode END
-					WHERE t.title IS NOT NULL ORDER BY t.t DESC`), r => ({ ...r, done: !!r.done })),
-			};
+			return { recent: recent_rows(), saved: saved_rows() };
 		let id = title_id(p), e = title_row(id), progress = null;
 		if (e?.season != null) {
 			let eps = {};
@@ -2604,6 +2668,22 @@ const routes = {
 		return { progress, prefs: e?.prefs ?? null };
 	},
 
+
+	// Saves a title to watch (on=1), with its name and poster for the list,
+	// or removes it (on=0); the titles saved, as /progress lists them.
+	'POST /save': p => {
+		let id = title_id(p);
+		if (!match(p.on ?? '', /^[01]$/))
+			fail(400, 'invalid on');
+		let title = length(p.title ?? '') <= 512 ? p.title : null;
+		if (p.on == '0')
+			sql_do('DELETE FROM saved WHERE id = ?', id);
+		else if (sql_do('INSERT INTO saved (id, title, poster, t) VALUES (?, ?, ?, ?) ' +
+		                'ON CONFLICT (id) DO NOTHING', id, title, own_poster(p.poster), time()))
+			system(`${shq(sourcepath())} mark ${shq(id)} </dev/null >/dev/null 2>&1 &`);
+		changed(true);
+		return { saved: saved_rows() };
+	},
 
 	'GET /devices': p => {
 		let list = p.refresh == '1' ? discover() : cached(DEVICES_TTL) ?? discover();
@@ -2722,6 +2802,10 @@ if (ARGV[0] == 'next' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
 }
 if (ARGV[0] == 'ahead' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
 	list_ahead(ARGV[1]);
+	exit(0);
+}
+if (ARGV[0] == 'mark' && match(ARGV[1] ?? '', /^[0-9A-Za-z]{1,64}$/)) {
+	mark_saved(ARGV[1]);
 	exit(0);
 }
 if (ARGV[0] == 'due' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
