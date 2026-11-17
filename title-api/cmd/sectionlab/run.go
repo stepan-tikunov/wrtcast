@@ -24,6 +24,8 @@ var prices = map[string][2]float64{
 	"claude-opus-5-5":   {4, 20},
 	"claude-sonnet-5-5": {2, 10},
 	"claude-haiku-4-5":  {1, 5},
+	// For prompts up to 100k tokens, which these are.
+	"claude-haiku-5-5": {0.10, 0.50},
 }
 
 type episodeResult struct {
