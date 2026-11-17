@@ -86,9 +86,8 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 #dmeta .gen{margin-top:8px;color:var(--mu)}
 /* TMDB's backdrop (#det.bd): the picture across the top, the logo or the
    title over its faded lower edge. The page is laid out so once the
-   backdrop and the logo have loaded (see tmdbOf); while it loads, laid out
-   so as the title was last, the blurred poster shows where the backdrop
-   fades in. */
+   backdrop and the logo have loaded (see tmdbOf); it loads laid out for the
+   poster. */
 #dbd{display:none}
 #det.bd #dbd{position:relative;display:block;margin:calc(-1 * max(8px,env(safe-area-inset-top))) -16px 0;aspect-ratio:16/10}
 #dbd img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s}
@@ -579,6 +578,7 @@ let searching = 0;      // number of the search shown; 0 = the recent titles are
 let query = '';         // query of the search shown
 localStorage.removeItem('last'); // searches are no longer restored
 localStorage.removeItem('q');
+localStorage.removeItem('backdrops'); // pages no longer open laid out for a backdrop
 
 // Requests that talk to the TV carry the chosen device.
 const withDevice = path => device ? path + (path.includes('?') ? '&' : '?') + 'device=' + encodeURIComponent(device) : path;
@@ -1379,21 +1379,6 @@ const preload = (src, srcset) => new Promise(done => {
   i.src = src;
 });
 
-// The titles last drawn with TMDB's backdrop, so their page opens laid out
-// for it rather than for the poster.
-function backdropKnown(id, on) {
-  let ids = [];
-  try {
-    ids = JSON.parse(localStorage.backdrops || '[]');
-  } catch {}
-  if (on === undefined) return ids.includes(id);
-  ids = ids.filter(x => x != id);
-  if (on) ids.push(id);
-  try {
-    localStorage.backdrops = JSON.stringify(ids.slice(-500));
-  } catch {}
-}
-
 // A title opened unmatched is matched in the background, by Claude when
 // TMDB's search can't settle it: the page waits for that up to a minute and
 // then draws TMDB's over itself.
@@ -1412,7 +1397,6 @@ async function awaitMatch(m, t) {
     t.tmdb = r.tmdb; // kept with /title's answer
     const x = await tmdbOf(t);
     if (!x || item != m) return;
-    backdropKnown(m.id, !!x.backdrop);
     keepTop(() => {
       showTmdb(m, t, x);
       renderInfo(t, x, true);
@@ -1466,7 +1450,6 @@ async function openDetails(m) {
   $('dplab').textContent = 'Смотреть на ТВ'; // the width of the button on desktop
   $('dpbar').style.width = 0;
   clearArt();
-  $('det').classList.toggle('bd', backdropKnown(m.id));
   m.tm = null;
   $('dsave').dataset.id = m.id;
   $('dsave').disabled = true; // until its name is known, for the saved list
@@ -1504,8 +1487,7 @@ async function openDetails(m) {
   const tm = t.tmdb && tmdbOf(t);
   const x = tm ? await Promise.race([tm, new Promise(done => setTimeout(done, 3000))]) : null;
   if (item != m) return;
-  if (x !== undefined) backdropKnown(m.id, !!x?.backdrop);
-  else tm.then(x => {
+  if (x === undefined) tm.then(x => {
     if (!x || item != m) return;
     keepTop(() => {
       showTmdb(m, t, x);
@@ -1521,8 +1503,7 @@ async function openDetails(m) {
   $('dposter').hidden = !m.poster;
   $('dtitle').textContent = t.title;
   keepTop(() => {
-    $('det').classList.remove('bd'); // as the page opened, which may be wrong
-    if (x) showTmdb(m, t, x);
+      if (x) showTmdb(m, t, x);
     renderInfo(t, x);
     renderDetails();
   });
