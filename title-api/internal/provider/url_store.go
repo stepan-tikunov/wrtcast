@@ -130,6 +130,11 @@ func (s *SQLiteProviderURLStore) save(ctx context.Context, key, value string) er
 	return err
 }
 
+// DB is the state database, which other state is kept in too.
+func (s *SQLiteProviderURLStore) DB() *sql.DB {
+	return s.db
+}
+
 func (s *SQLiteProviderURLStore) Close() error {
 	return s.db.Close()
 }

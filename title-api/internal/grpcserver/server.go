@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	titlev1 "title-api/api/title/v1"
+	"title-api/internal/marking"
 	"title-api/internal/provider"
 
 	"google.golang.org/grpc/codes"
@@ -14,11 +15,19 @@ import (
 
 type Server struct {
 	titlev1.UnimplementedTitleServiceServer
-	client *provider.Client
+	client  *provider.Client
+	marking *marking.Service
 }
 
 func New(client *provider.Client) *Server {
 	return &Server{client: client}
+}
+
+// WithMarking has the server tell marking of the titles played first and
+// serve its settings.
+func (s *Server) WithMarking(service *marking.Service) *Server {
+	s.marking = service
+	return s
 }
 
 func (s *Server) SearchTitles(
@@ -78,6 +87,9 @@ func (s *Server) GetPlaybackStreams(
 		}
 		if query.EpisodeNumber == nil || strings.TrimSpace(query.GetEpisodeNumber()) == "" {
 			return nil, status.Error(codes.InvalidArgument, "episode_number is required for a series")
+		}
+		if query.GetFirstPlay() && s.marking != nil {
+			s.marking.Opened(ctx, query.GetTitleId())
 		}
 		streams, err = s.client.EpisodeStreams(
 			ctx,
@@ -144,6 +156,46 @@ func (s *Server) GetTitleDetails(
 		response.Seasons = titleDetailsSeasons(seasons)
 	}
 	return response, nil
+}
+
+func (s *Server) GetMarkingSettings(
+	ctx context.Context,
+	_ *titlev1.GetMarkingSettingsQuery,
+) (*titlev1.MarkingSettings, error) {
+	if s.marking == nil {
+		return nil, status.Error(codes.Unimplemented, "marking is off")
+	}
+	settings, err := s.marking.Settings(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return markingSettings(settings), nil
+}
+
+func (s *Server) UpdateMarkingSettings(
+	ctx context.Context,
+	command *titlev1.UpdateMarkingSettingsCommand,
+) (*titlev1.MarkingSettings, error) {
+	if s.marking == nil {
+		return nil, status.Error(codes.Unimplemented, "marking is off")
+	}
+	settings, err := s.marking.Update(ctx, command.Enabled, command.ApiKey)
+	switch {
+	case errors.Is(err, marking.ErrInvalidKey):
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	case err != nil:
+		return nil, status.Error(codes.Unavailable, err.Error())
+	}
+	return markingSettings(settings), nil
+}
+
+func markingSettings(settings marking.Settings) *titlev1.MarkingSettings {
+	return &titlev1.MarkingSettings{
+		Enabled: settings.Enabled,
+		KeySet:  settings.KeySet,
+		KeyHint: settings.KeyHint,
+		Error:   settings.Error,
+	}
 }
 
 func providerStatus(err error) error {

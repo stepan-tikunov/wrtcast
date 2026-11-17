@@ -219,6 +219,10 @@ type GetPlaybackStreamsQuery struct {
 	TitleId       string                 `protobuf:"bytes,1,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`
 	SeasonNumber  *int32                 `protobuf:"varint,2,opt,name=season_number,json=seasonNumber,proto3,oneof" json:"season_number,omitempty"`
 	EpisodeNumber *string                `protobuf:"bytes,3,opt,name=episode_number,json=episodeNumber,proto3,oneof" json:"episode_number,omitempty"`
+	// The viewer plays the title for the first time: its episodes are marked
+	// from then on, those the primary player marks none of (see
+	// MarkingSettings).
+	FirstPlay     bool `protobuf:"varint,4,opt,name=first_play,json=firstPlay,proto3" json:"first_play,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -272,6 +276,13 @@ func (x *GetPlaybackStreamsQuery) GetEpisodeNumber() string {
 		return *x.EpisodeNumber
 	}
 	return ""
+}
+
+func (x *GetPlaybackStreamsQuery) GetFirstPlay() bool {
+	if x != nil {
+		return x.FirstPlay
+	}
+	return false
 }
 
 type GetPlaybackStreamsQueryResponse struct {
@@ -694,6 +705,168 @@ func (x *MediaStream) GetSectionsDurationSeconds() float64 {
 	return 0
 }
 
+type GetMarkingSettingsQuery struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMarkingSettingsQuery) Reset() {
+	*x = GetMarkingSettingsQuery{}
+	mi := &file_api_title_v1_title_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMarkingSettingsQuery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMarkingSettingsQuery) ProtoMessage() {}
+
+func (x *GetMarkingSettingsQuery) ProtoReflect() protoreflect.Message {
+	mi := &file_api_title_v1_title_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMarkingSettingsQuery.ProtoReflect.Descriptor instead.
+func (*GetMarkingSettingsQuery) Descriptor() ([]byte, []int) {
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{8}
+}
+
+// How title-api marks the recap, the intro and the credits of the episodes
+// the primary player marks none of, with Claude: in the background, of the
+// titles first played since, the episode played and the two after it.
+type MarkingSettings struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Enabled bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// Whether there is a Claude API key, and its last four characters.
+	KeySet  bool   `protobuf:"varint,2,opt,name=key_set,json=keySet,proto3" json:"key_set,omitempty"`
+	KeyHint string `protobuf:"bytes,3,opt,name=key_hint,json=keyHint,proto3" json:"key_hint,omitempty"`
+	// Why the last marking failed, if it did.
+	Error         string `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkingSettings) Reset() {
+	*x = MarkingSettings{}
+	mi := &file_api_title_v1_title_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkingSettings) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkingSettings) ProtoMessage() {}
+
+func (x *MarkingSettings) ProtoReflect() protoreflect.Message {
+	mi := &file_api_title_v1_title_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkingSettings.ProtoReflect.Descriptor instead.
+func (*MarkingSettings) Descriptor() ([]byte, []int) {
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *MarkingSettings) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *MarkingSettings) GetKeySet() bool {
+	if x != nil {
+		return x.KeySet
+	}
+	return false
+}
+
+func (x *MarkingSettings) GetKeyHint() string {
+	if x != nil {
+		return x.KeyHint
+	}
+	return ""
+}
+
+func (x *MarkingSettings) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type UpdateMarkingSettingsCommand struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Enabled *bool                  `protobuf:"varint,1,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
+	// A Claude API key, which is checked before it is kept; empty removes it.
+	ApiKey        *string `protobuf:"bytes,2,opt,name=api_key,json=apiKey,proto3,oneof" json:"api_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateMarkingSettingsCommand) Reset() {
+	*x = UpdateMarkingSettingsCommand{}
+	mi := &file_api_title_v1_title_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateMarkingSettingsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateMarkingSettingsCommand) ProtoMessage() {}
+
+func (x *UpdateMarkingSettingsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_api_title_v1_title_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateMarkingSettingsCommand.ProtoReflect.Descriptor instead.
+func (*UpdateMarkingSettingsCommand) Descriptor() ([]byte, []int) {
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *UpdateMarkingSettingsCommand) GetEnabled() bool {
+	if x != nil && x.Enabled != nil {
+		return *x.Enabled
+	}
+	return false
+}
+
+func (x *UpdateMarkingSettingsCommand) GetApiKey() string {
+	if x != nil && x.ApiKey != nil {
+		return *x.ApiKey
+	}
+	return ""
+}
+
 type SearchTitlesQueryResponse_SearchResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TitleId       string                 `protobuf:"bytes,1,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`
@@ -706,7 +879,7 @@ type SearchTitlesQueryResponse_SearchResult struct {
 
 func (x *SearchTitlesQueryResponse_SearchResult) Reset() {
 	*x = SearchTitlesQueryResponse_SearchResult{}
-	mi := &file_api_title_v1_title_proto_msgTypes[8]
+	mi := &file_api_title_v1_title_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -718,7 +891,7 @@ func (x *SearchTitlesQueryResponse_SearchResult) String() string {
 func (*SearchTitlesQueryResponse_SearchResult) ProtoMessage() {}
 
 func (x *SearchTitlesQueryResponse_SearchResult) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[8]
+	mi := &file_api_title_v1_title_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -772,7 +945,7 @@ type GetTitleDetailsQueryResponse_Rating struct {
 
 func (x *GetTitleDetailsQueryResponse_Rating) Reset() {
 	*x = GetTitleDetailsQueryResponse_Rating{}
-	mi := &file_api_title_v1_title_proto_msgTypes[9]
+	mi := &file_api_title_v1_title_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -784,7 +957,7 @@ func (x *GetTitleDetailsQueryResponse_Rating) String() string {
 func (*GetTitleDetailsQueryResponse_Rating) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Rating) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[9]
+	mi := &file_api_title_v1_title_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -824,7 +997,7 @@ type GetTitleDetailsQueryResponse_Season struct {
 
 func (x *GetTitleDetailsQueryResponse_Season) Reset() {
 	*x = GetTitleDetailsQueryResponse_Season{}
-	mi := &file_api_title_v1_title_proto_msgTypes[10]
+	mi := &file_api_title_v1_title_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -836,7 +1009,7 @@ func (x *GetTitleDetailsQueryResponse_Season) String() string {
 func (*GetTitleDetailsQueryResponse_Season) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Season) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[10]
+	mi := &file_api_title_v1_title_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -879,7 +1052,7 @@ type GetTitleDetailsQueryResponse_Season_Episode struct {
 
 func (x *GetTitleDetailsQueryResponse_Season_Episode) Reset() {
 	*x = GetTitleDetailsQueryResponse_Season_Episode{}
-	mi := &file_api_title_v1_title_proto_msgTypes[11]
+	mi := &file_api_title_v1_title_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -891,7 +1064,7 @@ func (x *GetTitleDetailsQueryResponse_Season_Episode) String() string {
 func (*GetTitleDetailsQueryResponse_Season_Episode) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Season_Episode) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[11]
+	mi := &file_api_title_v1_title_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -945,7 +1118,7 @@ type MediaStream_ProxyHeader struct {
 
 func (x *MediaStream_ProxyHeader) Reset() {
 	*x = MediaStream_ProxyHeader{}
-	mi := &file_api_title_v1_title_proto_msgTypes[12]
+	mi := &file_api_title_v1_title_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -957,7 +1130,7 @@ func (x *MediaStream_ProxyHeader) String() string {
 func (*MediaStream_ProxyHeader) ProtoMessage() {}
 
 func (x *MediaStream_ProxyHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[12]
+	mi := &file_api_title_v1_title_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1000,7 +1173,7 @@ type MediaStream_AudioTrack struct {
 
 func (x *MediaStream_AudioTrack) Reset() {
 	*x = MediaStream_AudioTrack{}
-	mi := &file_api_title_v1_title_proto_msgTypes[13]
+	mi := &file_api_title_v1_title_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1012,7 +1185,7 @@ func (x *MediaStream_AudioTrack) String() string {
 func (*MediaStream_AudioTrack) ProtoMessage() {}
 
 func (x *MediaStream_AudioTrack) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[13]
+	mi := &file_api_title_v1_title_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1076,7 +1249,7 @@ type MediaStream_SubtitleTrack struct {
 
 func (x *MediaStream_SubtitleTrack) Reset() {
 	*x = MediaStream_SubtitleTrack{}
-	mi := &file_api_title_v1_title_proto_msgTypes[14]
+	mi := &file_api_title_v1_title_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1088,7 +1261,7 @@ func (x *MediaStream_SubtitleTrack) String() string {
 func (*MediaStream_SubtitleTrack) ProtoMessage() {}
 
 func (x *MediaStream_SubtitleTrack) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[14]
+	mi := &file_api_title_v1_title_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1153,11 +1326,13 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
 	"\x04year\x18\x03 \x01(\tR\x04year\x12\x1f\n" +
 	"\vposter_link\x18\x04 \x01(\tR\n" +
-	"posterLink\"\xaf\x01\n" +
+	"posterLink\"\xce\x01\n" +
 	"\x17GetPlaybackStreamsQuery\x12\x19\n" +
 	"\btitle_id\x18\x01 \x01(\tR\atitleId\x12(\n" +
 	"\rseason_number\x18\x02 \x01(\x05H\x00R\fseasonNumber\x88\x01\x01\x12*\n" +
-	"\x0eepisode_number\x18\x03 \x01(\tH\x01R\repisodeNumber\x88\x01\x01B\x10\n" +
+	"\x0eepisode_number\x18\x03 \x01(\tH\x01R\repisodeNumber\x88\x01\x01\x12\x1d\n" +
+	"\n" +
+	"first_play\x18\x04 \x01(\bR\tfirstPlayB\x10\n" +
 	"\x0e_season_numberB\x11\n" +
 	"\x0f_episode_number\"R\n" +
 	"\x1fGetPlaybackStreamsQueryResponse\x12/\n" +
@@ -1231,16 +1406,31 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
 	"\blanguage\x18\x03 \x01(\tR\blanguage\x12\x16\n" +
 	"\x06forced\x18\x04 \x01(\bR\x06forced\x12!\n" +
-	"\fplaylist_url\x18\x05 \x01(\tR\vplaylistUrl*T\n" +
+	"\fplaylist_url\x18\x05 \x01(\tR\vplaylistUrl\"\x19\n" +
+	"\x17GetMarkingSettingsQuery\"u\n" +
+	"\x0fMarkingSettings\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x17\n" +
+	"\akey_set\x18\x02 \x01(\bR\x06keySet\x12\x19\n" +
+	"\bkey_hint\x18\x03 \x01(\tR\akeyHint\x12\x14\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"s\n" +
+	"\x1cUpdateMarkingSettingsCommand\x12\x1d\n" +
+	"\aenabled\x18\x01 \x01(\bH\x00R\aenabled\x88\x01\x01\x12\x1c\n" +
+	"\aapi_key\x18\x02 \x01(\tH\x01R\x06apiKey\x88\x01\x01B\n" +
+	"\n" +
+	"\b_enabledB\n" +
+	"\n" +
+	"\b_api_key*T\n" +
 	"\tMediaType\x12\x1a\n" +
 	"\x16MEDIA_TYPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10MEDIA_TYPE_MOVIE\x10\x01\x12\x15\n" +
-	"\x11MEDIA_TYPE_SERIES\x10\x022\x83\x03\n" +
+	"\x11MEDIA_TYPE_SERIES\x10\x022\xe0\x04\n" +
 	"\fTitleService\x12d\n" +
 	"\fSearchTitles\x12\x1b.title.v1.SearchTitlesQuery\x1a#.title.v1.SearchTitlesQueryResponse\"\x12\x82\xd3\xe4\x93\x02\f\x12\n" +
 	"/v1/search\x12\x92\x01\n" +
 	"\x12GetPlaybackStreams\x12!.title.v1.GetPlaybackStreamsQuery\x1a).title.v1.GetPlaybackStreamsQueryResponse\".\x82\xd3\xe4\x93\x02(\x12&/v1/titles/{title_id}/playback-streams\x12x\n" +
-	"\x0fGetTitleDetails\x12\x1e.title.v1.GetTitleDetailsQuery\x1a&.title.v1.GetTitleDetailsQueryResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/titles/{title_id}B Z\x1etitle-api/api/title/v1;titlev1b\x06proto3"
+	"\x0fGetTitleDetails\x12\x1e.title.v1.GetTitleDetailsQuery\x1a&.title.v1.GetTitleDetailsQueryResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/v1/titles/{title_id}\x12g\n" +
+	"\x12GetMarkingSettings\x12!.title.v1.GetMarkingSettingsQuery\x1a\x19.title.v1.MarkingSettings\"\x13\x82\xd3\xe4\x93\x02\r\x12\v/v1/marking\x12r\n" +
+	"\x15UpdateMarkingSettings\x12&.title.v1.UpdateMarkingSettingsCommand\x1a\x19.title.v1.MarkingSettings\"\x16\x82\xd3\xe4\x93\x02\x10:\x01*\"\v/v1/markingB Z\x1etitle-api/api/title/v1;titlev1b\x06proto3"
 
 var (
 	file_api_title_v1_title_proto_rawDescOnce sync.Once
@@ -1255,7 +1445,7 @@ func file_api_title_v1_title_proto_rawDescGZIP() []byte {
 }
 
 var file_api_title_v1_title_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_title_v1_title_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_api_title_v1_title_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_api_title_v1_title_proto_goTypes = []any{
 	(MediaType)(0),                                      // 0: title.v1.MediaType
 	(Section_Kind)(0),                                   // 1: title.v1.Section.Kind
@@ -1267,36 +1457,43 @@ var file_api_title_v1_title_proto_goTypes = []any{
 	(*GetTitleDetailsQueryResponse)(nil),                // 7: title.v1.GetTitleDetailsQueryResponse
 	(*Section)(nil),                                     // 8: title.v1.Section
 	(*MediaStream)(nil),                                 // 9: title.v1.MediaStream
-	(*SearchTitlesQueryResponse_SearchResult)(nil),      // 10: title.v1.SearchTitlesQueryResponse.SearchResult
-	(*GetTitleDetailsQueryResponse_Rating)(nil),         // 11: title.v1.GetTitleDetailsQueryResponse.Rating
-	(*GetTitleDetailsQueryResponse_Season)(nil),         // 12: title.v1.GetTitleDetailsQueryResponse.Season
-	(*GetTitleDetailsQueryResponse_Season_Episode)(nil), // 13: title.v1.GetTitleDetailsQueryResponse.Season.Episode
-	(*MediaStream_ProxyHeader)(nil),                     // 14: title.v1.MediaStream.ProxyHeader
-	(*MediaStream_AudioTrack)(nil),                      // 15: title.v1.MediaStream.AudioTrack
-	(*MediaStream_SubtitleTrack)(nil),                   // 16: title.v1.MediaStream.SubtitleTrack
+	(*GetMarkingSettingsQuery)(nil),                     // 10: title.v1.GetMarkingSettingsQuery
+	(*MarkingSettings)(nil),                             // 11: title.v1.MarkingSettings
+	(*UpdateMarkingSettingsCommand)(nil),                // 12: title.v1.UpdateMarkingSettingsCommand
+	(*SearchTitlesQueryResponse_SearchResult)(nil),      // 13: title.v1.SearchTitlesQueryResponse.SearchResult
+	(*GetTitleDetailsQueryResponse_Rating)(nil),         // 14: title.v1.GetTitleDetailsQueryResponse.Rating
+	(*GetTitleDetailsQueryResponse_Season)(nil),         // 15: title.v1.GetTitleDetailsQueryResponse.Season
+	(*GetTitleDetailsQueryResponse_Season_Episode)(nil), // 16: title.v1.GetTitleDetailsQueryResponse.Season.Episode
+	(*MediaStream_ProxyHeader)(nil),                     // 17: title.v1.MediaStream.ProxyHeader
+	(*MediaStream_AudioTrack)(nil),                      // 18: title.v1.MediaStream.AudioTrack
+	(*MediaStream_SubtitleTrack)(nil),                   // 19: title.v1.MediaStream.SubtitleTrack
 }
 var file_api_title_v1_title_proto_depIdxs = []int32{
-	10, // 0: title.v1.SearchTitlesQueryResponse.results:type_name -> title.v1.SearchTitlesQueryResponse.SearchResult
+	13, // 0: title.v1.SearchTitlesQueryResponse.results:type_name -> title.v1.SearchTitlesQueryResponse.SearchResult
 	9,  // 1: title.v1.GetPlaybackStreamsQueryResponse.streams:type_name -> title.v1.MediaStream
 	0,  // 2: title.v1.GetTitleDetailsQueryResponse.media_type:type_name -> title.v1.MediaType
-	11, // 3: title.v1.GetTitleDetailsQueryResponse.ratings:type_name -> title.v1.GetTitleDetailsQueryResponse.Rating
-	12, // 4: title.v1.GetTitleDetailsQueryResponse.seasons:type_name -> title.v1.GetTitleDetailsQueryResponse.Season
+	14, // 3: title.v1.GetTitleDetailsQueryResponse.ratings:type_name -> title.v1.GetTitleDetailsQueryResponse.Rating
+	15, // 4: title.v1.GetTitleDetailsQueryResponse.seasons:type_name -> title.v1.GetTitleDetailsQueryResponse.Season
 	8,  // 5: title.v1.GetTitleDetailsQueryResponse.sections:type_name -> title.v1.Section
 	1,  // 6: title.v1.Section.kind:type_name -> title.v1.Section.Kind
-	15, // 7: title.v1.MediaStream.audio_tracks:type_name -> title.v1.MediaStream.AudioTrack
-	16, // 8: title.v1.MediaStream.subtitles:type_name -> title.v1.MediaStream.SubtitleTrack
-	14, // 9: title.v1.MediaStream.proxy_headers:type_name -> title.v1.MediaStream.ProxyHeader
+	18, // 7: title.v1.MediaStream.audio_tracks:type_name -> title.v1.MediaStream.AudioTrack
+	19, // 8: title.v1.MediaStream.subtitles:type_name -> title.v1.MediaStream.SubtitleTrack
+	17, // 9: title.v1.MediaStream.proxy_headers:type_name -> title.v1.MediaStream.ProxyHeader
 	8,  // 10: title.v1.MediaStream.sections:type_name -> title.v1.Section
-	13, // 11: title.v1.GetTitleDetailsQueryResponse.Season.episodes:type_name -> title.v1.GetTitleDetailsQueryResponse.Season.Episode
+	16, // 11: title.v1.GetTitleDetailsQueryResponse.Season.episodes:type_name -> title.v1.GetTitleDetailsQueryResponse.Season.Episode
 	8,  // 12: title.v1.GetTitleDetailsQueryResponse.Season.Episode.sections:type_name -> title.v1.Section
 	2,  // 13: title.v1.TitleService.SearchTitles:input_type -> title.v1.SearchTitlesQuery
 	4,  // 14: title.v1.TitleService.GetPlaybackStreams:input_type -> title.v1.GetPlaybackStreamsQuery
 	6,  // 15: title.v1.TitleService.GetTitleDetails:input_type -> title.v1.GetTitleDetailsQuery
-	3,  // 16: title.v1.TitleService.SearchTitles:output_type -> title.v1.SearchTitlesQueryResponse
-	5,  // 17: title.v1.TitleService.GetPlaybackStreams:output_type -> title.v1.GetPlaybackStreamsQueryResponse
-	7,  // 18: title.v1.TitleService.GetTitleDetails:output_type -> title.v1.GetTitleDetailsQueryResponse
-	16, // [16:19] is the sub-list for method output_type
-	13, // [13:16] is the sub-list for method input_type
+	10, // 16: title.v1.TitleService.GetMarkingSettings:input_type -> title.v1.GetMarkingSettingsQuery
+	12, // 17: title.v1.TitleService.UpdateMarkingSettings:input_type -> title.v1.UpdateMarkingSettingsCommand
+	3,  // 18: title.v1.TitleService.SearchTitles:output_type -> title.v1.SearchTitlesQueryResponse
+	5,  // 19: title.v1.TitleService.GetPlaybackStreams:output_type -> title.v1.GetPlaybackStreamsQueryResponse
+	7,  // 20: title.v1.TitleService.GetTitleDetails:output_type -> title.v1.GetTitleDetailsQueryResponse
+	11, // 21: title.v1.TitleService.GetMarkingSettings:output_type -> title.v1.MarkingSettings
+	11, // 22: title.v1.TitleService.UpdateMarkingSettings:output_type -> title.v1.MarkingSettings
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
 	13, // [13:13] is the sub-list for extension type_name
 	13, // [13:13] is the sub-list for extension extendee
 	0,  // [0:13] is the sub-list for field type_name
@@ -1308,13 +1505,14 @@ func file_api_title_v1_title_proto_init() {
 		return
 	}
 	file_api_title_v1_title_proto_msgTypes[2].OneofWrappers = []any{}
+	file_api_title_v1_title_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_title_v1_title_proto_rawDesc), len(file_api_title_v1_title_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   15,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -48,7 +48,7 @@ var lok = 1, challengeMarker = "marker";`, serverURL, serverURL, serverURL, serv
 			_, _ = fmt.Fprintf(response, `
 makePlayer({source:{hls:"%s/movie/master.m3u8?token=base",audio:{names:["Dub"]}}});
 var lok = 1, challengeMarker = "marker";`, serverURL)
-		case "/s8e1/master.m3u8":
+		case "/s8e1/master.m3u8", "/s8e2/master.m3u8":
 			if _, ok := request.URL.Query()["marker"]; !ok {
 				response.WriteHeader(http.StatusForbidden)
 				return
@@ -119,6 +119,32 @@ video.m3u8
 			streams[0].Sections, streams[0].SectionsDuration, wantSections)
 	}
 
+	// The episodes the primary player marks none of are told of, the one
+	// played and two after it, and their sections are title-api's own.
+	marks := &fakeMarks{sections: map[string][]Section{"8|2": {{Kind: SectionIntro, Start: 5, End: 60, Skippable: true}}}}
+	client.marks = marks
+	if _, err := client.EpisodeStreams(ctx, seriesID, 8, "1"); err != nil {
+		t.Fatal(err)
+	}
+	if got := marks.told(); !reflect.DeepEqual(got, []string{"8|2", "8|10"}) {
+		t.Fatalf("unmarked = %v, want [8|2 8|10]", got)
+	}
+	if !strings.Contains(marks.unmarked[0][0].Master, "/s8e2/master.m3u8?token=base&marker") {
+		t.Fatalf("unmarked master = %q", marks.unmarked[0][0].Master)
+	}
+	marks.unmarked = nil
+	streams, err = client.EpisodeStreams(ctx, seriesID, 8, "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := marks.told(); !reflect.DeepEqual(got, []string{"8|2", "8|10"}) {
+		t.Fatalf("unmarked = %v, want [8|2 8|10]", got)
+	}
+	if !reflect.DeepEqual(streams[0].Sections, marks.sections["8|2"]) || streams[0].SectionsDuration != 2577 {
+		t.Fatalf("stream sections = %+v of %v, want title-api's", streams[0].Sections, streams[0].SectionsDuration)
+	}
+	client.marks = nil
+
 	if _, err := client.EpisodeStreams(ctx, seriesID, 8, "404"); !errors.Is(err, ErrEpisodeNotFound) {
 		t.Fatalf("missing episode error = %v, want ErrEpisodeNotFound", err)
 	}
@@ -141,4 +167,31 @@ func TestParseSeriesPayloadRejectsMalformedArray(t *testing.T) {
 	if err == nil || errors.Is(err, ErrNotSeries) {
 		t.Fatalf("parseSeriesPayload() error = %v, want malformed array error", err)
 	}
+}
+
+type fakeMarks struct {
+	sections map[string][]Section
+	unmarked [][]UnmarkedEpisode
+}
+
+func (f *fakeMarks) Sections(_ string, season int32, episode string) ([]Section, float64) {
+	list := f.sections[fmt.Sprintf("%d|%s", season, episode)]
+	if list == nil {
+		return nil, 0
+	}
+	return list, 2577
+}
+
+func (f *fakeMarks) Unmarked(episodes []UnmarkedEpisode) {
+	f.unmarked = append(f.unmarked, episodes)
+}
+
+func (f *fakeMarks) told() []string {
+	var result []string
+	for _, call := range f.unmarked {
+		for _, e := range call {
+			result = append(result, fmt.Sprintf("%d|%s", e.Season, e.Episode))
+		}
+	}
+	return result
 }

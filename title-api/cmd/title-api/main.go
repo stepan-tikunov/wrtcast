@@ -17,6 +17,7 @@ import (
 
 	titlev1 "title-api/api/title/v1"
 	"title-api/internal/grpcserver"
+	"title-api/internal/marking"
 	"title-api/internal/provider"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -54,6 +55,10 @@ func run() error {
 		return err
 	}
 	defer urlStore.Close()
+	marks, err := marking.New(ctx, urlStore.DB())
+	if err != nil {
+		return err
+	}
 
 	client, err := provider.NewClient(provider.Config{
 		BaseURL:          baseURL,
@@ -63,6 +68,7 @@ func run() error {
 		URLStore:         urlStore,
 		FingerprintStore: urlStore,
 		AlignmentStore:   urlStore,
+		Marks:            marks,
 	})
 	if err != nil {
 		return err
@@ -74,6 +80,7 @@ func run() error {
 		return err
 	}
 	log.Printf("provider anti-bot session initialized for %s", client.ProviderURL())
+	go marks.Run(ctx, client)
 
 	grpcListener, err := net.Listen("tcp", grpcAddress)
 	if err != nil {
@@ -85,7 +92,7 @@ func run() error {
 		return err
 	}
 
-	service := grpcserver.New(client)
+	service := grpcserver.New(client).WithMarking(marks)
 	grpcServer := grpc.NewServer()
 	titlev1.RegisterTitleServiceServer(grpcServer, service)
 	healthServer := health.NewServer()

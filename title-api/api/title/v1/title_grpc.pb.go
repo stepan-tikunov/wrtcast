@@ -19,9 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TitleService_SearchTitles_FullMethodName       = "/title.v1.TitleService/SearchTitles"
-	TitleService_GetPlaybackStreams_FullMethodName = "/title.v1.TitleService/GetPlaybackStreams"
-	TitleService_GetTitleDetails_FullMethodName    = "/title.v1.TitleService/GetTitleDetails"
+	TitleService_SearchTitles_FullMethodName          = "/title.v1.TitleService/SearchTitles"
+	TitleService_GetPlaybackStreams_FullMethodName    = "/title.v1.TitleService/GetPlaybackStreams"
+	TitleService_GetTitleDetails_FullMethodName       = "/title.v1.TitleService/GetTitleDetails"
+	TitleService_GetMarkingSettings_FullMethodName    = "/title.v1.TitleService/GetMarkingSettings"
+	TitleService_UpdateMarkingSettings_FullMethodName = "/title.v1.TitleService/UpdateMarkingSettings"
 )
 
 // TitleServiceClient is the client API for TitleService service.
@@ -31,6 +33,8 @@ type TitleServiceClient interface {
 	SearchTitles(ctx context.Context, in *SearchTitlesQuery, opts ...grpc.CallOption) (*SearchTitlesQueryResponse, error)
 	GetPlaybackStreams(ctx context.Context, in *GetPlaybackStreamsQuery, opts ...grpc.CallOption) (*GetPlaybackStreamsQueryResponse, error)
 	GetTitleDetails(ctx context.Context, in *GetTitleDetailsQuery, opts ...grpc.CallOption) (*GetTitleDetailsQueryResponse, error)
+	GetMarkingSettings(ctx context.Context, in *GetMarkingSettingsQuery, opts ...grpc.CallOption) (*MarkingSettings, error)
+	UpdateMarkingSettings(ctx context.Context, in *UpdateMarkingSettingsCommand, opts ...grpc.CallOption) (*MarkingSettings, error)
 }
 
 type titleServiceClient struct {
@@ -71,6 +75,26 @@ func (c *titleServiceClient) GetTitleDetails(ctx context.Context, in *GetTitleDe
 	return out, nil
 }
 
+func (c *titleServiceClient) GetMarkingSettings(ctx context.Context, in *GetMarkingSettingsQuery, opts ...grpc.CallOption) (*MarkingSettings, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkingSettings)
+	err := c.cc.Invoke(ctx, TitleService_GetMarkingSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *titleServiceClient) UpdateMarkingSettings(ctx context.Context, in *UpdateMarkingSettingsCommand, opts ...grpc.CallOption) (*MarkingSettings, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkingSettings)
+	err := c.cc.Invoke(ctx, TitleService_UpdateMarkingSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TitleServiceServer is the server API for TitleService service.
 // All implementations must embed UnimplementedTitleServiceServer
 // for forward compatibility.
@@ -78,6 +102,8 @@ type TitleServiceServer interface {
 	SearchTitles(context.Context, *SearchTitlesQuery) (*SearchTitlesQueryResponse, error)
 	GetPlaybackStreams(context.Context, *GetPlaybackStreamsQuery) (*GetPlaybackStreamsQueryResponse, error)
 	GetTitleDetails(context.Context, *GetTitleDetailsQuery) (*GetTitleDetailsQueryResponse, error)
+	GetMarkingSettings(context.Context, *GetMarkingSettingsQuery) (*MarkingSettings, error)
+	UpdateMarkingSettings(context.Context, *UpdateMarkingSettingsCommand) (*MarkingSettings, error)
 	mustEmbedUnimplementedTitleServiceServer()
 }
 
@@ -96,6 +122,12 @@ func (UnimplementedTitleServiceServer) GetPlaybackStreams(context.Context, *GetP
 }
 func (UnimplementedTitleServiceServer) GetTitleDetails(context.Context, *GetTitleDetailsQuery) (*GetTitleDetailsQueryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTitleDetails not implemented")
+}
+func (UnimplementedTitleServiceServer) GetMarkingSettings(context.Context, *GetMarkingSettingsQuery) (*MarkingSettings, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMarkingSettings not implemented")
+}
+func (UnimplementedTitleServiceServer) UpdateMarkingSettings(context.Context, *UpdateMarkingSettingsCommand) (*MarkingSettings, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateMarkingSettings not implemented")
 }
 func (UnimplementedTitleServiceServer) mustEmbedUnimplementedTitleServiceServer() {}
 func (UnimplementedTitleServiceServer) testEmbeddedByValue()                      {}
@@ -172,6 +204,42 @@ func _TitleService_GetTitleDetails_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TitleService_GetMarkingSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMarkingSettingsQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TitleServiceServer).GetMarkingSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TitleService_GetMarkingSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TitleServiceServer).GetMarkingSettings(ctx, req.(*GetMarkingSettingsQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TitleService_UpdateMarkingSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMarkingSettingsCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TitleServiceServer).UpdateMarkingSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TitleService_UpdateMarkingSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TitleServiceServer).UpdateMarkingSettings(ctx, req.(*UpdateMarkingSettingsCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TitleService_ServiceDesc is the grpc.ServiceDesc for TitleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +258,14 @@ var TitleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTitleDetails",
 			Handler:    _TitleService_GetTitleDetails_Handler,
+		},
+		{
+			MethodName: "GetMarkingSettings",
+			Handler:    _TitleService_GetMarkingSettings_Handler,
+		},
+		{
+			MethodName: "UpdateMarkingSettings",
+			Handler:    _TitleService_UpdateMarkingSettings_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -24,6 +24,19 @@ service TitleService {
       get: "/v1/titles/{title_id}"
     };
   }
+
+  rpc GetMarkingSettings(GetMarkingSettingsQuery) returns (MarkingSettings) {
+    option (google.api.http) = {
+      get: "/v1/marking"
+    };
+  }
+
+  rpc UpdateMarkingSettings(UpdateMarkingSettingsCommand) returns (MarkingSettings) {
+    option (google.api.http) = {
+      post: "/v1/marking"
+      body: "*"
+    };
+  }
 }
 
 enum MediaType {
@@ -51,6 +64,10 @@ message GetPlaybackStreamsQuery {
   string title_id = 1;
   optional int32 season_number = 2;
   optional string episode_number = 3;
+  // The viewer plays the title for the first time: its episodes are marked
+  // from then on, those the primary player marks none of (see
+  // MarkingSettings).
+  bool first_play = 4;
 }
 
 message GetPlaybackStreamsQueryResponse {
@@ -152,4 +169,24 @@ message MediaStream {
   // Another stream's video may be a little longer or shorter.
   repeated Section sections = 6;
   double sections_duration_seconds = 7;
+}
+
+message GetMarkingSettingsQuery {}
+
+// How title-api marks the recap, the intro and the credits of the episodes
+// the primary player marks none of, with Claude: in the background, of the
+// titles first played since, the episode played and the two after it.
+message MarkingSettings {
+  bool enabled = 1;
+  // Whether there is a Claude API key, and its last four characters.
+  bool key_set = 2;
+  string key_hint = 3;
+  // Why the last marking failed, if it did.
+  string error = 4;
+}
+
+message UpdateMarkingSettingsCommand {
+  optional bool enabled = 1;
+  // A Claude API key, which is checked before it is kept; empty removes it.
+  optional string api_key = 2;
 }

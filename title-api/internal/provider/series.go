@@ -161,6 +161,10 @@ func (c *Client) EpisodeStreams(
 	// The video they are marked on, which the alternative player's is
 	// aligned with, and the next episode's.
 	var reference sectionsReference
+	// Whether a primary player marks the episode, and the episodes from it
+	// on that the first one marks none of, for title-api to mark.
+	providerMarked, unmarkedSeen := false, false
+	var unmarkedEpisodes []UnmarkedEpisode
 	for index, embedURL := range embedURLs {
 		embedHTML, _, fetchErr := c.get(ctx, current, embedURL, c.providerURL().String()+"/")
 		if fetchErr != nil {
@@ -181,10 +185,14 @@ func (c *Client) EpisodeStreams(
 			continue
 		}
 		episodeFound = true
-		marked := sections(episode.Sections)
+		marked, duration := sections(episode.Sections), float64(episode.Duration)
+		providerMarked = providerMarked || len(marked) > 0
+		if len(marked) == 0 {
+			marked, duration = c.marked(externalMovieID, seasonNumber, episodeNumber)
+		}
 		marks := episodeSections == nil && len(marked) > 0
 		if marks {
-			episodeSections, sectionsDuration = marked, float64(episode.Duration)
+			episodeSections, sectionsDuration = marked, duration
 		}
 		if strings.TrimSpace(episode.HLS) == "" {
 			streamErrors = append(streamErrors, fmt.Errorf("%s: episode has no HLS URL", embedURL))
@@ -194,6 +202,11 @@ func (c *Client) EpisodeStreams(
 		if markerErr != nil {
 			streamErrors = append(streamErrors, fmt.Errorf("%s: %w", embedURL, markerErr))
 			continue
+		}
+		// The first primary player's video is the one marked.
+		if !unmarkedSeen {
+			unmarkedSeen = true
+			unmarkedEpisodes = unmarked(externalMovieID, seasons, seasonNumber, episode, marker)
 		}
 		stream, streamErr := c.streamFromHLS(
 			ctx,
@@ -209,23 +222,27 @@ func (c *Client) EpisodeStreams(
 		}
 		stream.Name = primaryStreamName(index, len(embedURLs))
 		if len(marked) > 0 {
-			stream.Sections, stream.SectionsDuration = marked, float64(episode.Duration)
+			stream.Sections, stream.SectionsDuration = marked, duration
 		}
 		if marks {
 			reference = sectionsReference{
 				title: externalMovieID, season: seasonNumber, episode: episodeNumber,
 				key: referenceKey(externalMovieID, seasonNumber, episodeNumber), master: stream.MasterPlaylistURL,
-				sections: marked, duration: float64(episode.Duration),
+				sections: marked, duration: duration,
 			}
 			if season, next, ok := nextEpisode(seasons, seasonNumber, episodeNumber); ok && strings.TrimSpace(next.HLS) != "" {
 				number := strings.TrimSpace(string(next.Episode))
+				nextMarked, nextDuration := sections(next.Sections), float64(next.Duration)
+				if len(nextMarked) == 0 {
+					nextMarked, nextDuration = c.marked(externalMovieID, season, number)
+				}
 				reference.next = &sectionsReference{
 					title:    externalMovieID,
 					season:   season,
 					episode:  number,
 					key:      referenceKey(externalMovieID, season, number),
 					master:   appendDynamicMarker(html.UnescapeString(next.HLS), marker),
-					sections: sections(next.Sections), duration: float64(next.Duration),
+					sections: nextMarked, duration: nextDuration,
 				}
 			}
 		}
@@ -245,6 +262,12 @@ func (c *Client) EpisodeStreams(
 		streams = append(streams, alternative...)
 	}
 	if len(streams) > 0 {
+		if providerMarked && len(unmarkedEpisodes) > 0 && unmarkedEpisodes[0].Season == seasonNumber && unmarkedEpisodes[0].Episode == episodeNumber {
+			unmarkedEpisodes = unmarkedEpisodes[1:]
+		}
+		if c.marks != nil && len(unmarkedEpisodes) > 0 {
+			c.marks.Unmarked(unmarkedEpisodes)
+		}
 		shareSections(streams, episodeSections, sectionsDuration)
 		c.alignStreams(streams, reference)
 		return streams, nil

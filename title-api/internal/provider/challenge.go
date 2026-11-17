@@ -35,6 +35,8 @@ type Config struct {
 	URLStore         ProviderURLStore
 	FingerprintStore PlayerFingerprintStore
 	AlignmentStore   AlignmentStore
+	// The sections title-api marks itself, if it does.
+	Marks Marks
 }
 
 type session struct {
@@ -84,6 +86,8 @@ type Client struct {
 	// No aligning ahead until then, after a refusal of the CDN.
 	aheadPausedUntil time.Time
 
+	marks Marks
+
 	mu             sync.RWMutex
 	session        *session
 	nextGeneration uint64
@@ -129,6 +133,7 @@ func NewClient(config Config) (*Client, error) {
 		urlStore:         config.URLStore,
 		fingerprintStore: config.FingerprintStore,
 		alignmentStore:   config.AlignmentStore,
+		marks:            config.Marks,
 		alignments:       map[string]*videoAlignment{},
 		primaries:        map[string]*primaryVideo{},
 		alignSlots:       make(chan struct{}, alignJobs),

@@ -138,3 +138,18 @@ func object(properties map[string]any) map[string]any {
 func typed(kind, description string) map[string]any {
 	return map[string]any{"type": kind, "description": description}
 }
+
+// Prices are the dollars a million input and output tokens of a model cost.
+var Prices = map[string][2]float64{
+	"claude-opus-5-5":   {4, 20},
+	"claude-sonnet-5-5": {2, 10},
+	"claude-haiku-4-5":  {1, 5},
+	// For prompts up to 100k tokens, which these are.
+	"claude-haiku-5-5": {0.10, 0.50},
+}
+
+// Cost is the dollars usage of a model took.
+func (u Usage) Cost(model string) float64 {
+	price := Prices[model]
+	return float64(u.InputTokens)/1e6*price[0] + float64(u.OutputTokens)/1e6*price[1]
+}

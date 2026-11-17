@@ -20,14 +20,6 @@ import (
 )
 
 // Per million tokens, input and output, for the cost shown.
-var prices = map[string][2]float64{
-	"claude-opus-5-5":   {4, 20},
-	"claude-sonnet-5-5": {2, 10},
-	"claude-haiku-4-5":  {1, 5},
-	// For prompts up to 100k tokens, which these are.
-	"claude-haiku-5-5": {0.10, 0.50},
-}
-
 type episodeResult struct {
 	Episode   string             `json:"episode"`
 	Track     string             `json:"track"`
@@ -305,8 +297,7 @@ func printSummary(results []episodeResult) {
 	}
 	cost := 0.0
 	for id, u := range usage {
-		price := prices[id]
-		modelCost := float64(u.InputTokens)/1e6*price[0] + float64(u.OutputTokens)/1e6*price[1]
+		modelCost := u.Cost(id)
 		cost += modelCost
 		fmt.Printf("%s: %d requests, %d input and %d output tokens, $%.3f\n", id, u.Requests, u.InputTokens, u.OutputTokens, modelCost)
 	}
