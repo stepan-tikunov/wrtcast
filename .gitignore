@@ -6,3 +6,5 @@
 /title-api/*.db*
 /.claude/
 /router-app/build/
+/.codegraph/
+/.idea/
