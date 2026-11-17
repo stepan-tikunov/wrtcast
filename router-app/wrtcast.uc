@@ -2868,6 +2868,17 @@ const routes = {
 		return r ? tmdb_details(p.type, +id, r) : null;
 	},
 
+	// The title on TMDB of a title /title told without one, as title-api
+	// matches it in the background: waits up to 15 s; pending, if it is
+	// still to be matched, to be asked again.
+	'GET /tmdb/match': p => {
+		let r = api(`/v1/titles/${title_id(p)}/tmdb`);
+		return {
+			tmdb: r.tmdb?.id ? { id: +r.tmdb.id, type: tmdb_type(r.tmdb.mediaType) } : null,
+			pending: !!r.pending,
+		};
+	},
+
 	// The episodes of a season of a series on TMDB (id its TMDB ID); null
 	// as /tmdb/title.
 	'GET /tmdb/season': p => {

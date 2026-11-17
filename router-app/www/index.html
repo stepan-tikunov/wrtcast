@@ -1393,6 +1393,32 @@ function backdropKnown(id, on) {
   } catch {}
 }
 
+// A title opened unmatched is matched in the background, by Claude when
+// TMDB's search can't settle it: the page waits for that up to a minute and
+// then draws TMDB's over itself.
+async function awaitMatch(m, t) {
+  for (let i = 0; i < 4 && item == m; i++) {
+    let r;
+    try {
+      r = await api('tmdb/match?id=' + encodeURIComponent(m.id));
+    } catch {
+      return;
+    }
+    if (!r.tmdb) {
+      if (r.pending) continue;
+      return;
+    }
+    t.tmdb = r.tmdb; // kept with /title's answer
+    const x = await tmdbOf(t);
+    if (!x || item != m) return;
+    backdropKnown(m.id, !!x.backdrop);
+    showTmdb(m, t, x);
+    renderInfo(t, x, true);
+    renderDetails();
+    return;
+  }
+}
+
 function showTmdb(m, t, x) {
   m.tm = x;
   renderArt(t, x);
@@ -1485,6 +1511,7 @@ async function openDetails(m) {
   if (x) showTmdb(m, t, x);
   renderInfo(t, x);
   renderDetails();
+  if (!t.tmdb) awaitMatch(m, t);
   if (t.type != 'series') return;
   const now = st?.now?.id == m.id ? st.now : null;
   const cont = continueAt(m);

@@ -88,7 +88,10 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
   потом рисуется без них и дорисовывается) и рисуется один раз; тайтлы,
   показанные с фоном, запоминаются (`localStorage.backdrops`), и их
   скелетон сразу в раскладке с фоном. Ответы кэшируются до перезагрузки
-  страницы. Нет ответа или данных — страница остаётся как есть. Внизу такой страницы и в «Настройках» — атрибуция TMDB.
+  страницы. Нет ответа или данных — страница остаётся как есть. Тайтл,
+  который title-api при первом открытии не нашёл сразу поиском TMDB,
+  сопоставляется в фоне; страница ждёт этого до минуты (`/api/tmdb/match`)
+  и дорисовывается. Внизу такой страницы и в «Настройках» — атрибуция TMDB.
 - Пока выполняется `/api/play` (~9 с), мини-плеер показывает новый фильм со
   спиннером, повторные нажатия игнорируются, а опрос статуса его не
   перезаписывает. Элементы управления (шкала, дорожки, кнопки) скрыты до
@@ -230,6 +233,7 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
 | `GET /api/tmdb/settings` | сопоставление тайтлов title-api с TMDB (см. README title-api): `{ key, hint, error }` — задан ли ключ TMDB и его последние символы, ошибка последнего сопоставления |
 | `POST /api/tmdb/settings` `key` | задаёт ключ API или токен доступа TMDB (title-api сперва проверяет его; неподходящий — `400`), пустой `key` удаляет; ключ уходит в title-api так же, как у `/api/marking`; возвращает то же, что `GET` |
 | `GET /api/tmdb/title?type=&id=` | что есть на TMDB о тайтле — есть он у провайдера или нет (`type` — `movie` или `tv`, `id` — его ID на TMDB, как их отдаёт `tmdb` у `/api/title`): `{id,type,title_id,title,original,year,date,tagline,overview,backdrop:{w780,w1280},logo:{url,aspect},poster,age,rating,runtime,genres,countries,directors,creators,status,last,next,seasons:[{season,episodes,date,title}],cast:[{name,character,photo}],trailers:[{name,lang,kind,url,thumb}],collection:{id,name,parts},recommendations}`; `title_id` — тайтл title-api, если он сопоставлен (так же у частей коллекции и рекомендаций: `{id,type,title_id,title,year,date,poster,backdrop}`); `age` — `0+`…`18+`, `runtime` — минуты фильма; `status` (`returning`, `ended`, `canceled`, `other`), `last` и `next` (`{season,episode,date,title}`) — у сериала; картинки — URL через title-api (и `/api/p`, если включён `proxy`); `null`, если на TMDB такого нет или в title-api не задан ключ; хранит title-api, роутер не кэширует |
+| `GET /api/tmdb/match?id=` | тайтл на TMDB для тайтла, который `/api/title` отдал без `tmdb`, пока title-api сопоставляет его в фоне (через Claude): ждёт до 15 с; `{tmdb:{id,type}\|null,pending}`, `pending` — ещё не сопоставлен, спросить снова |
 | `GET /api/tmdb/season?id=&season=` | серии сезона сериала на TMDB: `{episodes:[{episode,title,overview,still,date,runtime,upcoming}]}`; `title` пуст, если у TMDB это просто номер или не по-русски, `overview` — по-английски, если по-русски нет, `upcoming` — ещё не вышла; сезона, которого у TMDB нет, — пустой список; `null` — как у `/api/tmdb/title` |
 | `POST /api/cmd` `c`, `arg`? | `pause resume stop quit mute unmute` · `seek ff rew volume` (число) · `audio subs` (id/язык/название/`off`) · `substyle` (`size=…,bg=#RRGGBBAA`, формат `castctl substyle`) |
 | `GET /api/devices` `refresh`? | `{devices:[{id,name,model,host,port}],default}`: `castctl discover`, кэш на 60 с, если не передан `refresh=1`; `default` — id устройства из `cast_host` |
