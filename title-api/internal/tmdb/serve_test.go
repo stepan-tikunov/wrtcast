@@ -145,6 +145,10 @@ func TestDetailsCached(t *testing.T) {
 	if details.Name != "Бойцовский клуб" || len(details.Countries) != 2 || details.Countries[0] != "Германия" || details.Countries[1] != "США" {
 		t.Fatalf("details %q, countries %v", details.Name, details.Countries)
 	}
+	// The whole cast, from what is kept.
+	if cast, err := service.Cast(ctx, KindMovie, 550); err != nil || len(cast) != len(details.Cast) || len(cast) <= CastShown {
+		t.Fatalf("cast %d, %v", len(cast), err)
+	}
 	// Fresh for 30 days, the movie being old.
 	now.advance(29 * 24 * time.Hour)
 	if _, err := service.Details(ctx, KindMovie, 550); err != nil {
@@ -169,7 +173,7 @@ func TestDetailsCached(t *testing.T) {
 	fake.holding(nil)
 	close(hold)
 	waitFor(t, "the refresh to be kept", func() bool {
-		_, fetched, _, _ := service.cache.read(ctx, "movie:550")
+		_, fetched, _, _ := service.cache.read(ctx, "movie:550:v2")
 		return fetched.Equal(now.Now().Truncate(time.Second))
 	})
 	if n := fake.count("/movie/550"); n != 2 {

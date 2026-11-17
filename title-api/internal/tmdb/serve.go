@@ -39,18 +39,8 @@ func (s *Service) Details(ctx context.Context, kind string, id uint64) (Details,
 	if err != nil {
 		return Details{}, err
 	}
-	details, err := cached(ctx, s.cache, fmt.Sprintf("%s:%d", kind, id), Details.ttl,
-		func(ctx context.Context) (Details, error) {
-			raw, err := tmdb.details(ctx, kind, id)
-			if err != nil {
-				return Details{}, err
-			}
-			return pickDetails(kind, raw), nil
-		})
-	switch {
-	case errors.Is(err, errNotFound):
-		return Details{}, ErrNotFound
-	case err != nil:
+	details, err := s.details(ctx, tmdb, kind, id)
+	if err != nil {
 		return Details{}, err
 	}
 	if details.CollectionID != 0 {
@@ -77,6 +67,36 @@ func (s *Service) Details(ctx context.Context, kind string, id uint64) (Details,
 	}
 	s.titleIDs(ctx, &details)
 	return details, nil
+}
+
+// detailsVersion changes the key Details are cached by when what is kept
+// of a title changes: 2 keeps the whole cast, not 12 with photos.
+const detailsVersion = 2
+
+// details are a title on TMDB as cached.
+func (s *Service) details(ctx context.Context, tmdb *client, kind string, id uint64) (Details, error) {
+	details, err := cached(ctx, s.cache, fmt.Sprintf("%s:%d:v%d", kind, id, detailsVersion), Details.ttl,
+		func(ctx context.Context) (Details, error) {
+			raw, err := tmdb.details(ctx, kind, id)
+			if err != nil {
+				return Details{}, err
+			}
+			return pickDetails(kind, raw), nil
+		})
+	if errors.Is(err, errNotFound) {
+		return Details{}, ErrNotFound
+	}
+	return details, err
+}
+
+// Cast are the people in a title on TMDB, as billed, as Details keep them.
+func (s *Service) Cast(ctx context.Context, kind string, id uint64) ([]Person, error) {
+	tmdb, err := s.keyed(ctx)
+	if err != nil {
+		return nil, err
+	}
+	details, err := s.details(ctx, tmdb, kind, id)
+	return details.Cast, err
 }
 
 // titleIDs tells title-api's titles of a title and of those it lists, of

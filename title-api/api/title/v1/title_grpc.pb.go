@@ -29,6 +29,7 @@ const (
 	TitleService_UpdateTmdbSettings_FullMethodName    = "/title.v1.TitleService/UpdateTmdbSettings"
 	TitleService_GetTmdbDetails_FullMethodName        = "/title.v1.TitleService/GetTmdbDetails"
 	TitleService_GetTmdbSeason_FullMethodName         = "/title.v1.TitleService/GetTmdbSeason"
+	TitleService_GetTmdbCast_FullMethodName           = "/title.v1.TitleService/GetTmdbCast"
 	TitleService_WaitTmdbMatch_FullMethodName         = "/title.v1.TitleService/WaitTmdbMatch"
 )
 
@@ -46,6 +47,7 @@ type TitleServiceClient interface {
 	UpdateTmdbSettings(ctx context.Context, in *UpdateTmdbSettingsCommand, opts ...grpc.CallOption) (*TmdbSettings, error)
 	GetTmdbDetails(ctx context.Context, in *GetTmdbDetailsQuery, opts ...grpc.CallOption) (*TmdbDetails, error)
 	GetTmdbSeason(ctx context.Context, in *GetTmdbSeasonQuery, opts ...grpc.CallOption) (*TmdbSeason, error)
+	GetTmdbCast(ctx context.Context, in *GetTmdbDetailsQuery, opts ...grpc.CallOption) (*TmdbCast, error)
 	WaitTmdbMatch(ctx context.Context, in *WaitTmdbMatchQuery, opts ...grpc.CallOption) (*TmdbMatch, error)
 }
 
@@ -157,6 +159,16 @@ func (c *titleServiceClient) GetTmdbSeason(ctx context.Context, in *GetTmdbSeaso
 	return out, nil
 }
 
+func (c *titleServiceClient) GetTmdbCast(ctx context.Context, in *GetTmdbDetailsQuery, opts ...grpc.CallOption) (*TmdbCast, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TmdbCast)
+	err := c.cc.Invoke(ctx, TitleService_GetTmdbCast_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *titleServiceClient) WaitTmdbMatch(ctx context.Context, in *WaitTmdbMatchQuery, opts ...grpc.CallOption) (*TmdbMatch, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(TmdbMatch)
@@ -181,6 +193,7 @@ type TitleServiceServer interface {
 	UpdateTmdbSettings(context.Context, *UpdateTmdbSettingsCommand) (*TmdbSettings, error)
 	GetTmdbDetails(context.Context, *GetTmdbDetailsQuery) (*TmdbDetails, error)
 	GetTmdbSeason(context.Context, *GetTmdbSeasonQuery) (*TmdbSeason, error)
+	GetTmdbCast(context.Context, *GetTmdbDetailsQuery) (*TmdbCast, error)
 	WaitTmdbMatch(context.Context, *WaitTmdbMatchQuery) (*TmdbMatch, error)
 	mustEmbedUnimplementedTitleServiceServer()
 }
@@ -221,6 +234,9 @@ func (UnimplementedTitleServiceServer) GetTmdbDetails(context.Context, *GetTmdbD
 }
 func (UnimplementedTitleServiceServer) GetTmdbSeason(context.Context, *GetTmdbSeasonQuery) (*TmdbSeason, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTmdbSeason not implemented")
+}
+func (UnimplementedTitleServiceServer) GetTmdbCast(context.Context, *GetTmdbDetailsQuery) (*TmdbCast, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTmdbCast not implemented")
 }
 func (UnimplementedTitleServiceServer) WaitTmdbMatch(context.Context, *WaitTmdbMatchQuery) (*TmdbMatch, error) {
 	return nil, status.Error(codes.Unimplemented, "method WaitTmdbMatch not implemented")
@@ -426,6 +442,24 @@ func _TitleService_GetTmdbSeason_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TitleService_GetTmdbCast_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTmdbDetailsQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TitleServiceServer).GetTmdbCast(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TitleService_GetTmdbCast_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TitleServiceServer).GetTmdbCast(ctx, req.(*GetTmdbDetailsQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _TitleService_WaitTmdbMatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(WaitTmdbMatchQuery)
 	if err := dec(in); err != nil {
@@ -490,6 +524,10 @@ var TitleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTmdbSeason",
 			Handler:    _TitleService_GetTmdbSeason_Handler,
+		},
+		{
+			MethodName: "GetTmdbCast",
+			Handler:    _TitleService_GetTmdbCast_Handler,
 		},
 		{
 			MethodName: "WaitTmdbMatch",

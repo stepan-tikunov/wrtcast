@@ -73,7 +73,12 @@ func TestTmdbDetailsResponse(t *testing.T) {
 		},
 		Collection:      &tmdb.Collection{ID: 1, Name: "c", Parts: []tmdb.Related{{ID: 2, Kind: tmdb.KindMovie, Date: "2027-02-01", TitleID: "x"}}},
 		Recommendations: []tmdb.Related{{ID: 3, Kind: tmdb.KindTV, Name: "r"}},
+		Cast:            make([]tmdb.Person, 20),
 	})
+	// The first billed; GetTmdbCast tells them all.
+	if len(response.GetCast()) != tmdb.CastShown || response.GetCastTotal() != 20 {
+		t.Errorf("cast %d of %d", len(response.GetCast()), response.GetCastTotal())
+	}
 	if response.GetYear() != "2006" || response.GetReleaseDate() != "2006-10-01" || response.GetTitleId() != "64aee42620222" ||
 		response.GetTitle().GetMediaType() != titlev1.MediaType_MEDIA_TYPE_SERIES ||
 		response.GetStatus() != titlev1.TmdbStatus_TMDB_STATUS_RETURNING || response.GetNumberOfSeasons() != 8 ||

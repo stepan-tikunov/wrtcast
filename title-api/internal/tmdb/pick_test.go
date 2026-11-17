@@ -104,11 +104,11 @@ func TestPickDetails(t *testing.T) {
 			if test.firstVideo != "" && (len(d.Videos) == 0 || d.Videos[0].Language != test.firstVideo) {
 				t.Errorf("videos %+v", d.Videos)
 			}
-			if len(d.Cast) != castLimit {
+			if len(d.Cast) <= CastShown {
 				t.Errorf("%d cast", len(d.Cast))
 			}
 			for _, person := range d.Cast {
-				if person.Profile == "" || strings.HasPrefix(person.Profile, "/") {
+				if person.Name == "" || strings.HasPrefix(person.Profile, "/") {
 					t.Errorf("cast %+v", person)
 				}
 			}

@@ -70,6 +70,12 @@ service TitleService {
     };
   }
 
+  rpc GetTmdbCast(GetTmdbDetailsQuery) returns (TmdbCast) {
+    option (google.api.http) = {
+      get: "/v1/tmdb/{media_type}/{tmdb_id}/cast"
+    };
+  }
+
   rpc WaitTmdbMatch(WaitTmdbMatchQuery) returns (TmdbMatch) {
     option (google.api.http) = {
       get: "/v1/titles/{title_id}/tmdb"
@@ -324,7 +330,7 @@ message TmdbDetails {
   TmdbEpisodeRef last_episode = 18;
   uint32 number_of_seasons = 19;
   repeated string creators = 20;
-  // Up to 12, those with a photo.
+  // The first 12 billed, with a photo or not; GetTmdbCast tells them all.
   repeated TmdbPerson cast = 21;
   // Up to 4 trailers and teasers on YouTube, Russian and official first.
   repeated TmdbVideo videos = 22;
@@ -338,6 +344,13 @@ message TmdbDetails {
   // A series' seasons, the specials left out.
   repeated TmdbSeasonRef seasons = 27;
   string release_date = 28;
+  // How many people GetTmdbCast tells.
+  uint32 cast_total = 29;
+}
+
+// Who is in a title on TMDB, as billed.
+message TmdbCast {
+  repeated TmdbPerson cast = 1;
 }
 
 enum TmdbStatus {
@@ -367,6 +380,7 @@ message TmdbSeasonRef {
 message TmdbPerson {
   string name = 1;
   string character = 2;
+  // Empty when TMDB has no photo.
   string profile_path = 3;
 }
 

@@ -257,18 +257,46 @@ func (s *Server) GetTmdbDetails(
 	if s.tmdb == nil {
 		return nil, status.Error(codes.Unimplemented, "TMDB is off")
 	}
-	kind := query.GetMediaType()
-	if kind != tmdb.KindMovie && kind != tmdb.KindTV {
-		return nil, status.Error(codes.InvalidArgument, `media_type must be "movie" or "tv"`)
-	}
-	if query.GetTmdbId() == 0 {
-		return nil, status.Error(codes.InvalidArgument, "tmdb_id is required")
+	kind, err := tmdbQuery(query)
+	if err != nil {
+		return nil, err
 	}
 	details, err := s.tmdb.Details(ctx, kind, query.GetTmdbId())
 	if err != nil {
 		return nil, tmdbStatus(err)
 	}
 	return tmdbDetails(details), nil
+}
+
+// GetTmdbCast tells who is in a title on TMDB, all of them.
+func (s *Server) GetTmdbCast(
+	ctx context.Context,
+	query *titlev1.GetTmdbDetailsQuery,
+) (*titlev1.TmdbCast, error) {
+	if s.tmdb == nil {
+		return nil, status.Error(codes.Unimplemented, "TMDB is off")
+	}
+	kind, err := tmdbQuery(query)
+	if err != nil {
+		return nil, err
+	}
+	cast, err := s.tmdb.Cast(ctx, kind, query.GetTmdbId())
+	if err != nil {
+		return nil, tmdbStatus(err)
+	}
+	return &titlev1.TmdbCast{Cast: tmdbPeople(cast)}, nil
+}
+
+// tmdbQuery is the kind of the title a query is of, checked.
+func tmdbQuery(query *titlev1.GetTmdbDetailsQuery) (string, error) {
+	kind := query.GetMediaType()
+	if kind != tmdb.KindMovie && kind != tmdb.KindTV {
+		return "", status.Error(codes.InvalidArgument, `media_type must be "movie" or "tv"`)
+	}
+	if query.GetTmdbId() == 0 {
+		return "", status.Error(codes.InvalidArgument, "tmdb_id is required")
+	}
+	return kind, nil
 }
 
 // GetTmdbSeason tells of a season of a series on TMDB.
@@ -310,6 +338,16 @@ func tmdbStatus(err error) error {
 	}
 }
 
+func tmdbPeople(people []tmdb.Person) []*titlev1.TmdbPerson {
+	result := make([]*titlev1.TmdbPerson, 0, len(people))
+	for _, person := range people {
+		result = append(result, &titlev1.TmdbPerson{
+			Name: person.Name, Character: person.Character, ProfilePath: person.Profile,
+		})
+	}
+	return result
+}
+
 func tmdbDetails(details tmdb.Details) *titlev1.TmdbDetails {
 	response := &titlev1.TmdbDetails{
 		Title: tmdbRef(details.Kind, details.ID), Name: details.Name, OriginalName: details.OriginalName,
@@ -320,11 +358,7 @@ func tmdbDetails(details tmdb.Details) *titlev1.TmdbDetails {
 		Directors: details.Directors, TitleId: details.TitleID,
 		Recommendations: tmdbRelated(details.Recommendations),
 	}
-	for _, person := range details.Cast {
-		response.Cast = append(response.Cast, &titlev1.TmdbPerson{
-			Name: person.Name, Character: person.Character, ProfilePath: person.Profile,
-		})
-	}
+	response.Cast, response.CastTotal = tmdbPeople(details.Cast[:min(len(details.Cast), tmdb.CastShown)]), uint32(len(details.Cast))
 	for _, video := range details.Videos {
 		response.Videos = append(response.Videos, &titlev1.TmdbVideo{
 			YoutubeKey: video.Key, Name: video.Name, Language: video.Language, Kind: video.Kind,

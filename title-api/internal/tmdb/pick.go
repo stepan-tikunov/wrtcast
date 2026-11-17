@@ -17,9 +17,11 @@ const (
 	StatusOther     = "other"
 )
 
-// How many people, videos and recommendations a title's page shows at most.
+// How many people, videos and recommendations a title's page shows at most;
+// all the people are kept, up to castKept, for the page of them all.
 const (
-	castLimit    = 12
+	CastShown    = 12
+	castKept     = 300
 	videoLimit   = 4
 	relatedLimit = 12
 )
@@ -349,7 +351,7 @@ func pickVideos(videos []video) []Video {
 	return result
 }
 
-// pickCast are the first people billed who have a photo.
+// pickCast are the people billed, with a photo or not.
 func pickCast(kind string, raw rawDetails) []Person {
 	cast := raw.Credits.Cast
 	if kind == KindTV {
@@ -357,15 +359,12 @@ func pickCast(kind string, raw rawDetails) []Person {
 	}
 	var result []Person
 	for _, member := range cast {
-		if member.ProfilePath == "" {
-			continue
-		}
 		character := member.Character
 		if len(member.Roles) > 0 {
 			character = member.Roles[0].Character
 		}
 		result = append(result, Person{Name: member.Name, Character: strings.TrimSpace(character), Profile: file(member.ProfilePath)})
-		if len(result) == castLimit {
+		if len(result) == castKept {
 			break
 		}
 	}
