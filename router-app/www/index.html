@@ -38,6 +38,7 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .card .open{display:block;width:100%;padding:0;border:0;background:none;text-align:left}
 .card img,.card i{display:block;width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--s2)}
 .card i{display:grid;place-items:center;color:#55555c;font:600 40px system-ui;font-style:normal}
+.pf{display:block;border-radius:12px}
 .card b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:7px;font-size:14px;font-weight:550}
 .card span{color:var(--mu);font-size:13px}
 .badge{position:absolute;top:6px;left:6px;padding:2px 7px;border-radius:6px;background:#000c;color:#ddd!important;font-size:11px!important;font-weight:600}
@@ -342,7 +343,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .card img{opacity:0;transition:opacity .35s}
 .card img.ld{opacity:1}
 .sk{display:block;aspect-ratio:2/3;border-radius:12px}
-.sk,.skl,.nop.ph,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
+.sk,.skl,.nop.ph,.pf.ph,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
 .skl{display:block;height:12px;margin-top:9px;border-radius:6px}
 .skl+.skl{width:40%}
 .badge.on{animation:bounce .35s ease-out}
@@ -1051,15 +1052,26 @@ function renderResults(results) {
 
 // Poster of a card, with a placeholder for titles without one or when it
 // fails to load. One the browser has already shows at once.
+// A poster in a frame that shimmers, as the search's placeholders do,
+// until the picture has loaded and faded in over it.
 function poster(m) {
   const ph = () => el('i', {}, (m.title || '?')[0]);
-  const img = m.poster
-    ? el('img', { src: m.poster, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer' })
-    : ph();
-  img.onerror = () => img.replaceWith(ph());
-  img.onload = () => img.classList.add('ld');
-  if (img.complete && img.naturalWidth) img.classList.add('ld');
-  return img;
+  if (!m.poster) return el('span', { className: 'pf' }, ph());
+  const img = el('img', { src: m.poster, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer' });
+  const frame = el('span', { className: 'pf ph' }, img);
+  img.onerror = () => {
+    img.replaceWith(ph());
+    frame.classList.remove('ph');
+  };
+  img.onload = () => {
+    img.classList.add('ld');
+    setTimeout(() => frame.classList.remove('ph'), 400); // once faded in
+  };
+  if (img.complete && img.naturalWidth) {
+    img.classList.add('ld');
+    frame.classList.remove('ph');
+  }
+  return frame;
 }
 
 const svgIcon = name => {
