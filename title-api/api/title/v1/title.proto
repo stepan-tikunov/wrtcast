@@ -37,6 +37,13 @@ service TitleService {
       body: "*"
     };
   }
+
+  rpc MarkEpisode(MarkEpisodeCommand) returns (MarkEpisodeCommandResponse) {
+    option (google.api.http) = {
+      post: "/v1/titles/{title_id}/marking"
+      body: "*"
+    };
+  }
 }
 
 enum MediaType {
@@ -190,3 +197,15 @@ message UpdateMarkingSettingsCommand {
   // A Claude API key, which is checked before it is kept; empty removes it.
   optional string api_key = 2;
 }
+
+// A series the viewer saved to watch: its episodes are marked from then on,
+// as of one played first (see GetPlaybackStreamsQuery.first_play), and the
+// episode it would start with is put in the queue alone, if the primary
+// player marks none of it.
+message MarkEpisodeCommand {
+  string title_id = 1;
+  int32 season_number = 2;
+  string episode_number = 3;
+}
+
+message MarkEpisodeCommandResponse {}

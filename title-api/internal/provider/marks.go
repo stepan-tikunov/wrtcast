@@ -49,11 +49,11 @@ func (c *Client) marked(title string, season int32, episode string) ([]Section, 
 }
 
 // unmarked are the episode of a series payload and the ones after it,
-// unmarkedAhead at most, that the primary player marks none of.
-func unmarked(title string, seasons []seriesSeason, season int32, episode seriesEpisode, marker string) []UnmarkedEpisode {
+// ahead at most, that the primary player marks none of.
+func unmarked(title string, seasons []seriesSeason, season int32, episode seriesEpisode, marker string, ahead int) []UnmarkedEpisode {
 	var result []UnmarkedEpisode
 	number := strings.TrimSpace(string(episode.Episode))
-	for step := 0; step <= unmarkedAhead; step++ {
+	for step := 0; step <= ahead; step++ {
 		if step > 0 {
 			next, after, ok := nextEpisode(seasons, season, number)
 			if !ok {
@@ -71,6 +71,51 @@ func unmarked(title string, seasons []seriesSeason, season int32, episode series
 		})
 	}
 	return result
+}
+
+// EpisodeToMark is the episode of a series, alone, if no primary player
+// marks it: as the first primary player that has it plays it.
+func (c *Client) EpisodeToMark(ctx context.Context, externalMovieID string, seasonNumber int32, episodeNumber string) ([]UnmarkedEpisode, error) {
+	episodeNumber = strings.TrimSpace(episodeNumber)
+	if seasonNumber < 0 || episodeNumber == "" {
+		return nil, fmt.Errorf("%w: season and episode are required", ErrEpisodeNotFound)
+	}
+	current, _, embedURLs, err := c.movieDocument(ctx, externalMovieID)
+	if err != nil {
+		return nil, err
+	}
+	var result []UnmarkedEpisode
+	series, found := false, false
+	for _, embedURL := range embedURLs {
+		embedHTML, _, err := c.get(ctx, current, embedURL, c.providerURL().String()+"/")
+		if err != nil {
+			continue
+		}
+		seasons, err := parseSeriesPayload(embedHTML)
+		if err != nil {
+			continue
+		}
+		series = true
+		episode, ok := findEpisode(seasons, seasonNumber, episodeNumber)
+		if !ok {
+			continue
+		}
+		found = true
+		if len(sections(episode.Sections)) > 0 {
+			return nil, nil
+		}
+		marker, err := parseDynamicMarker(embedHTML)
+		if result == nil && err == nil {
+			result = unmarked(externalMovieID, seasons, seasonNumber, episode, marker, 0)
+		}
+	}
+	if !series {
+		return nil, ErrNotSeries
+	}
+	if !found {
+		return nil, fmt.Errorf("%w: season %d episode %s", ErrEpisodeNotFound, seasonNumber, episodeNumber)
+	}
+	return result, nil
 }
 
 // Fetch loads a URL of the provider's players or their CDN, with the

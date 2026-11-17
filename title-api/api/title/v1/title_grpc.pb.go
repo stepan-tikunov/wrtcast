@@ -24,6 +24,7 @@ const (
 	TitleService_GetTitleDetails_FullMethodName       = "/title.v1.TitleService/GetTitleDetails"
 	TitleService_GetMarkingSettings_FullMethodName    = "/title.v1.TitleService/GetMarkingSettings"
 	TitleService_UpdateMarkingSettings_FullMethodName = "/title.v1.TitleService/UpdateMarkingSettings"
+	TitleService_MarkEpisode_FullMethodName           = "/title.v1.TitleService/MarkEpisode"
 )
 
 // TitleServiceClient is the client API for TitleService service.
@@ -35,6 +36,7 @@ type TitleServiceClient interface {
 	GetTitleDetails(ctx context.Context, in *GetTitleDetailsQuery, opts ...grpc.CallOption) (*GetTitleDetailsQueryResponse, error)
 	GetMarkingSettings(ctx context.Context, in *GetMarkingSettingsQuery, opts ...grpc.CallOption) (*MarkingSettings, error)
 	UpdateMarkingSettings(ctx context.Context, in *UpdateMarkingSettingsCommand, opts ...grpc.CallOption) (*MarkingSettings, error)
+	MarkEpisode(ctx context.Context, in *MarkEpisodeCommand, opts ...grpc.CallOption) (*MarkEpisodeCommandResponse, error)
 }
 
 type titleServiceClient struct {
@@ -95,6 +97,16 @@ func (c *titleServiceClient) UpdateMarkingSettings(ctx context.Context, in *Upda
 	return out, nil
 }
 
+func (c *titleServiceClient) MarkEpisode(ctx context.Context, in *MarkEpisodeCommand, opts ...grpc.CallOption) (*MarkEpisodeCommandResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkEpisodeCommandResponse)
+	err := c.cc.Invoke(ctx, TitleService_MarkEpisode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TitleServiceServer is the server API for TitleService service.
 // All implementations must embed UnimplementedTitleServiceServer
 // for forward compatibility.
@@ -104,6 +116,7 @@ type TitleServiceServer interface {
 	GetTitleDetails(context.Context, *GetTitleDetailsQuery) (*GetTitleDetailsQueryResponse, error)
 	GetMarkingSettings(context.Context, *GetMarkingSettingsQuery) (*MarkingSettings, error)
 	UpdateMarkingSettings(context.Context, *UpdateMarkingSettingsCommand) (*MarkingSettings, error)
+	MarkEpisode(context.Context, *MarkEpisodeCommand) (*MarkEpisodeCommandResponse, error)
 	mustEmbedUnimplementedTitleServiceServer()
 }
 
@@ -128,6 +141,9 @@ func (UnimplementedTitleServiceServer) GetMarkingSettings(context.Context, *GetM
 }
 func (UnimplementedTitleServiceServer) UpdateMarkingSettings(context.Context, *UpdateMarkingSettingsCommand) (*MarkingSettings, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateMarkingSettings not implemented")
+}
+func (UnimplementedTitleServiceServer) MarkEpisode(context.Context, *MarkEpisodeCommand) (*MarkEpisodeCommandResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkEpisode not implemented")
 }
 func (UnimplementedTitleServiceServer) mustEmbedUnimplementedTitleServiceServer() {}
 func (UnimplementedTitleServiceServer) testEmbeddedByValue()                      {}
@@ -240,6 +256,24 @@ func _TitleService_UpdateMarkingSettings_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TitleService_MarkEpisode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkEpisodeCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TitleServiceServer).MarkEpisode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TitleService_MarkEpisode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TitleServiceServer).MarkEpisode(ctx, req.(*MarkEpisodeCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TitleService_ServiceDesc is the grpc.ServiceDesc for TitleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +300,10 @@ var TitleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateMarkingSettings",
 			Handler:    _TitleService_UpdateMarkingSettings_Handler,
+		},
+		{
+			MethodName: "MarkEpisode",
+			Handler:    _TitleService_MarkEpisode_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

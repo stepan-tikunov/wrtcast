@@ -145,6 +145,19 @@ video.m3u8
 	}
 	client.marks = nil
 
+	// A series saved: the episode it starts with alone, unless marked.
+	toMark, err := client.EpisodeToMark(ctx, seriesID, 8, "2")
+	if err != nil || len(toMark) != 1 || toMark[0].Season != 8 || toMark[0].Episode != "2" ||
+		!strings.Contains(toMark[0].Master, "/s8e2/master.m3u8?token=base&marker") {
+		t.Fatalf("EpisodeToMark(8, 2) = %+v, %v", toMark, err)
+	}
+	if toMark, err := client.EpisodeToMark(ctx, seriesID, 8, "1"); err != nil || len(toMark) != 0 {
+		t.Fatalf("EpisodeToMark(8, 1) = %+v, %v, want none", toMark, err)
+	}
+	if _, err := client.EpisodeToMark(ctx, seriesID, 8, "404"); !errors.Is(err, ErrEpisodeNotFound) {
+		t.Fatalf("EpisodeToMark(8, 404) error = %v, want ErrEpisodeNotFound", err)
+	}
+
 	if _, err := client.EpisodeStreams(ctx, seriesID, 8, "404"); !errors.Is(err, ErrEpisodeNotFound) {
 		t.Fatalf("missing episode error = %v, want ErrEpisodeNotFound", err)
 	}
@@ -155,6 +168,9 @@ video.m3u8
 	movieID := client.ExternalTitleID("42185")
 	if _, err := client.Series(ctx, movieID); !errors.Is(err, ErrNotSeries) {
 		t.Fatalf("movie Series() error = %v, want ErrNotSeries", err)
+	}
+	if _, err := client.EpisodeToMark(ctx, movieID, 1, "1"); !errors.Is(err, ErrNotSeries) {
+		t.Fatalf("movie EpisodeToMark() error = %v, want ErrNotSeries", err)
 	}
 	if _, err := client.EpisodeStreams(ctx, movieID, 1, "1"); !errors.Is(err, ErrNotSeries) {
 		t.Fatalf("movie EpisodeStreams() error = %v, want ErrNotSeries", err)

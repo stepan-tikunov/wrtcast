@@ -206,7 +206,7 @@ func (c *Client) EpisodeStreams(
 		// The first primary player's video is the one marked.
 		if !unmarkedSeen {
 			unmarkedSeen = true
-			unmarkedEpisodes = unmarked(externalMovieID, seasons, seasonNumber, episode, marker)
+			unmarkedEpisodes = unmarked(externalMovieID, seasons, seasonNumber, episode, marker, unmarkedAhead)
 		}
 		stream, streamErr := c.streamFromHLS(
 			ctx,

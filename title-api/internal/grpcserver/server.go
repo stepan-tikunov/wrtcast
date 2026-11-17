@@ -189,6 +189,37 @@ func (s *Server) UpdateMarkingSettings(
 	return markingSettings(settings), nil
 }
 
+// MarkEpisode tells marking of a series saved to watch, and has the episode
+// it would start with marked, while marking is on.
+func (s *Server) MarkEpisode(
+	ctx context.Context,
+	command *titlev1.MarkEpisodeCommand,
+) (*titlev1.MarkEpisodeCommandResponse, error) {
+	if command.GetTitleId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "title_id is required")
+	}
+	if command.GetSeasonNumber() < 0 || strings.TrimSpace(command.GetEpisodeNumber()) == "" {
+		return nil, status.Error(codes.InvalidArgument, "season_number and episode_number are required")
+	}
+	if s.marking == nil {
+		return nil, status.Error(codes.Unimplemented, "marking is off")
+	}
+	s.marking.Opened(ctx, command.GetTitleId())
+	settings, err := s.marking.Settings(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if !settings.Enabled || !settings.KeySet {
+		return &titlev1.MarkEpisodeCommandResponse{}, nil
+	}
+	episodes, err := s.client.EpisodeToMark(ctx, command.GetTitleId(), command.GetSeasonNumber(), command.GetEpisodeNumber())
+	if err != nil {
+		return nil, providerStatus(err)
+	}
+	s.marking.Unmarked(episodes)
+	return &titlev1.MarkEpisodeCommandResponse{}, nil
+}
+
 func markingSettings(settings marking.Settings) *titlev1.MarkingSettings {
 	return &titlev1.MarkingSettings{
 		Enabled: settings.Enabled,
