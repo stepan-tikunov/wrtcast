@@ -22,7 +22,7 @@ svg{width:24px;height:24px;fill:currentColor;flex:none}
 
 header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));background:linear-gradient(var(--bg) 70%,#0e0e1000)}
 #f{position:relative;flex:1}
-#devbtn{width:46px;height:46px;border-radius:14px;background:var(--s2);color:var(--mu)}
+#devbtn,#mkbtn{width:46px;height:46px;border-radius:14px;background:var(--s2);color:var(--mu)}
 #devbtn.on{color:var(--ac)}
 #f svg{position:absolute;left:14px;top:13px;width:20px;height:20px;color:var(--mu)}
 #q{width:100%;height:46px;padding:0 46px 0 42px;border:0;border-radius:14px;background:var(--s2);outline:none;font-size:17px;-webkit-user-select:text;user-select:text}
@@ -175,7 +175,13 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .sw input::before{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--tx);transition:transform .2s}
 .sw input:checked{background:var(--ac)}
 .sw input:checked::before{transform:translateX(18px)}
-#stop{display:block;margin:4px auto 0;padding:10px 16px;border:0;background:none;color:var(--err);font-size:15px}
+#stop,#mkdel{display:block;margin:4px auto 0;padding:10px 16px;border:0;background:none;color:var(--err);font-size:15px}
+.sw input:disabled{opacity:.4}
+.hint{margin:0 2px 4px;color:var(--mu);font-size:13px;line-height:1.4}
+.hint.err{color:var(--err)}
+#mkkey{flex:1;min-width:0;height:46px;padding:0 14px;border:0;border-radius:14px;background:var(--s2);outline:none;font-size:16px;-webkit-user-select:text;user-select:text}
+#mkkey:focus{box-shadow:0 0 0 2px var(--ac)}
+#mkf .pill{flex:none;height:46px}
 .spin{width:14px;height:14px;border:2px solid var(--mu);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -325,10 +331,11 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
 
-<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg></button></header>
+<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg></button><button class="ib" id="mkbtn" aria-label="Разметка серий"><svg><use href="#i-gear"/></svg></button></header>
 <h2 id="rtitle" hidden>Недавно смотрели</h2>
 <main id="grid"></main>
 <p class="note" id="msg"><svg><use href="#i-tv"/></svg><span>Найдите фильм или сериал и запустите его на ТВ</span></p>
@@ -408,6 +415,15 @@ svg.spring{animation:spring .3s ease-out}
   <div class="opt"><label>Шрифт</label><div id="styfont"></div></div>
   <button id="styreset">Сбросить</button>
 </section>
+<section id="mk" class="sheet" hidden>
+  <div class="handle"></div>
+  <h2><span>Разметка серий</span></h2>
+  <p class="hint">Повтор, заставку и титры серий, которые источник не разметил, отметит Claude: у сериалов, впервые запущенных с этого дня, — текущую серию и две следующие.</p>
+  <div class="row"><label class="sw"><span>Размечать в фоне<small id="mkstate"></small></span><input type="checkbox" id="mkon"></label></div>
+  <form class="row" id="mkf"><input id="mkkey" type="password" autocomplete="off" spellcheck="false" autocapitalize="off"><button class="pill" id="mksave">Сохранить</button></form>
+  <p class="hint err" id="mkerr" hidden></p>
+  <button id="mkdel" hidden>Удалить ключ</button>
+</section>
 <div id="toast"></div>
 
 <script>
@@ -425,7 +441,7 @@ let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF defaul
 let devices = null;     // last /devices answer
 let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null = receiver default
 localStorage.removeItem('subStyle'); // older format with colors
-const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs' }; // layer name -> bottom sheet
+const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs', mk: 'mk' }; // layer name -> bottom sheet
 let recent = [];        // /progress list: recently watched titles, latest first
 let searching = 0;      // number of the search shown; 0 = the recent titles are
 let query = '';         // query of the search shown
@@ -2349,6 +2365,53 @@ $('devbtn').onclick = () => {
   loadDevices(true);
 };
 $('devname').onclick = $('devbtn').onclick;
+
+// ---- marking ----------------------------------------------------------------
+//
+// title-api marks the recap, the intro and the credits of the episodes the
+// provider leaves unmarked, with Claude, once given a key (see /marking).
+let marking = null; // { enabled, key, hint, error } or null while loading
+
+// error: why the last request failed, else the marking's own last error.
+function renderMarking(error) {
+  const m = marking;
+  $('mkon').checked = !!m?.enabled;
+  $('mkon').disabled = !m?.key;
+  $('mkstate').textContent = !m ? 'Загрузка…' : !m.key ? 'Сначала задайте ключ' : m.enabled ? 'Включено' : 'Выключено';
+  $('mkkey').placeholder = m?.key ? `Ключ задан: …${m.hint}` : 'Ключ API Claude (sk-ant-…)';
+  $('mkdel').hidden = !m?.key;
+  const e = error || (m?.error && 'Последняя ошибка: ' + m.error);
+  $('mkerr').hidden = !e;
+  $('mkerr').textContent = e || '';
+}
+
+async function setMarking(body) {
+  try {
+    marking = await api('marking', body);
+    renderMarking();
+    return true;
+  } catch (e) {
+    renderMarking(e.message);
+    return false;
+  }
+}
+
+$('mkbtn').onclick = () => {
+  openLayer('mk');
+  renderMarking();
+  setMarking();
+};
+$('mkon').onchange = e => setMarking({ on: e.target.checked ? '1' : '0' });
+// A key saved turns the marking on.
+$('mkf').onsubmit = async e => {
+  e.preventDefault();
+  const key = $('mkkey').value.trim();
+  if (!key) return;
+  $('mksave').disabled = true;
+  if (await setMarking({ key, on: '1' })) $('mkkey').value = '';
+  $('mksave').disabled = false;
+};
+$('mkdel').onclick = () => confirm('Удалить ключ?') && setMarking({ key: '' });
 $('devscan').onclick = () => loadDevices(true);
 $('styb').onclick = () => {
   openLayer('sty');

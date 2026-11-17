@@ -392,6 +392,23 @@ function api_try(path) {
 	}
 }
 
+// A POST of body, as JSON, to title-api: { status, out } as api has them.
+// The body goes through a pipe, never on a command line or into a file,
+// as it may carry a key; only the answer is written to /tmp.
+function api_post(path, body) {
+	let f = ERR + clock()[1];
+	let p = popen(`uclient-fetch -T 20 -O ${shq(f)} --header='Content-Type: application/json' ` +
+		`--post-file=/dev/stdin ${shq(API + path)} 2>${shq(f + '.e')}`, 'w');
+	if (!p)
+		return { status: 0, out: '' };
+	p.write(sprintf('%J', body));
+	p.close();
+	let m = match(readfile(f + '.e') ?? '', /HTTP error ([0-9]+)/), out = trim(readfile(f) ?? '');
+	unlink(f);
+	unlink(f + '.e');
+	return { status: m ? +m[1] : out == '' ? 0 : 200, out };
+}
+
 const SECTION_KINDS = { KIND_RECAP: 'recap', KIND_INTRO: 'intro', KIND_CREDITS: 'credits' };
 
 // title-api's sections of a movie or an episode: [{ kind: recap, intro or
@@ -693,10 +710,13 @@ function title_id(p) {
 	return p.id;
 }
 
-// Streams of a movie, or of an episode when season is given.
+// Streams of a movie, or of an episode when season is given. A series
+// never watched is told to title-api as played first: it marks the
+// episodes of those (see /marking).
 function streams(id, season, episode) {
 	let r = api(`/v1/titles/${id}/playback-streams` + (season == null ? '' :
-		`?season_number=${season}&episode_number=${urlenc(episode)}`));
+		`?season_number=${season}&episode_number=${urlenc(episode)}` +
+		(title_row(id) ? '' : '&first_play=true')));
 	return map(r.streams ?? [], (s, i) => ({
 		index: i,
 		name: s.name || `Плеер ${i + 1}`,
@@ -2495,6 +2515,10 @@ function wake(key, token) {
 	}
 }
 
+const marking = r => ({
+	enabled: !!r?.enabled, key: !!r?.keySet, hint: r?.keyHint || null, error: r?.error || null,
+});
+
 const routes = {
 	'GET /search': p => {
 		let q = trim(p.q ?? '');
@@ -2622,6 +2646,33 @@ const routes = {
 			now_set(key, now);
 		}
 		return with_now(castctl(dev, 'status'), dev);
+	},
+
+	// title-api's marking of the episodes the provider marks none of:
+	// { enabled, key, hint, error }, the key only told whether it is set
+	// and by its last characters.
+	'GET /marking': p => marking(api('/v1/marking')),
+
+	// Turns the marking on or off (on), sets the Claude API key (key) or
+	// removes it (key '').
+	'POST /marking': p => {
+		let body = {};
+		if (p.on != null) {
+			if (!match(p.on, /^[01]$/))
+				fail(400, 'invalid on');
+			body.enabled = p.on == '1';
+		}
+		if (p.key != null) {
+			if (!match(p.key, /^[!-~]{0,256}$/))
+				fail(400, 'invalid key');
+			body.apiKey = p.key;
+		}
+		let r = api_post('/v1/marking', body);
+		if (r.status == 400)
+			fail(400, 'Ключ не подошёл');
+		if (r.status != 200)
+			fail(502, 'title-api request failed' + (r.status ? ` (HTTP ${r.status})` : ''));
+		return marking(json(r.out));
 	},
 
 	'POST /cmd': p => {
