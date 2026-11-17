@@ -148,6 +148,26 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .attr{display:flex;align-items:center;gap:8px;color:#6b6b72;font-size:11px;line-height:1.3}
 .attr b{flex:none;padding:2px 6px;border-radius:4px;background:linear-gradient(90deg,#90cea1,#01b4e4);color:#0d253f;font-size:11px}
 #dattr{margin:28px 16px 0;padding-top:12px;border-top:1px solid var(--s2)}
+/* The trailers, the collection and what is like the title: rows of tiles,
+   wide frames or posters, that scroll. */
+#dmore{padding:0 16px}
+#dmore .dh{margin-top:26px}
+.row{display:flex;gap:10px;overflow-x:auto;margin:0 -16px;padding:0 16px 4px;scrollbar-width:none}
+.row::-webkit-scrollbar{display:none}
+.tile{flex:none;width:150px;padding:0;border:0;background:none;color:var(--tx);font-size:13px;line-height:1.3;text-align:left;text-decoration:none;cursor:pointer;transition:transform .12s}
+.tile:active{transform:scale(.96)}
+.tile.tall{width:108px}
+.tile .st{margin-bottom:6px;border-radius:8px}
+.tile.tall .st{aspect-ratio:2/3}
+.tile .st>b{color:#55555c;font-size:28px}
+.tile .st svg{width:32px;height:32px;color:#55555c}
+.tile>b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:550;overflow-wrap:anywhere}
+.tile>span{display:block;margin-top:2px;color:var(--mu);font-size:12px}
+.tile.here{cursor:default}
+.tile.here .st{outline:2px solid var(--ac);outline-offset:-2px}
+.tile.here>span{color:var(--ac)}
+.ep.x.info{cursor:default}
+.ep.x.info:active{transform:none}
 #mk .attr{margin:10px 2px 0}
 .facts{color:var(--mu);font-size:14px}
 .facts div{margin:4px 0}
@@ -370,7 +390,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 #det,#list,#cast{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
 #det.out,#list.out,#cast.out{animation:slideout .2s ease-in forwards}
 #dposter{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards}
-#dinfo>*,.rt,#dlogo,#dacts>*{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
+#dinfo>*,#dmore>*,.rt,#dlogo,#dacts>*{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
 /* Drawn again as TMDB answers, what was there doesn't pop up anew. */
 #det .still,.person.still{animation:none}
 #det h1,#dmeta,#dplay{animation:pop .4s .1s cubic-bezier(.2,.8,.2,1) backwards}
@@ -430,6 +450,10 @@ svg.spring{animation:spring .3s ease-out}
   #det.bd #dlogo{--lh:120px;width:min(100%,calc(var(--lh) * var(--a,3)));margin:0 0 16px}
   #dinfo{padding:8px var(--dgut) 4px}
   .cast{gap:12px;margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
+  #dmore{padding:0 var(--dgut)}
+  .row{gap:14px;margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
+  .tile{width:220px;font-size:14px}
+  .tile.tall{width:140px}
   .cast div{width:96px;font-size:13px}
   .cast img,.cast .nop{width:80px;height:80px}
   .cast button{width:96px;font-size:13px}
@@ -512,6 +536,7 @@ svg.spring{animation:spring .3s ease-out}
   <div id="dinfo"></div>
   <div id="seasons"></div>
   <div id="eps"></div>
+  <div id="dmore"></div>
   <p class="attr" id="dattr" hidden><b>TMDB</b>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
 </section>
 
@@ -1010,13 +1035,15 @@ function closeLayer() {
 //
 // / is the watch history, /search?q=<query> a search, /recent and /saved
 // the page of all the titles of a section of the main page (see openList),
-// /title/<id> a title's page over any of them, /title/<id>/cast the page
-// of its cast over it.
+// /title/<id> a title's page over any of them, /tmdb/<movie|tv>/<id> the
+// page of a title of TMDB alone (see openTmdb), <either>/cast the page of
+// its cast over it. A title opened from another's page is over it in the
+// history (hop), the same overlay.
 
 const titleUrl = id => '/title/' + encodeURIComponent(id);
 const searchUrl = q => '/search?q=' + encodeURIComponent(q);
 const urlTitle = () => /^\/title\/([^/]+)(\/cast)?$/.exec(location.pathname)?.[1];
-const urlCast = () => /^\/title\/[^/]+\/cast$/.test(location.pathname);
+const urlCast = () => /^\/(title\/[^/]+|tmdb\/(movie|tv)\/[0-9]+)\/cast$/.test(location.pathname);
 const urlList = () => /^\/(recent|saved)$/.exec(location.pathname)?.[1];
 const urlQuery = () => location.pathname == '/search' && new URLSearchParams(location.search).get('q') || '';
 
@@ -1027,26 +1054,27 @@ function route() {
   // way back would bring them back.
   const caughtUp = backs > 0;
   if (caughtUp && --backs) return;
-  const depth = history.state?.depth || 0, id = urlTitle(), kind = urlList();
+  const depth = history.state?.depth || 0, id = urlTitle(), only = urlTmdb(), kind = urlList();
+  const page = id || only;
   while (layers.length > depth) closeLayer();
   // Forward to a title or a list, or a reload, leaves the page to open
   // again; a title opens over the list it was opened from.
-  if (!id && layers.includes('det') || !id && !kind && layers.includes('list'))
+  if (!page && layers.includes('det') || !page && !kind && layers.includes('list'))
     while (layers.length) closeLayer();
-  if (id && !layers.includes('det')) {
+  if (page && !layers.includes('det')) {
     while (layers.length && layers.at(-1) != 'list') closeLayer();
     layers.push('det');
     showLayer('det', true);
   }
   // The cast over the title's page.
-  const cast = !!id && urlCast();
+  const cast = !!page && urlCast(), key = id ? decodeURIComponent(id) : only && `tmdb:${only.type}:${only.id}`;
   if (!cast) while (layers.includes('cast')) closeLayer();
   if (cast && !layers.includes('cast')) {
     while (layers.at(-1) != 'det') closeLayer();
     layers.push('cast');
     showLayer('cast', true);
   }
-  if (cast && castShown != decodeURIComponent(id)) showCast(decodeURIComponent(id));
+  if (cast && castShown != key) showCast(key);
   if (kind && !layers.includes('list')) {
     while (layers.length) closeLayer();
     layers.push('list');
@@ -1054,6 +1082,7 @@ function route() {
   }
   if (kind && listShown != kind) showList(kind);
   if (id && item?.id != decodeURIComponent(id)) openDetails({ id: decodeURIComponent(id) });
+  if (only && !(item?.tmdbOnly && pageKey(item) == key)) openTmdb(only);
   // Overlays forward of here are not brought back.
   if (depth != layers.length) history.replaceState({ ...history.state, depth: layers.length }, '');
   const q = urlQuery();
@@ -1509,6 +1538,7 @@ function keepTop(draw) {
 function showTmdb(m, t, x) {
   m.tm = x;
   renderArt(t, x);
+  renderMore(x);
   $('dattr').hidden = false;
   // Come after the season was shown: its stills, a season coming.
   if (m.seasons?.includes(season)) showSeason(season, true);
@@ -1527,34 +1557,16 @@ $('dposter').onload = $('dposter').onerror = e => {
 // m comes from search results (id, title, year, poster); whether it is a movie
 // or a series is only known once /title answers. Until then the page shows
 // placeholders where its parts will be; opened by its address it knows only the id.
-async function openDetails(m) {
-  item = m;
-  $('det').classList.add('loading');
-  $('dtitle').replaceChildren(m.title || skl(70));
-  $('dmeta').replaceChildren(...sklLines(55), el('div', { className: 'rt' }, el('span', { className: 'skl' }), el('span', { className: 'skl' })));
-  const showPoster = p => {
-    $('dposter').src = p || BLANK;
-    $('dposter').classList.add('loading'); // until the picture comes
-    $('dbg').style.backgroundImage = p ? `url("${p}")` : 'none';
-  };
-  showPoster(m.poster);
-  $('dposter').hidden = false;
-  $('dplay').hidden = false;
-  $('dplay').disabled = true;
-  $('dplab').textContent = 'Смотреть на ТВ'; // the width of the button on desktop
-  $('dpbar').style.width = 0;
-  clearArt();
-  m.tm = null;
-  $('dsave').dataset.id = m.id;
-  $('dsave').disabled = true; // until its name is known, for the saved list
-  showSaved($('dsave'));
-  $('dfrom0').hidden = true;
-  $('seasons').replaceChildren();
-  $('eps').replaceChildren();
-  $('dinfo').replaceChildren(el('p', { id: 'ddesc' }, ...sklLines(100, 100, 100, 70)),
-    el('div', { className: 'facts' }, ...sklLines(45, 35, 85)));
-  // The blurred backdrop overflows .top; older engines can still scroll it.
-  $('det').scrollTop = $('det').firstElementChild.scrollTop = 0;
+// quiet: the page of a TMDB title found on the provider (see lookUp), drawn
+// over as it is, without placeholders.
+async function openDetails(m, quiet) {
+  if (quiet) {
+    item = m;
+    m.tm = null;
+    $('dsave').dataset.id = m.id;
+    $('dsave').hidden = false;
+    showSaved($('dsave'));
+  } else skeleton(m);
   // From the player the page may already be open with another title.
   if (!layers.includes('det')) openLayer('det', titleUrl(m.id));
   else if (urlTitle() != encodeURIComponent(m.id)) history.replaceState(history.state, '', titleUrl(m.id));
@@ -1565,14 +1577,7 @@ async function openDetails(m) {
     t = await title(m.id);
     ({ progress: m.progress = null, prefs: m.prefs = null } = await prog);
   } catch (e) {
-    if (item == m) {
-      $('det').classList.remove('loading');
-      $('dtitle').textContent = m.title || '';
-      $('dmeta').textContent = m.year || '';
-      $('dposter').hidden = !m.poster;
-      $('dplay').hidden = true;
-      $('dinfo').replaceChildren(el('p', { className: 'note' }, 'Не удалось загрузить'));
-    }
+    if (item == m) failed(m);
     return toast(e);
   }
   if (item != m) return;
@@ -1590,22 +1595,179 @@ async function openDetails(m) {
     });
   });
   // A saved poster can point at a host the provider has since left.
-  if (t.poster && t.poster != m.poster) showPoster(t.poster);
+  if (t.poster && t.poster != m.poster && !quiet) showPoster(t.poster);
   Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: t.poster || m.poster });
   $('det').classList.remove('loading');
   $('dsave').disabled = false;
   $('dposter').hidden = !m.poster;
   $('dtitle').textContent = t.title;
   keepTop(() => {
-      if (x) showTmdb(m, t, x);
-    renderInfo(t, x);
+    if (x) showTmdb(m, t, x);
+    renderInfo(t, x, quiet);
     renderDetails();
   });
   if (!t.tmdb) awaitMatch(m, t);
   if (t.type != 'series') return;
   const now = st?.now?.id == m.id ? st.now : null;
   const cont = continueAt(m);
-  showSeason(m.seasons.find(s => s.season == (now?.season ?? cont?.season)) || m.seasons[0]);
+  showSeason(m.seasons.find(s => s.season == (now?.season ?? cont?.season)) || m.seasons[0], quiet);
+}
+
+function showPoster(p) {
+  $('dposter').src = p || BLANK;
+  $('dposter').classList.add('loading'); // until the picture comes
+  $('dbg').style.backgroundImage = p ? `url("${p}")` : 'none';
+}
+
+// The page as it opens, with placeholders where its parts will be.
+function skeleton(m) {
+  item = m;
+  $('det').classList.add('loading');
+  $('dtitle').replaceChildren(m.title || skl(70));
+  $('dmeta').replaceChildren(...sklLines(55), el('div', { className: 'rt' }, el('span', { className: 'skl' }), el('span', { className: 'skl' })));
+  showPoster(m.poster);
+  $('dposter').hidden = false;
+  $('dplay').hidden = false;
+  $('dplay').disabled = true;
+  $('dplab').textContent = 'Смотреть на ТВ'; // the width of the button on desktop
+  $('dpbar').style.width = 0;
+  clearArt();
+  m.tm = null;
+  $('dsave').dataset.id = m.id;
+  $('dsave').disabled = true; // until its name is known, for the saved list
+  $('dsave').hidden = !!m.tmdbOnly; // not to be watched here
+  showSaved($('dsave'));
+  $('dfrom0').hidden = true;
+  $('seasons').replaceChildren();
+  $('eps').replaceChildren();
+  $('dmore').replaceChildren();
+  $('dinfo').replaceChildren(el('p', { id: 'ddesc' }, ...sklLines(100, 100, 100, 70)),
+    el('div', { className: 'facts' }, ...sklLines(45, 35, 85)));
+  // The blurred backdrop overflows .top; older engines can still scroll it.
+  $('det').scrollTop = $('det').firstElementChild.scrollTop = 0;
+}
+
+// The page of a title that failed to load.
+function failed(m) {
+  $('det').classList.remove('loading');
+  $('dtitle').textContent = m.title || '';
+  $('dmeta').textContent = m.year || '';
+  $('dposter').hidden = !m.poster;
+  $('dplay').hidden = true;
+  $('dinfo').replaceChildren(el('p', { className: 'note' }, 'Не удалось загрузить'));
+}
+
+// ---- titles of TMDB alone ----------------------------------------------
+//
+// A title of a collection or of the recommendations the provider is not
+// known to have opens a page of TMDB's alone, at /tmdb/<movie|tv>/<id>,
+// nothing on it to be played or saved, while title-api looks for it on the
+// provider (/tmdb/lookup); found, the page becomes the title's own.
+
+const tmdbUrl = r => `/tmdb/${r.type}/${r.id}`;
+const urlTmdb = () => {
+  const m = /^\/tmdb\/(movie|tv)\/([1-9][0-9]*)(\/cast)?$/.exec(location.pathname);
+  return m && { type: m[1], id: +m[2] };
+};
+// What the page keeps of a title, its title-api's ID or its TMDB's.
+const pageKey = m => m.tmdbOnly ? `tmdb:${m.tmdb.type}:${m.tmdb.id}` : m.id;
+
+// r: { type, id } and what is known of it (title, year, poster).
+async function openTmdb(r) {
+  const m = { id: null, tmdbOnly: true, tmdb: { type: r.type, id: +r.id }, title: r.title, year: r.year, poster: r.poster, lookup: 'pending' };
+  skeleton(m);
+  if (!layers.includes('det')) openLayer('det', tmdbUrl(m.tmdb));
+  else if (location.pathname != tmdbUrl(m.tmdb)) history.replaceState(history.state, '', tmdbUrl(m.tmdb));
+  const x = await tmdbOf(m);
+  if (item != m) return;
+  if (!x) return failed(m);
+  // The provider has it after all.
+  if (x.title_id) return openDetails({ id: x.title_id, title: x.title, year: x.year });
+  const t = tmdbTitle(x);
+  if (x.poster != m.poster) showPoster(x.poster);
+  Object.assign(m, { type: t.type, seasons: t.seasons, title: t.title, year: t.year, poster: x.poster });
+  $('det').classList.remove('loading');
+  $('dposter').hidden = !m.poster;
+  $('dtitle').textContent = t.title;
+  keepTop(() => {
+    showTmdb(m, t, x);
+    renderInfo(t, x);
+    renderDetails();
+  });
+  if (m.seasons) showSeason(m.seasons[0] || null);
+  lookUp(m);
+}
+
+// A title of TMDB as the page draws a title of the provider's.
+const tmdbTitle = x => ({
+  title: x.title, original: x.original, year: x.year, type: x.type == 'tv' ? 'series' : 'movie',
+  seasons: x.type == 'tv' ? x.seasons.filter(s => s.season > 0 && s.episodes).map(s => ({ season: s.season, episodes: [], only: true })) : null,
+  duration: x.runtime * 60 || 0, countries: x.countries, genres: x.genres, directors: x.directors, actors: [],
+  ratings: x.rating ? [{ source: 'TMDB', value: x.rating }] : [], description: x.overview,
+});
+
+// Asks title-api to look for the title on the provider, as long as it
+// does, a minute at most (each ask waits up to 15 s).
+async function lookUp(m) {
+  for (let i = 0; i < 4 && item == m; i++) {
+    let r;
+    try {
+      r = await api(`tmdb/lookup?type=${m.tmdb.type}&id=${m.tmdb.id}`, {});
+    } catch {
+      break;
+    }
+    if (item != m) return;
+    if (r.state == 'found' && r.title_id) {
+      const x = tmdbs[m.tmdb.type + m.tmdb.id];
+      if (x) x.title_id = r.title_id;
+      history.replaceState(history.state, '', titleUrl(r.title_id));
+      return openDetails({ id: r.title_id, title: m.title, year: m.year, poster: m.poster }, true);
+    }
+    if (r.state != 'pending') break;
+  }
+  if (item != m) return;
+  m.lookup = 'none';
+  renderDetails();
+}
+
+// Another title from the page's, over it: back leads to this one again.
+function openRelated(r) {
+  if (item?.tm?.id == r.id && item.tm.type == r.type) return;
+  history.pushState({ depth: layers.length, hop: 1 }, '', r.title_id ? titleUrl(r.title_id) : tmdbUrl(r));
+  if (r.title_id) openDetails({ id: r.title_id, title: r.title, year: r.year });
+  else openTmdb(r);
+}
+
+// The trailers, the collection the title is of, and what TMDB recommends.
+function renderMore(x) {
+  const again = $('dmore').children.length > 0;
+  const row = (head, list) => el('section', { className: again ? 'still' : '' },
+    el('h2', { className: 'dh' }, head), el('div', { className: 'row' }, ...list));
+  const parts = x.collection?.parts ?? [];
+  $('dmore').replaceChildren(...[
+    x.trailers.length && row('Трейлеры', x.trailers.map(v =>
+      el('a', { className: 'tile', href: v.url, target: '_blank', rel: 'noopener' }, still(v.thumb, svgIcon('film')),
+        el('b', {}, v.name), el('span', {}, v.lang == 'ru' ? 'рус.' : 'оригинал')))),
+    parts.length > 1 && row(x.collection.name, parts.map(r => {
+      const here = r.id == x.id && r.type == x.type;
+      const seen = !!r.title_id && recent.some(e => e.id == r.title_id && e.done);
+      return related(r, here, here ? 'Вы здесь' : seen ? 'Просмотрено' : when(r), seen);
+    })),
+    x.recommendations.length && row('Похожее', x.recommendations.map(r => related(r, false, when(r), false, true))),
+  ].filter(Boolean));
+}
+
+// A title of TMDB's is out: its year, or when it comes out.
+const when = r => r.date > today() ? 'Выйдет ' + day(r.date) : r.year || '';
+
+// A tile of a title the page lists: a frame wide (its backdrop) or tall (its poster).
+function related(r, here, under, seen, tall) {
+  const pic = still(tall ? r.poster : r.backdrop || r.poster, (r.title || '?')[0]);
+  if (seen) pic.append(el('i', { className: 'ok' }, svgIcon('check')));
+  const b = el('button', { className: 'tile' + (tall ? ' tall' : '') + (here ? ' here' : '') }, pic,
+    el('b', {}, r.title || ''), ...(under ? [el('span', {}, under)] : []));
+  b.onclick = () => openRelated(r);
+  return b;
 }
 
 // The episode to go on with and where: the last one watched, or the one
@@ -1643,6 +1805,15 @@ function renderDetails() {
   const trailer = item.tm?.trailers?.[0];
   $('dtrailer').hidden = !trailer;
   if (trailer) $('dtrailer').href = trailer.url;
+  if (item.tmdbOnly) {
+    $('dplay').hidden = false;
+    $('dplay').disabled = true;
+    $('dplay').classList.remove('ac');
+    $('dplab').textContent = item.lookup == 'pending' ? 'Ищем у провайдера…' : 'Нет у провайдера';
+    $('dpbar').style.width = 0;
+    $('dfrom0').hidden = true;
+    return;
+  }
   const on = st?.media && st.now?.id == item.id;
   const starting = pending?.id == item.id || asking?.id == item.id;
   const t = playTarget(item);
@@ -1706,8 +1877,9 @@ async function loadSeason(m, s) {
 // coming after them; null where the numbering can't be told to agree: a
 // number the provider joins (1-2) or TMDB hasn't, or the provider short of
 // what has come out by more than it may lag. Of a season only TMDB has, what
-// it has coming.
+// it has coming; of a title of TMDB alone, all its episodes.
 function matchSeason(s, eps) {
+  if (s.only) return { eps: [], coming: eps };
   if (s.coming) return { eps: [], coming: eps.filter(e => e.upcoming && e.date) };
   const by = new Map(eps.map(e => [String(e.episode), e]));
   const out = eps.filter(e => !e.upcoming).length;
@@ -1798,14 +1970,20 @@ function renderEpisodes(how) {
     };
     return row;
   });
-  // What TMDB has coming: dim, with nothing to play.
+  // What TMDB has coming, dim, and of a title of TMDB alone what it has
+  // out: nothing to play.
   rows.push(...(x?.coming ?? []).map(t => {
-    const name = epTitle(t.title);
-    return el('div', { className: 'ep x soon' }, still(t.still, t.episode),
+    const name = epTitle(t.title), desc = t.overview && el('p', { className: 'eo' }, t.overview);
+    if (desc) desc.onclick = () => desc.classList.toggle('full');
+    return el('div', { className: 'ep x ' + (t.upcoming ? 'soon' : 'info') }, still(t.still, t.episode),
       el('div', { className: 'eh' }, el('b', {}, name ? `${t.episode}. ${name}` : `Серия ${t.episode}`),
-        el('small', {}, 'Выйдет ' + day(t.date))),
-      ...(t.overview ? [el('p', { className: 'eo' }, t.overview)] : []));
+        el('small', {}, t.upcoming ? (t.date ? 'Выйдет ' + day(t.date) : 'Ещё не вышла') :
+          [t.runtime && duration(t.runtime * 60), t.date && aired(t.date)].filter(Boolean).join(' · '))),
+      ...(desc ? [desc] : []));
   }));
+  // A season of TMDB alone, until it comes.
+  if (s.only && x === undefined) rows.push(...[0, 1, 2].map(() => el('div', { className: 'ep x info' },
+    el('span', { className: 'st ph' }), el('div', { className: 'eh' }, skl(60), skl(30)))));
   rows.forEach((r, i) => {
     if (how == 'anim') r.classList.add('anim');
     r.style.setProperty('--i', i);
@@ -1816,7 +1994,8 @@ function renderEpisodes(how) {
 // Without start the router resumes where it was left off.
 $('dplay').onclick = () => start(playTarget(item));
 $('dfrom0').onclick = () => start({ ...playTarget(item), start: 0 });
-$('dback').onclick = closeTop;
+// Back to the title this one was opened from, else off the page.
+$('dback').onclick = () => history.state?.hop ? history.back() : closeTop();
 $('dsave').onclick = () => item && toggleSave(item);
 
 // ---- cast ---------------------------------------------------------------
@@ -1826,23 +2005,25 @@ const casts = {};       // /tmdb/cast answers by type and TMDB ID
 
 function openCast() {
   if (!item?.tm) return;
-  showCast(item.id);
-  openLayer('cast', titleUrl(item.id) + '/cast');
+  showCast(pageKey(item));
+  openLayer('cast', (item.tmdbOnly ? tmdbUrl(item.tmdb) : titleUrl(item.id)) + '/cast');
 }
 
 // The cast of a title, all of it as TMDB bills it: the first ones the
 // title's page has at once, the rest as they come.
+// id: a page's key (see pageKey).
 async function showCast(id) {
   castShown = id;
+  const only = /^tmdb:(movie|tv):(\d+)$/.exec(id);
   $('cast').scrollTop = 0;
-  $('ctitle').textContent = titles[id]?.title || '';
+  $('ctitle').textContent = (only ? tmdbs[only[1] + only[2]] : titles[id])?.title || '';
   $('clist').replaceChildren();
-  if (item?.id == id && item.tm) renderCast(item.tm.cast);
+  if (item && pageKey(item) == id && item.tm) renderCast(item.tm.cast);
   try {
-    const t = await title(id), k = t.tmdb && t.tmdb.type + t.tmdb.id;
+    const t = only ? { tmdb: { type: only[1], id: only[2] } } : await title(id), k = t.tmdb && t.tmdb.type + t.tmdb.id;
     if (k && !(k in casts)) casts[k] = await api(`tmdb/cast?type=${t.tmdb.type}&id=${t.tmdb.id}`);
     if (castShown != id) return;
-    $('ctitle').textContent = t.title;
+    $('ctitle').textContent = t.title || tmdbs[k]?.title || '';
     renderCast(k && casts[k]?.cast || []);
   } catch (e) {
     if (castShown == id) toast(e);
@@ -3191,7 +3372,7 @@ $('qx').onclick = () => {
 };
 // Opened by a title's or a list's address, back leads to the history
 // underneath.
-if ((urlTitle() || urlList()) && !history.state) {
+if ((urlTitle() || urlTmdb() || urlList()) && !history.state) {
   const url = location.href;
   history.replaceState({ depth: 0 }, '', '/');
   history.pushState({ depth: 1 }, '', url);

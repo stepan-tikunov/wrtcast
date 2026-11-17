@@ -2884,6 +2884,23 @@ const routes = {
 		};
 	},
 
+	// Looks for a title of TMDB (type movie or tv, id) on the provider, as
+	// title-api does in the background, waiting up to 15 s: state pending
+	// (to be asked again), found, with the provider's title_id, or
+	// not_found.
+	'POST /tmdb/lookup': p => {
+		if (!match(p.type ?? '', /^(movie|tv)$/))
+			fail(400, 'invalid type');
+		let r = api_post(`/v1/tmdb/${p.type}/${tmdb_id(p)}/lookup`, {});
+		if (r.status != 200)
+			fail(502, 'title-api request failed' + (r.status ? ` (HTTP ${r.status})` : ''));
+		let j = json(r.out);
+		return {
+			state: { STATE_PENDING: 'pending', STATE_FOUND: 'found' }[j?.state] ?? 'not_found',
+			title_id: j?.titleId || null,
+		};
+	},
+
 	// Who is in a title on TMDB, all of them as billed; null as /tmdb/title.
 	'GET /tmdb/cast': p => {
 		if (!match(p.type ?? '', /^(movie|tv)$/))
