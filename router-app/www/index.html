@@ -120,8 +120,10 @@ header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;pa
 .cast::-webkit-scrollbar{display:none}
 .cast div{flex:none;width:76px;font-size:12px;line-height:1.25;text-align:center}
 .cast img{display:block;width:56px;height:56px;margin:0 auto 6px;border-radius:50%;object-fit:cover;background:var(--s2)}
-.cast b{display:block;font-weight:550}
-.cast span{display:block;margin-top:2px;color:var(--mu)}
+/* Two lines at most each; a long word (a nickname as a role) breaks. */
+.cast b,.cast span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.cast b{font-weight:550}
+.cast span{margin-top:2px;color:var(--mu)}
 /* TMDB's attribution, under a page drawn with it and with the key. */
 .attr{display:flex;align-items:center;gap:8px;color:#6b6b72;font-size:11px;line-height:1.3}
 .attr b{flex:none;padding:2px 6px;border-radius:4px;background:linear-gradient(90deg,#90cea1,#01b4e4);color:#0d253f;font-size:11px}
