@@ -75,7 +75,7 @@ func (m *Marker) Refine(ctx context.Context, video Video, cues []Cue, boundary B
 		result.Passes++
 		text := fmt.Sprintf("Find %s.\n\n%s", boundary.What, known)
 		question := fmt.Sprintf("Which is the first frame after the boundary: %s?", boundary.What)
-		if err := m.ask(ctx, refineSystem, framesContent(text, question, frames, cues), refineSchema, &answer); err != nil {
+		if err := m.ask(ctx, StageRefine, refineSystem, framesContent(text, question, frames, cues), refineSchema, &answer); err != nil {
 			return result, err
 		}
 		switch {

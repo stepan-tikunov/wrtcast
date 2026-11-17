@@ -34,7 +34,8 @@ type episodeResult struct {
 	Duration  float64            `json:"duration"`
 	Reference map[string]float64 `json:"reference"`
 	Result    marker.Result      `json:"result"`
-	Usage     marker.Usage       `json:"usage"`
+	// By model.
+	Usage map[string]marker.Usage `json:"usage"`
 }
 
 func runMark(args []string) error {
@@ -43,6 +44,7 @@ func runMark(args []string) error {
 	model := flags.String("model", "claude-sonnet-5-5", "model")
 	effort := flags.String("effort", "low", "effort")
 	language := flags.String("lang", "en,eng,ru,rus", "subtitle languages by preference")
+	stages := flags.String("stages", "", "models of some stages, as head=claude-sonnet-5-5:low,refine=...; stages: subtitles, head, tail, refine")
 	flags.Parse(args)
 	if *dir == "" {
 		return errors.New("usage: sectionlab run -dir DIR/<title> [s2e5 ...]")
@@ -59,7 +61,23 @@ func runMark(args []string) error {
 			}
 		}
 	}
-	m := &marker.Marker{Client: anthropic.NewClient(), Model: *model, Effort: anthropic.OutputConfigEffort(*effort)}
+	m := &marker.Marker{
+		Client: anthropic.NewClient(),
+		Model:  marker.Model{ID: *model, Effort: anthropic.OutputConfigEffort(*effort)},
+		Stages: map[marker.Stage]marker.Model{},
+	}
+	label := *model + "-" + *effort
+	if *stages != "" {
+		for _, item := range strings.Split(*stages, ",") {
+			stage, spec, ok := strings.Cut(item, "=")
+			if !ok {
+				return fmt.Errorf("stage %q: want stage=model[:effort]", item)
+			}
+			id, level, _ := strings.Cut(spec, ":")
+			m.Stages[marker.Stage(stage)] = marker.Model{ID: id, Effort: anthropic.OutputConfigEffort(level)}
+		}
+		label += "-" + strings.NewReplacer("=", "_", ":", "_", ",", "-").Replace(*stages)
+	}
 	stamp := time.Now().Format("20060102-150405")
 	var results []episodeResult
 	for _, name := range episodes {
@@ -70,23 +88,25 @@ func runMark(args []string) error {
 			continue
 		}
 		result.Episode = name
-		after := m.Usage()
-		result.Usage = marker.Usage{
-			Requests:     after.Requests - before.Requests,
-			InputTokens:  after.InputTokens - before.InputTokens,
-			OutputTokens: after.OutputTokens - before.OutputTokens,
+		result.Usage = map[string]marker.Usage{}
+		for id, after := range m.Usage() {
+			result.Usage[id] = marker.Usage{
+				Requests:     after.Requests - before[id].Requests,
+				InputTokens:  after.InputTokens - before[id].InputTokens,
+				OutputTokens: after.OutputTokens - before[id].OutputTokens,
+			}
 		}
 		runs := filepath.Join(*dir, name, "runs")
 		if err := os.MkdirAll(runs, 0o755); err != nil {
 			return err
 		}
-		if err := writeJSON(filepath.Join(runs, fmt.Sprintf("%s-%s-%s.json", stamp, *model, *effort)), result); err != nil {
+		if err := writeJSON(filepath.Join(runs, fmt.Sprintf("%s-%s.json", stamp, label)), result); err != nil {
 			return err
 		}
 		results = append(results, result)
 		printEpisode(result)
 	}
-	printSummary(results, *model)
+	printSummary(results)
 	return nil
 }
 
@@ -244,7 +264,7 @@ func diff(v, ref float64, ok bool) string {
 	return fmt.Sprintf("%+.2f", v-ref)
 }
 
-func printSummary(results []episodeResult, model string) {
+func printSummary(results []episodeResult) {
 	fmt.Printf("\n%d episodes\n", len(results))
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.AlignRight)
 	fmt.Fprintln(w, "boundary\tn\tsubs med\tscan med\tfinal med\tfinal max\t≤0.5 s\t≤1 s\tmissed\textra\t")
@@ -273,15 +293,24 @@ func printSummary(results []episodeResult, model string) {
 			median(rough), median(scan), median(end), maximum(end), within(end, 0.5), within(end, 1), missed, extra)
 	}
 	w.Flush()
-	var usage marker.Usage
+	usage := map[string]marker.Usage{}
 	for _, r := range results {
-		usage.Requests += r.Usage.Requests
-		usage.InputTokens += r.Usage.InputTokens
-		usage.OutputTokens += r.Usage.OutputTokens
+		for id, u := range r.Usage {
+			total := usage[id]
+			total.Requests += u.Requests
+			total.InputTokens += u.InputTokens
+			total.OutputTokens += u.OutputTokens
+			usage[id] = total
+		}
 	}
-	price := prices[model]
-	cost := float64(usage.InputTokens)/1e6*price[0] + float64(usage.OutputTokens)/1e6*price[1]
-	fmt.Printf("%d requests, %d input and %d output tokens, $%.3f", usage.Requests, usage.InputTokens, usage.OutputTokens, cost)
+	cost := 0.0
+	for id, u := range usage {
+		price := prices[id]
+		modelCost := float64(u.InputTokens)/1e6*price[0] + float64(u.OutputTokens)/1e6*price[1]
+		cost += modelCost
+		fmt.Printf("%s: %d requests, %d input and %d output tokens, $%.3f\n", id, u.Requests, u.InputTokens, u.OutputTokens, modelCost)
+	}
+	fmt.Printf("$%.3f", cost)
 	if len(results) > 0 {
 		fmt.Printf(" ($%.3f an episode)", cost/float64(len(results)))
 	}

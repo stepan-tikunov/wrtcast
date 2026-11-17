@@ -16,6 +16,8 @@ const (
 	scanStep = 2.0
 	// The recap and the intro so close are made to meet.
 	joinGap = 5.0
+	// Credits that end so close to the video's end run to it.
+	creditsTail = 5.0
 )
 
 // Span is a part as a scan found it: the numbers of its first frame and of
@@ -110,11 +112,11 @@ func (m *Marker) Mark(ctx context.Context, video Video, cues []Cue, duration flo
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		headFrames, headErr = m.scan(ctx, video, cues, result.HeadRange, headSystem, headSchema, &result.Head)
+		headFrames, headErr = m.scan(ctx, StageHead, video, cues, result.HeadRange, headSystem, headSchema, &result.Head)
 	}()
 	go func() {
 		defer wg.Done()
-		tailFrames, tailErr = m.scan(ctx, video, cues, result.TailRange, tailSystem, tailSchema, &result.Tail)
+		tailFrames, tailErr = m.scan(ctx, StageTail, video, cues, result.TailRange, tailSystem, tailSchema, &result.Tail)
 	}()
 	wg.Wait()
 	if headErr != nil {
@@ -138,7 +140,8 @@ func (m *Marker) Mark(ctx context.Context, video Video, cues []Cue, duration flo
 	}
 	if tailErr == nil && tail.Credits.Present {
 		result.addNear("credits_start", "where the end credits begin: the first black frame after the story's last shot when black leads into the credit cards, or else the first frame with credit text over the picture", tailFrames, tail.Credits.First)
-		if tail.Credits.After == 0 {
+		// Credits ending a few frames before the video, on black, end with it.
+		if tail.Credits.After == 0 || tailFrames[min(tail.Credits.After, len(tailFrames))-1].Time >= duration-creditsTail {
 			result.Times["credits_end"] = duration
 		} else {
 			result.addNear("credits_end", "where the end credits end: the first frame after the last credit", tailFrames, tail.Credits.After)
@@ -191,7 +194,7 @@ func (r *Result) addNear(name, what string, frames []Frame, at int) {
 
 // scan shows the model the frames over span, at most maxFrames of them,
 // and reads its answer into result.
-func (m *Marker) scan(ctx context.Context, video Video, cues []Cue, span [2]float64, system string, schema map[string]any, result any) ([]Frame, error) {
+func (m *Marker) scan(ctx context.Context, stage Stage, video Video, cues []Cue, span [2]float64, system string, schema map[string]any, result any) ([]Frame, error) {
 	decoded, err := video.Decode(ctx, span[0], span[1])
 	if err != nil {
 		return nil, err
@@ -199,7 +202,7 @@ func (m *Marker) scan(ctx context.Context, video Video, cues []Cue, span [2]floa
 	step := math.Max(scanStep, math.Ceil((span[1]-span[0])/maxFrames*2)/2)
 	frames := sample(decoded, span[0], span[1], step)
 	text := fmt.Sprintf("Frames every %.1f s from %.1f to %.1f s.", step, span[0], span[1])
-	if err := m.ask(ctx, system, framesContent(text, "Mark the parts.", frames, cues), schema, result); err != nil {
+	if err := m.ask(ctx, stage, system, framesContent(text, "Mark the parts.", frames, cues), schema, result); err != nil {
 		return nil, err
 	}
 	return frames, nil

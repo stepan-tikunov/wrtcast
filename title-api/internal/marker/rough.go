@@ -71,6 +71,6 @@ func (m *Marker) Rough(ctx context.Context, cues []Cue, duration float64) (Rough
 		fmt.Fprintf(&text, "%.1f–%.1f (%.0f s)\n", gap.Start, gap.End, gap.End-gap.Start)
 	}
 	var result Rough
-	err := m.ask(ctx, roughSystem, []anthropic.ContentBlockParamUnion{anthropic.NewTextBlock(text.String())}, roughSchema, &result)
+	err := m.ask(ctx, StageSubtitles, roughSystem, []anthropic.ContentBlockParamUnion{anthropic.NewTextBlock(text.String())}, roughSchema, &result)
 	return result, err
 }
