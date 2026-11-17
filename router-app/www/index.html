@@ -148,7 +148,7 @@ header.stuck::before{bottom:-28px}
 /* The photo over it, faded in once loaded (see photo). */
 .nop img{position:absolute;inset:0;width:100%;height:100%;margin:0;border-radius:50%;object-fit:cover;opacity:0;transition:opacity .3s}
 .nop img.ld{opacity:1}
-.cast button{display:block;width:76px;padding:0;border:0;background:none;color:var(--mu);font-size:12px;cursor:pointer}
+.cast button{display:block;flex:none;align-self:flex-start;width:76px;padding:0;border:0;background:none;color:var(--mu);font-size:12px;cursor:pointer}
 .cast button .nop{color:var(--mu)}
 .dh.more{display:flex;align-items:center;gap:2px;cursor:pointer}
 .dh svg{width:20px;height:20px;color:var(--mu)}
@@ -447,6 +447,14 @@ svg.spring{animation:spring .3s ease-out}
   .lhead h1{font-size:24px}
   .card b{font-size:15px}
   #det .top{padding:24px var(--dgut) 36px}
+  /* The top's bottom, under its buttons, fades out (eased) along a flat
+     saucer, the blurred backdrop or poster across it with it: 96 px at the
+     middle, ending some 34 px higher at the sides (an ellipse's 600 px
+     high and half again as wide as the top, its lower half; above its
+     middle all shows). The room for it is under the text after the top,
+     laid over it. */
+  #det .top{padding-bottom:110px;-webkit-mask-image:radial-gradient(150% 600px at 50% calc(100% - 600px),#000000ff 84%,#000000f4 86%,#000000d7 88%,#000000ae 90%,#00000080 92%,#00000051 94%,#00000028 96%,#0000000b 98%,#00000000 100%),linear-gradient(#000 calc(100% - 600px),#0000 calc(100% - 600px));mask-image:radial-gradient(150% 600px at 50% calc(100% - 600px),#000000ff 84%,#000000f4 86%,#000000d7 88%,#000000ae 90%,#00000080 92%,#00000051 94%,#00000028 96%,#0000000b 98%,#00000000 100%),linear-gradient(#000 calc(100% - 600px),#0000 calc(100% - 600px))}
+  #dinfo{position:relative;margin-top:-74px}
   #det .hero{gap:28px}
   #dposter{width:210px;border-radius:14px}
   #det h1{font-size:34px}
@@ -455,9 +463,23 @@ svg.spring{animation:spring .3s ease-out}
   .acts{flex-wrap:nowrap;align-items:center}
   #dplay{flex:none;min-width:260px}
   #dacts{width:auto;gap:4px}
-  #det.bd .top{display:flex;flex-direction:column;justify-content:flex-end;min-height:min(44vw,640px)}
-  #det.bd #dbd{position:absolute;inset:0 0 0 auto;width:72%;margin:0;aspect-ratio:auto}
-  #dbd::after{background:linear-gradient(90deg,var(--bg),#0e0e10cc 22%,#0e0e1000 55%),linear-gradient(#0e0e1000 65%,var(--bg))}
+  #det.bd .top{display:flex;flex-direction:column;justify-content:flex-end;min-height:calc(min(100vw,1280px) * 9 / 16)}
+  /* The whole backdrop (16:9) at the window's right edge, over the page's
+     margin, 90 % as high as it would be at its width (w1280) or the
+     window's, the blurred one (#dbg, as YouTube's ambient mode) going on
+     under it. It melts away
+     to the left, along an arc like "(" (an ellipse's, from the right
+     edge), and at the bottom, over its last fifth along a flat saucer (an
+     ellipse's wider than it, 8 % higher at its sides) (eased, so no edge
+     shows: a linear fade has one), into the blurred one across the window,
+     so no box of it shows on black. A scrim at Netflix's angle keeps the
+     text over it legible. */
+  #det.bd #dbd{position:absolute;top:0;right:0;left:auto;height:calc(min(100vw,1280px) * 9 / 16 * .9);width:auto;margin:0;aspect-ratio:16/9;
+    --h:radial-gradient(100% 130% at 100% 45%,#000000ff 72%,#000000f4 75.5%,#000000d7 79%,#000000ae 82.5%,#00000080 86%,#00000051 89.5%,#00000028 93%,#0000000b 96.5%,#00000000 100%);--v:radial-gradient(127.5% 100% at 50% 0,#000000ff 80%,#000000f4 82.5%,#000000d7 85%,#000000ae 87.5%,#00000080 90%,#00000051 92.5%,#00000028 95%,#0000000b 97.5%,#00000000 100%);
+    -webkit-mask-image:var(--h),var(--v);mask-image:var(--h),var(--v);-webkit-mask-composite:source-in;mask-composite:intersect}
+  #dbd::after{background:linear-gradient(77deg,#0e0e10e6 0%,#0e0e10a9 15.2%,#0e0e107c 27.2%,#0e0e1058 37.6%,#0e0e1040 45.2%,#0e0e102d 52%,#0e0e101d 58.4%,#0e0e1011 64.16%,#0e0e100a 68.88%,#0e0e1005 72.8%,#0e0e1002 76.16%,#0e0e1000 78.56%,#0e0e1000 80%)}
+  #det.bd:has(#dbd.ld) #dbg{opacity:1;background-image:var(--bd)!important;filter:blur(80px) brightness(.45) saturate(1.3);
+    -webkit-mask-image:linear-gradient(#000000ff 35%,#000000f4 43.12%,#000000d7 51.25%,#000000ae 59.38%,#00000080 67.5%,#00000051 75.62%,#00000028 83.75%,#0000000b 91.88%,#00000000 100%);mask-image:linear-gradient(#000000ff 35%,#000000f4 43.12%,#000000d7 51.25%,#000000ae 59.38%,#00000080 67.5%,#00000051 75.62%,#00000028 83.75%,#0000000b 91.88%,#00000000 100%)}
   #det.bd .nav{top:24px;left:calc(var(--dgut) - 12px)}
   #det.bd .hero{max-width:560px;margin-top:72px;text-align:left}
   #det.bd .rt{justify-content:flex-start}
@@ -466,6 +488,8 @@ svg.spring{animation:spring .3s ease-out}
   .cast{gap:12px;margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
   #dmore{padding:0 var(--dgut)}
   .strip{gap:14px;margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
+  /* What scrolls aside fades out into the margins. */
+  .cast,.strip{--fade:linear-gradient(90deg,#0000 calc(var(--dgut) - 40px),#000 var(--dgut),#000 calc(100% - var(--dgut)),#0000 calc(100% - var(--dgut) + 40px));-webkit-mask-image:var(--fade);mask-image:var(--fade)}
   .tile{width:220px;font-size:14px}
   .tile.tall{width:140px}
   .cast div{width:96px;font-size:13px}
@@ -1506,6 +1530,8 @@ function renderArt(t, x) {
     bd.sizes = BD_SIZES;
     bd.srcset = bdSet(x);
     bd.src = x.backdrop.w780;
+    // Blurred across the window on desktop, the one there.
+    $('det').style.setProperty('--bd', `url("${x.backdrop.w1280}")`);
     $('det').classList.add('bd');
     $('dbd').classList.add('ld'); // loaded ahead
   }
@@ -1526,6 +1552,7 @@ $('dlogo').onerror = () => {
 // The page without TMDB's, as it opens.
 function clearArt() {
   $('det').classList.remove('bd');
+  $('det').style.removeProperty('--bd');
   $('dbd').classList.remove('ld');
   for (const a of ['srcset', 'src']) $('dbd').firstChild.removeAttribute(a);
   $('dlogo').hidden = true;
@@ -1551,7 +1578,7 @@ async function tmdbOf(t) {
   return { ...x, backdrop: bd ? x.backdrop : null, logo: logo ? x.logo : null };
 }
 
-const BD_SIZES = '(min-width:900px) 72vw, 100vw';
+const BD_SIZES = '(min-width:900px) 1280px, 100vw';
 const bdSet = x => `${x.backdrop.w780} 780w, ${x.backdrop.w1280} 1280w`;
 
 // Whether a picture loads; as the page's own (the same candidate of the
