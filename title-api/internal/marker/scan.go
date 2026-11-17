@@ -43,7 +43,7 @@ const headSystem = `You mark the beginning of a TV episode on frames of it shown
 
 - recap: a montage of scenes from earlier episodes, often opened by a card or a voice saying "Previously on …". When present, it starts at the very beginning of the video.
 - cold open: a scene of the new episode before the intro. It is neither recap nor intro.
-- intro: the opening title sequence. It begins as soon as the recap or the cold open ends, together with whatever leads into it (black frames, a network or studio card such as "… presents"), and ends after its last title card. The first frame after it is the episode's story going on.
+- intro: the opening title sequence. It begins with its first visible frame, a network or studio card such as "… presents" fading in included; black frames before it belong to what precedes it. It ends as soon as its last title card, the episode's own title card included, has faded out; black frames after it belong to the episode's story.
 
 For each part, say whether it is there, the number of its first frame and the number of the first frame after it (0 if it runs past the last frame shown). Notes are one or two short sentences on what you saw.`
 
@@ -126,17 +126,17 @@ func (m *Marker) Mark(ctx context.Context, video Video, cues []Cue, duration flo
 	joined := head.Recap.Present && head.Intro.Present && head.Recap.After == head.Intro.First
 	if headErr == nil {
 		if head.Recap.Present {
-			what := "where the recap (the montage of earlier episodes) ends: the first frame that is no longer part of it"
+			what := "where the recap (the montage of earlier episodes) ends: the first frame after its last shot"
 			if joined {
-				what = "where the recap ends and what leads into the opening title sequence begins (black frames, a network card, the titles themselves)"
+				what = "where the opening title sequence begins after the recap: the first frame where its first card (such as a network's \"… presents\") or shot becomes visible, the black frames before it not counted"
 			}
 			result.addNear("recap_end", what, headFrames, head.Recap.After)
 		}
 		if head.Intro.Present && !joined {
-			result.addNear("intro_start", "where the opening title sequence begins, with whatever leads into it (black frames, a network card): its first frame", headFrames, head.Intro.First)
+			result.addNear("intro_start", "where the opening title sequence begins: the first frame where its first card (such as a network's \"… presents\") or shot becomes visible, the black frames before it not counted", headFrames, head.Intro.First)
 		}
 		if head.Intro.Present {
-			result.addNear("intro_end", "where the opening title sequence ends: the first frame after its last title card, where the episode goes on", headFrames, head.Intro.After)
+			result.addNear("intro_end", "where the opening title sequence ends: the first frame after its last title card (the episode's title card included) has faded out, whether black or the episode's next shot", headFrames, head.Intro.After)
 		}
 	}
 	if tailErr == nil && tail.Credits.Present {
