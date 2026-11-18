@@ -62,6 +62,20 @@ header.stuck::before{bottom:-28px}
 .sv svg{width:18px;height:18px}
 .sv.on{color:var(--ac)}
 .sv:active{transform:scale(.88)}
+/* Starts a title on the TV from its poster, as its page's play button
+   would (see playButton): over the poster's lower right corner, which .ov,
+   of the poster's size, places it by. Grey while the title is on; others
+   wait while one starts. */
+.card .ov{position:absolute;top:0;left:0;right:0;aspect-ratio:2/3;pointer-events:none}
+.cp{position:absolute;right:6px;bottom:6px;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:var(--ac);color:#111;pointer-events:auto;box-shadow:0 2px 8px #0006;transition:transform .12s,opacity .15s}
+.cp::before{content:'';position:absolute;inset:-6px}
+.cp svg{width:16px;height:16px;margin-left:2px}
+.cp:active{transform:scale(.88)}
+.cp:disabled{opacity:.5}
+.cp.tv{background:#5a5a60;color:#ddd;opacity:1}
+.cp.busy{opacity:1}
+.cp.busy svg{display:none}
+.cp.busy::after{content:'';width:14px;height:14px;border:2px solid #111;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
 /* A section of the main page; with more than fits, its heading leads to
    the page of them all, as the last card does. */
 .sec{display:flex;align-items:center;gap:2px;margin:0;padding:4px 12px 10px;font-size:17px}
@@ -88,6 +102,7 @@ header.stuck::before{bottom:-28px}
 .pw{position:relative}
 .pw .bar{position:absolute;left:6px;right:6px;bottom:6px;height:4px;border-radius:2px;background:#000a;overflow:hidden}
 .pw .bar div{min-width:6px;height:100%;background:var(--ac)} /* a few seconds watched show too */
+.card .pw .bar{right:44px;bottom:20px} /* clear of the play button, level with its middle */
 .note{padding:56px 24px;color:var(--mu);text-align:center}
 .note svg{display:block;width:48px;height:48px;margin:0 auto 12px;opacity:.5}
 
@@ -521,6 +536,10 @@ svg.spring{animation:spring .3s ease-out}
 @media (hover:hover){
   .card img{transition:opacity .35s,transform .2s,filter .2s}
   .card:hover img{transform:translateY(-3px);filter:brightness(1.12)}
+  .card .cp:not(.busy){opacity:0}
+  .card:hover .cp:not(:disabled),.cp:focus-visible{opacity:1}
+  .card:hover .cp:disabled{opacity:.5}
+  .card:hover .cp.tv{opacity:1}
   .ep:hover,.dev:hover:not(:disabled){background:var(--s1)}
   .chip:hover:not(.on),.pill:hover:not(.ac),.ib:hover{filter:brightness(1.25)}
   .pill.ac:hover{filter:brightness(1.08)}
@@ -1178,15 +1197,16 @@ const svgIcon = name => {
 };
 
 // A title's card: its poster, with how far it was watched (part, 0..1) if
-// given, its name and a line under it; it opens the title's page, and the
-// button over the poster's corner saves it (see saveButton).
+// given, its name and a line under it; it opens the title's page, the
+// button over the poster's top corner saves it (see saveButton), and the
+// one over its bottom corner starts it (see playButton).
 function card(m, i, under, part) {
   const p = poster(m);
   const open = el('button', { className: 'open' },
     part != null ? el('div', { className: 'pw' }, p, el('div', { className: 'bar' }, el('div', { style: `width:${100 * part}%` }))) : p,
     el('b', {}, m.title || ''), el('span', {}, under || ''));
   open.onclick = () => openDetails({ id: m.id, title: m.title, poster: m.poster, year: m.year });
-  const c = el('div', { className: 'card' }, open, saveButton(m));
+  const c = el('div', { className: 'card' }, open, saveButton(m), el('div', { className: 'ov' }, playButton(m)));
   c.style.setProperty('--i', i);
   c.dataset.id = m.id;
   markUpdate(c);
@@ -1210,6 +1230,20 @@ function saveButton(m) {
     toggleSave(m);
   };
   showSaved(b);
+  return b;
+}
+
+// Starts the title on the TV without opening its page: the router picks
+// what its play button would (see /play's auto); the first start of one
+// with several sources asks for the source, as the page does (see play).
+function playButton(m) {
+  const b = el('button', { className: 'cp', ariaLabel: 'Смотреть на ТВ' });
+  b.append(svgIcon('play'));
+  b.onclick = e => {
+    e.stopPropagation();
+    arm(); // still inside the tap
+    play({ id: m.id, title: m.title, poster: m.poster, auto: 1 });
+  };
   return b;
 }
 
@@ -1421,7 +1455,7 @@ function showRecent() {
   renderRecent();
 }
 
-// Marks the cards of whatever is on the TV now.
+// Marks the cards of whatever is on the TV now, and of what is starting.
 function markPlaying() {
   const id = st?.media && st.now?.id;
   for (const c of document.querySelectorAll('.card')) {
@@ -1429,6 +1463,11 @@ function markPlaying() {
     const b = c.querySelector('.badge.on'), on = !!id && c.dataset.id == id;
     if (on && !b) c.append(el('span', { className: 'badge on' }, 'На ТВ'));
     if (!on && b) b.remove();
+    const p = c.querySelector('.cp'), busy = pending?.id == c.dataset.id;
+    if (!p) continue;
+    p.disabled = !!pending || on;
+    p.classList.toggle('busy', busy);
+    p.classList.toggle('tv', on && !busy);
   }
 }
 
@@ -2169,7 +2208,7 @@ async function play(m) {
   const req = { id: m.id, title: m.title };
   if (m.poster) req.poster = m.poster;
   // Quality switches replay the same stream from the current position.
-  for (const k of ['stream', 'start', 'rate', 'audio', 'subs', 'reuse'])
+  for (const k of ['stream', 'start', 'rate', 'audio', 'subs', 'reuse', 'auto'])
     if (m[k] != null) req[k] = String(m[k]);
   const quality = m.quality ?? localStorage.quality;
   if (quality) req.quality = quality;

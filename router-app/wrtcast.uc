@@ -33,7 +33,7 @@ const COMMANDS = {
 };
 const REASONS = {
 	'200': 'OK', '400': 'Bad Request', '401': 'Unauthorized', '403': 'Forbidden',
-	'404': 'Not Found', '405': 'Method Not Allowed', '500': 'Internal Server Error',
+	'404': 'Not Found', '405': 'Method Not Allowed', '409': 'Conflict', '500': 'Internal Server Error',
 	'502': 'Bad Gateway', '503': 'Service Unavailable',
 };
 const MIME = {
@@ -2136,6 +2136,11 @@ function prepare(dev, p, keep) {
 	for (let i, x in list)
 		if (p.source != null ? x.name == p.source : i == +(p.stream ?? 0))
 			n = i;
+	// A title started from its poster for the first time asks for the
+	// source, as its page does, when there is a choice.
+	if (p.auto == '1' && pref?.source == null && p.source == null && p.stream == null &&
+	    length(list) > 1)
+		reply(409, { error: 'choose a source', sources: map(list, x => x.name) });
 	let s = list[n];
 	if (!s || !s.url)
 		fail(404, 'stream not found');
@@ -2591,9 +2596,10 @@ function recent_rows() {
 // the provider's pages for it.
 
 // The episode a series would start with, as the page's play button has it:
-// the last one watched, or the one after it once that is watched or left
-// past 90 %, else the first; { season, episode }, or null after the last.
-function start_episode(id, S) {
+// the last one watched, or the one after it (next) once that is watched or
+// left past 90 %, else the first; { season, episode, next }, or null after
+// the last. strict: null too when the last one watched isn't of S.
+function start_episode(id, S, strict) {
 	let all = [], e = title_row(id), i = -1;
 	for (let x in S)
 		for (let y in x.episodes ?? [])
@@ -2603,9 +2609,38 @@ function start_episode(id, S) {
 			if (x.season == e.season && x.episode == e.episode)
 				i = j;
 	if (i < 0)
-		return all[0];
+		return strict && e?.season != null ? null : all[0];
 	let x = progress_row(id, ep_key(e.season, e.episode));
-	return x && (x.done || x.dur > 0 && x.pos >= x.dur * 0.9) ? all[i + 1] : all[i];
+	if (!(x && (x.done || x.dur > 0 && x.pos >= x.dur * 0.9)))
+		return all[i];
+	return all[i + 1] ? { ...all[i + 1], next: true } : null;
+}
+
+// What the play button of a title's page would start, for /play with
+// auto=1 from a poster: sets p's season and episode of a series by
+// start_episode, of the provider's episodes as kept (see kept_updates) or,
+// when those don't tell it, asked for; a movie is left as is, prepare
+// resuming it.
+function auto_episode(p) {
+	let id = title_id(p), e = title_row(id), x = kept_updates()[id];
+	if (e ? e.season == null : x?.movie)
+		return;
+	let ep = start_episode(id, map(x?.seasons ?? [], s => ({
+		seasonNumber: s[0], episodes: map(s[1], n => ({ episodeNumber: n })),
+	})), true);
+	if (!ep) {
+		let r = api(`/v1/titles/${id}`);
+		if (r.mediaType != 'MEDIA_TYPE_SERIES')
+			return;
+		ep = start_episode(id, r.seasons ?? []);
+		if (!ep)
+			fail(409, 'Сериал досмотрен');
+	}
+	p.season = `${ep.season}`;
+	p.episode = ep.episode;
+	// The next one from its start, as the page has it.
+	if (ep.next && p.start == null)
+		p.start = '0';
 }
 
 // Has title-api mark the episode a series saved would start with, while
@@ -2931,7 +2966,15 @@ const routes = {
 		return with_now(castctl(dev, 'status'), dev);
 	},
 
-	'POST /play': p => play(device(p), p),
+	// With auto=1 and no season or episode, what the play button of the
+	// title's page would start (see auto_episode); a title never started
+	// answers 409 with the sources to pick from, if there are several.
+	'POST /play': p => {
+		let dev = device(p);
+		if (p.auto == '1' && p.season == null && p.episode == null)
+			auto_episode(p);
+		return play(dev, p);
+	},
 
 	// Turns the next episode on or off for what is on (see ended).
 	'POST /autonext': p => {
