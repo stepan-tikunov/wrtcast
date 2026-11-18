@@ -67,7 +67,7 @@ header.stuck::before{bottom:-28px}
    of the poster's size, places it by. Grey while the title is on; others
    wait while one starts. */
 .card .ov{position:absolute;top:0;left:0;right:0;aspect-ratio:2/3;pointer-events:none}
-.cp{position:absolute;right:6px;bottom:6px;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:var(--ac);color:#111;pointer-events:auto;box-shadow:0 2px 8px #0006;transition:transform .12s,opacity .15s}
+.cp{position:absolute;right:6px;bottom:6px;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:var(--ac);color:#111;pointer-events:auto;transition:transform .12s,opacity .15s}
 .cp::before{content:'';position:absolute;inset:-6px}
 .cp svg{width:20px;height:20px}
 .cp:active{transform:scale(.88)}
@@ -100,9 +100,12 @@ header.stuck::before{bottom:-28px}
 .lhead{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:4px;padding:max(8px,env(safe-area-inset-top)) 12px 8px 4px;background:linear-gradient(var(--bg) 70%,#0e0e1000)}
 .lhead h1{margin:0;font-size:20px}
 .pw{position:relative}
-.pw .bar{position:absolute;left:6px;right:6px;bottom:6px;height:4px;border-radius:2px;background:#000a;overflow:hidden}
-.pw .bar div{min-width:6px;height:100%;background:var(--ac)} /* a few seconds watched show too */
-.card .pw .bar{right:44px;bottom:20px} /* clear of the play button, level with its middle */
+/* How far a title was watched: a strip along the poster's whole bottom
+   edge, under the play button, which the poster's rounded corners clip. */
+.pw .bar{position:absolute;inset:0;border-radius:12px;overflow:hidden;pointer-events:none}
+.pw .bar::before,.pw .bar div{content:'';position:absolute;left:0;bottom:0;height:4px}
+.pw .bar::before{right:0;background:#000a}
+.pw .bar div{min-width:12px;background:var(--ac)} /* a few seconds watched show too, past the corner */
 .note{padding:56px 24px;color:var(--mu);text-align:center}
 .note svg{display:block;width:48px;height:48px;margin:0 auto 12px;opacity:.5}
 
