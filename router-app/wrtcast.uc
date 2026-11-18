@@ -2777,9 +2777,10 @@ const tmdb_episode = e => e?.episodeNumber ? {
 	season: e.seasonNumber, episode: e.episodeNumber, date: e.airDate || null, title: e.name || null,
 } : null;
 
-// Someone in a title; photo null if TMDB has none.
+// Someone in a title, by their TMDB ID (see /tmdb/person); photo null if
+// TMDB has none.
 const tmdb_person = c => ({
-	name: c.name, character: c.character || null, photo: tmdb_img(c.profilePath, 'w185'),
+	id: +(c.id ?? 0) || null, name: c.name, character: c.character || null, photo: tmdb_img(c.profilePath, 'w185'),
 });
 
 // A title of a collection or of the recommendations.
@@ -2809,7 +2810,7 @@ function tmdb_details(type, id, r) {
 		age: r.age || null, rating: +(r.voteAverage ?? 0) || null,
 		runtime: +(r.runtimeMinutes ?? 0) || null,
 		genres: r.genres ?? [], countries: r.countries ?? [],
-		directors: r.directors ?? [], creators: r.creators ?? [],
+		directors: map(r.directors ?? [], tmdb_person), creators: map(r.creators ?? [], tmdb_person),
 		status: TMDB_STATUSES[r.status] ?? null,
 		last: tmdb_episode(r.lastEpisode), next: tmdb_episode(r.nextEpisode),
 		seasons: map(r.seasons ?? [], s => ({
@@ -3087,6 +3088,33 @@ const routes = {
 			fail(400, 'invalid type');
 		let r = api(`/v1/tmdb/${p.type}/${tmdb_id(p)}/cast`, [400, 404]);
 		return r ? { cast: map(r.cast ?? [], tmdb_person) } : null;
+	},
+
+	// Someone on TMDB (id their TMDB ID): who they are, their pages
+	// elsewhere and the titles they are in or made, the best known first,
+	// those watched here seen; null as /tmdb/title.
+	'GET /tmdb/person': p => {
+		let r = api(`/v1/tmdb/person/${tmdb_id(p)}`, [400, 404]);
+		if (!r)
+			return null;
+		let watched = {};
+		for (let t in sql_rows('SELECT id FROM titles'))
+			watched[t.id] = true;
+		return {
+			id: +r.id, name: r.name, original: r.originalName || null,
+			photo: tmdb_img(r.profilePath, 'w342'), profession: r.profession || null,
+			birthday: r.birthday || null, deathday: r.deathday || null, place: r.placeOfBirth || null,
+			biography: r.biography || null,
+			gender: { TMDB_GENDER_FEMALE: 'female', TMDB_GENDER_MALE: 'male' }[r.gender] ?? null,
+			links: map(r.links ?? [], l => ({ site: l.site, url: l.url })),
+			credits: map(r.credits ?? [], c => {
+				let t = tmdb_related(c.title ?? {});
+				return {
+					...t, character: c.character || null, jobs: c.jobs ?? [],
+					episodes: +(c.episodes ?? 0) || null, acting: !!c.acting, seen: !!watched[t.title_id],
+				};
+			}),
+		};
 	},
 
 	// The episodes of a season of a series on TMDB (id its TMDB ID); null

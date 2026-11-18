@@ -91,6 +91,33 @@ header.stuck::before{bottom:-28px}
 #list{position:fixed;inset:0;z-index:3;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* The page of a title's cast, over the title's. */
 #cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+/* Someone's page, over the title's or its cast's. */
+#person{position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+#pinfo{padding:4px 16px}
+.phero{display:flex;gap:16px;align-items:flex-start}
+.phero .st{flex:none;width:112px;aspect-ratio:2/3;border-radius:12px}
+.phero .st svg{width:48px;height:48px;color:#55555c}
+.phero .facts{min-width:0;padding-top:2px}
+.phero .facts .orig{margin-bottom:6px;color:var(--mu)}
+/* Their pages elsewhere. */
+.links{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 4px}
+.links a{padding:7px 14px;border-radius:18px;background:var(--s2);color:var(--tx);font-size:14px;font-weight:550;text-decoration:none;transition:transform .12s}
+.links a:active{transform:scale(.96)}
+#pbio{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;margin:14px 0 0;color:#c8c8cc;font-size:15px;line-height:1.45;white-space:pre-line;cursor:pointer}
+#pbio.full{-webkit-line-clamp:unset}
+#pmore{padding:0 16px}
+#pmore .dh{margin-top:26px}
+/* All they are in or made, the latest first. */
+.works button{display:grid;grid-template-columns:48px 1fr;gap:10px;width:100%;padding:9px 0;border:0;border-bottom:1px solid var(--s2);background:none;color:var(--tx);font-size:15px;text-align:left;cursor:pointer}
+.works span{color:var(--mu);font-variant-numeric:tabular-nums}
+.works small{display:block;margin-top:2px;color:var(--mu);font-size:13px}
+.works .ok{display:inline-grid;place-items:center;width:16px;height:16px;margin-left:6px;vertical-align:-2px;color:var(--ac)}
+.works .ok svg{width:16px;height:16px}
+#pattr{margin:28px 16px 0;padding-top:12px;border-top:1px solid var(--s2)}
+#person .skl{display:inline-block;vertical-align:middle;height:.8em;margin:0;border-radius:.4em}
+/* Names that lead to someone's page. */
+.cast [role=button],.person[role=button]{cursor:pointer}
+.facts .nm{padding:0;border:0;background:none;color:inherit;font:inherit;text-decoration:underline;text-decoration-color:#ffffff40;text-underline-offset:3px;cursor:pointer}
 .lhead h1 small{display:block;overflow:hidden;color:var(--mu);font-size:13px;font-weight:400;white-space:nowrap;text-overflow:ellipsis}
 .lhead h1{min-width:0}
 .person{display:flex;align-items:center;gap:14px;padding:8px 16px;animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 18ms)}
@@ -422,8 +449,9 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .skl{display:block;height:12px;margin-top:9px;border-radius:6px}
 .skl+.skl{width:40%}
 .badge.on{animation:bounce .35s ease-out}
-#det,#list,#cast{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
-#det.out,#list.out,#cast.out{animation:slideout .2s ease-in forwards}
+#det,#list,#cast,#person{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
+#det.out,#list.out,#cast.out,#person.out{animation:slideout .2s ease-in forwards}
+#pinfo>*,#pmore>*{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
 #dposter{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards}
 #dinfo>*,#dmore>*,.rt,#dlogo,#dacts>*{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
 /* Drawn again as TMDB answers, what was there doesn't pop up anew. */
@@ -519,6 +547,12 @@ svg.spring{animation:spring .3s ease-out}
   .tag{font-size:16px}
   .news{max-width:760px}
   #dattr{margin:36px var(--dgut) 0}
+  #pinfo,#pmore{padding-left:var(--dgut);padding-right:var(--dgut)}
+  #pmore .strip{margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
+  .phero .st{width:160px}
+  #pbio{max-width:760px;-webkit-line-clamp:6;font-size:16px}
+  .works{max-width:760px}
+  #pattr{margin:36px var(--dgut) 0}
   #clist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));padding:0 calc(var(--gut) - 16px)}
   #ddesc{max-width:760px;-webkit-line-clamp:6;font-size:16px}
   #seasons{flex-wrap:wrap;padding:20px var(--dgut) 10px}
@@ -611,6 +645,13 @@ svg.spring{animation:spring .3s ease-out}
 <section id="cast" hidden>
   <div class="lhead"><button class="ib" id="cback" aria-label="Назад"><svg><use href="#i-back"/></svg></button><h1>В ролях<small id="ctitle"></small></h1></div>
   <div id="clist"></div>
+</section>
+
+<section id="person" hidden>
+  <div class="lhead"><button class="ib" id="pback" aria-label="Назад"><svg><use href="#i-back"/></svg></button><h1><span id="pname"></span><small id="pjob"></small></h1></div>
+  <div id="pinfo"></div>
+  <div id="pmore"></div>
+  <p class="attr" id="pattr" hidden><b>TMDB</b>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
 </section>
 
 <section id="list" hidden>
@@ -818,7 +859,7 @@ function showLayer(name, on) {
     e.style.transform = e.style.opacity = ''; // left by a pull (see pullSheet)
     e.hidden = false;
   };
-  const page = name == 'det' || name == 'list' || name == 'cast';
+  const page = name == 'det' || name == 'list' || name == 'cast' || name == 'person';
   const e = $(page ? name : 'shade');
   // The shade is shared by the player and the sheets.
   if (on) show(e);
@@ -1098,6 +1139,7 @@ function closeLayer() {
   }
   if (name == 'list') listShown = null;
   if (name == 'cast') castShown = null;
+  if (name == 'person') personShown = null;
 }
 
 // ---- addresses ----------------------------------------------------------
@@ -1106,13 +1148,20 @@ function closeLayer() {
 // the page of all the titles of a section of the main page (see openList),
 // /title/<id> a title's page over any of them, /tmdb/<movie|tv>/<id> the
 // page of a title of TMDB alone (see openTmdb), <either>/cast the page of
-// its cast over it. A title opened from another's page is over it in the
-// history (hop), the same overlay.
+// its cast over it, and <any of those>/person/<TMDB ID> someone's page over
+// it (see openPerson). A title opened from another's page, or from
+// someone's, is over it in the history (hop), the same overlay.
 
 const titleUrl = id => '/title/' + encodeURIComponent(id);
 const searchUrl = q => '/search?q=' + encodeURIComponent(q);
-const urlTitle = () => /^\/title\/([^/]+)(\/cast)?$/.exec(location.pathname)?.[1];
-const urlCast = () => /^\/(title\/[^/]+|tmdb\/(movie|tv)\/[0-9]+)\/cast$/.test(location.pathname);
+// The address of the page someone's is over, and whose it is.
+const basePath = () => location.pathname.replace(/\/person\/[1-9][0-9]*$/, '');
+const urlPerson = () => +(/\/person\/([1-9][0-9]*)$/.exec(location.pathname)?.[1] ?? 0) || null;
+const urlTitle = () => /^\/title\/([^/]+)(\/cast)?$/.exec(basePath())?.[1];
+const urlCast = () => /^\/(title\/[^/]+|tmdb\/(movie|tv)\/[0-9]+)\/cast$/.test(basePath());
+// What is over a title's page in its address (its cast's, someone's), kept
+// as the page turns to another title.
+const overPage = () => /^\/(title\/[^/]+|tmdb\/(movie|tv)\/[0-9]+)(\/.+)$/.exec(location.pathname)?.[3] ?? '';
 const urlList = () => /^\/(recent|saved)$/.exec(location.pathname)?.[1];
 const urlQuery = () => location.pathname == '/search' && new URLSearchParams(location.search).get('q') || '';
 
@@ -1144,6 +1193,14 @@ function route() {
     showLayer('cast', true);
   }
   if (cast && castShown != key) showCast(key);
+  // Someone's page over the title's, or over its cast.
+  const person = urlPerson();
+  if (!person) while (layers.includes('person')) closeLayer();
+  if (person && !layers.includes('person')) {
+    layers.push('person');
+    showLayer('person', true);
+  }
+  if (person && personShown != person) showPerson(person);
   if (kind && !layers.includes('list')) {
     while (layers.length) closeLayer();
     layers.push('list');
@@ -1549,10 +1606,12 @@ function renderInfo(t, x, again) {
     ...(t.ratings.length ? [el('div', { className: 'rt' + still }, ...t.ratings.map(r =>
       el('span', {}, (RATINGS[r.source] || r.source) + ' ', el('b', {}, r.value.toFixed(1)))))] : []),
     ...(t.genres.length ? [el('div', { className: 'gen' }, t.genres.slice(0, 4).join(' • '))] : []));
-  // TMDB's cast, with photos, takes the place of the names.
+  // TMDB's cast, with photos, takes the place of the names; its directors,
+  // who lead to their pages, the place of the provider's.
   const cast = x?.cast?.length ? x.cast : null, more = cast && x.cast_total - cast.length;
-  const facts = [['Режиссёр', (t.directors.length ? t.directors : x?.directors ?? []).slice(0, 2)],
-    ['Создатель', x?.creators?.slice(0, 2) ?? []], ['В ролях', cast ? [] : t.actors.slice(0, 6)]]
+  const named = list => list.map(name => ({ name }));
+  const facts = [['Режиссёр', (x?.directors?.length ? x.directors : named(t.directors)).slice(0, 2)],
+    ['Создатель', x?.creators?.slice(0, 2) ?? []], ['В ролях', cast ? [] : named(t.actors.slice(0, 6))]]
     .filter(([, v]) => v.length);
   const text = t.description || x?.overview, soon = fresh(t) || news(x);
   const desc = text && el('p', { id: 'ddesc', className: t.description ? still : '' }, text);
@@ -1562,10 +1621,11 @@ function renderInfo(t, x, again) {
       el('div', {}, el('b', {}, soon.head), ...(soon.sub ? [el('span', {}, soon.sub)] : []))),
     x?.tagline && el('p', { className: 'tag' }, x.tagline),
     desc,
-    el('div', { className: 'facts' + still }, ...facts.map(([k, v]) => el('div', {}, el('b', {}, k + ': '), v.join(', ')))),
+    el('div', { className: 'facts' + still }, ...facts.map(([k, v]) => el('div', {}, el('b', {}, k + ': '),
+      ...v.flatMap((c, i) => [i ? ', ' : '', c.id ? el('button', { className: 'nm', onclick: () => openPerson(c) }, c.name) : c.name])))),
     cast && el('h2', { className: 'dh more', onclick: openCast }, 'В ролях', svgIcon('more')),
-    cast && el('div', { className: 'cast' }, ...cast.map(c => el('div', {},
-      photo(c.photo), el('b', {}, c.name), ...(c.character ? [el('span', {}, c.character)] : []))),
+    cast && el('div', { className: 'cast' }, ...cast.map(c => personButton(el('div', {},
+      photo(c.photo), el('b', {}, c.name), ...(c.character ? [el('span', {}, c.character)] : [])), c)),
       ...(more > 0 ? [el('button', { onclick: openCast }, el('i', { className: 'nop' }, svgIcon('more')), 'ещё ' + more)] : [])),
   ].filter(Boolean));
 }
@@ -1728,7 +1788,7 @@ async function openDetails(m, quiet) {
   } else skeleton(m);
   // From the player the page may already be open with another title.
   if (!layers.includes('det')) openLayer('det', titleUrl(m.id));
-  else if (urlTitle() != encodeURIComponent(m.id)) history.replaceState(history.state, '', titleUrl(m.id));
+  else if (urlTitle() != encodeURIComponent(m.id)) history.replaceState(history.state, '', titleUrl(m.id) + overPage());
   // Watch progress changes between visits, so unlike /title it isn't cached.
   const prog = api('progress?id=' + encodeURIComponent(m.id)).catch(() => ({}));
   let t;
@@ -1827,7 +1887,7 @@ function failed(m) {
 
 const tmdbUrl = r => `/tmdb/${r.type}/${r.id}`;
 const urlTmdb = () => {
-  const m = /^\/tmdb\/(movie|tv)\/([1-9][0-9]*)(\/cast)?$/.exec(location.pathname);
+  const m = /^\/tmdb\/(movie|tv)\/([1-9][0-9]*)(\/cast)?$/.exec(basePath());
   return m && { type: m[1], id: +m[2] };
 };
 // What the page keeps of a title, its title-api's ID or its TMDB's.
@@ -1838,7 +1898,7 @@ async function openTmdb(r) {
   const m = { id: null, tmdbOnly: true, tmdb: { type: r.type, id: +r.id }, title: r.title, year: r.year, poster: r.poster, lookup: 'pending' };
   skeleton(m);
   if (!layers.includes('det')) openLayer('det', tmdbUrl(m.tmdb));
-  else if (location.pathname != tmdbUrl(m.tmdb)) history.replaceState(history.state, '', tmdbUrl(m.tmdb));
+  else if (basePath().replace(/\/cast$/, '') != tmdbUrl(m.tmdb)) history.replaceState(history.state, '', tmdbUrl(m.tmdb) + overPage());
   const x = await tmdbOf(m);
   if (item != m) return;
   if (!x) return failed(m);
@@ -1863,7 +1923,7 @@ async function openTmdb(r) {
 const tmdbTitle = x => ({
   title: x.title, original: x.original, year: x.year, type: x.type == 'tv' ? 'series' : 'movie',
   seasons: x.type == 'tv' ? x.seasons.filter(s => s.season > 0 && s.episodes).map(s => ({ season: s.season, episodes: [], only: true })) : null,
-  duration: x.runtime * 60 || 0, countries: x.countries, genres: x.genres, directors: x.directors, actors: [],
+  duration: x.runtime * 60 || 0, countries: x.countries, genres: x.genres, directors: [], actors: [],
   ratings: x.rating ? [{ source: 'TMDB', value: x.rating }] : [], description: x.overview,
 });
 
@@ -1881,7 +1941,7 @@ async function lookUp(m) {
     if (r.state == 'found' && r.title_id) {
       const x = tmdbs[m.tmdb.type + m.tmdb.id];
       if (x) x.title_id = r.title_id;
-      history.replaceState(history.state, '', titleUrl(r.title_id));
+      history.replaceState(history.state, '', titleUrl(r.title_id) + overPage());
       return openDetails({ id: r.title_id, title: m.title, year: m.year, poster: m.poster }, true);
     }
     if (r.state != 'pending') break;
@@ -1922,12 +1982,12 @@ function renderMore(x) {
 const when = r => r.date > today() ? 'Выйдет ' + day(r.date) : r.year || '';
 
 // A tile of a title the page lists: a frame wide (its backdrop) or tall (its poster).
-function related(r, here, under, seen, tall) {
+function related(r, here, under, seen, tall, open = openRelated) {
   const pic = still(tall ? r.poster : r.backdrop || r.poster, (r.title || '?')[0]);
   if (seen) pic.append(el('i', { className: 'ok' }, svgIcon('check')));
   const b = el('button', { className: 'tile' + (tall ? ' tall' : '') + (here ? ' here' : '') }, pic,
     el('b', {}, r.title || ''), ...(under ? [el('span', {}, under)] : []));
-  b.onclick = () => openRelated(r);
+  b.onclick = () => open(r);
   return b;
 }
 
@@ -2200,14 +2260,133 @@ async function showCast(id) {
 function renderCast(list) {
   const shown = $('clist').children.length;
   $('clist').replaceChildren(...list.map((c, i) => {
-    const row = el('div', { className: 'person' + (i < shown ? ' still' : '') }, photo(c.photo),
-      el('div', {}, el('b', {}, c.name), ...(c.character ? [el('span', {}, c.character)] : [])));
+    const row = personButton(el('div', { className: 'person' + (i < shown ? ' still' : '') }, photo(c.photo),
+      el('div', {}, el('b', {}, c.name), ...(c.character ? [el('span', {}, c.character)] : []))), c);
     row.style.setProperty('--i', Math.min(i - shown, 20));
     return row;
   }));
   if (!list.length) $('clist').replaceChildren(el('p', { className: 'note' }, 'TMDB не знает, кто здесь снимался'));
 }
 $('cback').onclick = closeTop;
+
+// ---- someone's page -------------------------------------------------------
+
+let personShown = null; // whose page is open, their TMDB ID
+const people = {};      // /tmdb/person answers by TMDB ID; null where TMDB has none
+
+// Someone in a row of a page (c: { id, name, photo }) leads to their page;
+// those TMDB has no ID of, nowhere.
+function personButton(e, c) {
+  if (!c.id) return e;
+  e.setAttribute('role', 'button');
+  Object.assign(e, { tabIndex: 0, onclick: () => openPerson(c), onkeydown: ev => ev.key == 'Enter' && openPerson(c) });
+  return e;
+}
+
+// Someone of a title's page or of its cast, over it.
+function openPerson(c) {
+  showPerson(c.id, c);
+  openLayer('person', basePath() + '/person/' + c.id);
+}
+
+// known: what the page they were opened from has of them (name, photo),
+// drawn until TMDB answers.
+async function showPerson(id, known) {
+  personShown = id;
+  $('person').scrollTop = 0;
+  if (id in people) return renderPerson(people[id]);
+  renderPerson(undefined, known);
+  try {
+    people[id] = await api('tmdb/person?id=' + id);
+  } catch (e) {
+    if (personShown != id) return;
+    renderPerson(null, known);
+    return toast(e);
+  }
+  if (personShown == id) renderPerson(people[id], known);
+}
+
+const LINKS = { kinopoisk: 'Кинопоиск', imdb: 'IMDb', wikipedia: 'Википедия', tmdb: 'TMDB', instagram: 'Instagram' };
+
+// A date of TMDB (1969-08-18) in full, "18 августа 1969".
+const fullDay = date => date.length < 10 ? date :
+  new Date(date + 'T00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).replace(/ г\.$/, '');
+
+// Years from one date of TMDB to another (today, if none).
+function age(from, to = today()) {
+  const [y, md] = [+from.slice(0, 4), from.slice(4)], [ty, tmd] = [+to.slice(0, 4), to.slice(4)];
+  return ty - y - (tmd < md ? 1 : 0);
+}
+const years = n => `${n} ${plural(n, 'год', 'года', 'лет')}`;
+
+// What they were in a title: whom they played, what else they did.
+const creditNote = c => [c.character, ...c.jobs].filter(Boolean).join(', ');
+
+// p: /tmdb/person's answer, undefined while it comes, null if there is
+// none.
+function renderPerson(p, known) {
+  $('pname').textContent = p?.name || known?.name || '';
+  $('pjob').textContent = p?.profession || '';
+  $('pattr').hidden = !p;
+  if (p === null) {
+    $('pinfo').replaceChildren(el('p', { className: 'note' }, 'TMDB ничего не знает об этом человеке'));
+    return $('pmore').replaceChildren();
+  }
+  const she = p?.gender == 'female', facts = [];
+  if (p?.original && p.original != p.name) facts.push(el('div', { className: 'orig' }, p.original));
+  if (p?.birthday) facts.push(el('div', {}, `${she ? 'Родилась' : 'Родился'} ${fullDay(p.birthday)}` +
+    (p.deathday || p.birthday.length < 10 ? '' : ` · ${years(age(p.birthday))}`)));
+  if (p?.deathday) facts.push(el('div', {}, `${she ? 'Умерла' : 'Умер'} ${fullDay(p.deathday)}` +
+    (p.birthday?.length == 10 && p.deathday.length == 10 ? ` · ${years(age(p.birthday, p.deathday))}` : '')));
+  if (p?.place) facts.push(el('div', {}, p.place));
+  const bio = p?.biography && el('p', { id: 'pbio' }, p.biography);
+  if (bio) bio.onclick = () => bio.classList.toggle('full');
+  $('pinfo').replaceChildren(...[
+    el('div', { className: 'phero' }, still(p ? p.photo : known?.photo, svgIcon('person')),
+      el('div', { className: 'facts' }, ...(p ? facts : sklLines(70, 50, 60)))),
+    p?.links.length && el('div', { className: 'links' }, ...p.links.map(l =>
+      el('a', { href: l.url, target: '_blank', rel: 'noopener' }, LINKS[l.site] || l.site))),
+    bio,
+  ].filter(Boolean));
+  if (!p) return $('pmore').replaceChildren();
+  const under = c => [when(c), c.character || c.jobs[0]].filter(Boolean).join(' · ');
+  const row = (head, list) => list.length && el('section', {},
+    el('h2', { className: 'dh' }, head), el('div', { className: 'strip' }, ...list));
+  // Those not out yet first, the latest of the rest next.
+  const works = p.credits.slice().sort((a, b) => (b.date || '9999').localeCompare(a.date || '9999'));
+  $('pmore').replaceChildren(...[
+    row('Вы смотрели', p.credits.filter(c => c.seen).map(c => related(c, false, under(c), false, true, openCredit))),
+    row('Известные работы', p.credits.filter(c => c.poster && !c.seen).slice(0, 20)
+      .map(c => related(c, false, under(c), false, true, openCredit))),
+    works.length && el('section', {}, el('h2', { className: 'dh' }, 'Фильмография'),
+      el('div', { className: 'works' }, ...works.map(c => {
+        const note = [creditNote(c), c.episodes && `${c.episodes} ${plural(c.episodes, 'серия', 'серии', 'серий')}`].filter(Boolean).join(' · ');
+        const b = el('button', {}, el('span', {}, c.year || '—'), el('div', {}, c.title || '',
+          ...(c.seen ? [el('i', { className: 'ok', title: 'Смотрели' }, svgIcon('check'))] : []),
+          ...(note ? [el('small', {}, note)] : [])));
+        b.onclick = () => openCredit(c);
+        return b;
+      }))),
+  ].filter(Boolean));
+}
+
+// A title from someone's page: over the title's page they were opened
+// from, as another title of it (see openRelated), so back leads to them
+// again; that title itself, back to it.
+async function openCredit(r) {
+  if (!layers.includes('det')) {
+    while (layers.length) await closeTop();
+    return r.title_id ? openDetails({ id: r.title_id, title: r.title, year: r.year }) : openTmdb(r);
+  }
+  const here = item?.tm ? item.tm.id == r.id && item.tm.type == r.type : !!r.title_id && item?.id == r.title_id;
+  if (here) {
+    while (layers.at(-1) != 'det') await closeTop();
+    return;
+  }
+  while (layers.at(-1) != 'det') closeLayer();
+  openRelated(r);
+}
+$('pback').onclick = closeTop;
 
 // ---- playback -----------------------------------------------------------
 
