@@ -1696,8 +1696,12 @@ async function openDetails(m, quiet) {
   const tm = t.tmdb && tmdbOf(t);
   const x = tm ? await Promise.race([tm, new Promise(done => setTimeout(done, 3000))]) : null;
   if (item != m) return;
+  // A series' episodes wait for TMDB's as skeletons, not as a plain list.
+  m.tmWait = x === undefined && t.tmdb.type == 'tv';
   if (x === undefined) tm.then(x => {
-    if (!x || item != m) return;
+    if (item != m) return;
+    m.tmWait = false;
+    if (!x) return renderEpisodes('again');
     keepTop(() => {
       showTmdb(m, t, x);
       renderInfo(t, x, true);
@@ -2032,13 +2036,13 @@ function still(src, n) {
 function renderEpisodes(how) {
   if (!item?.seasons || !season) return;
   const now = pending || (st?.media && st.now);
-  const s = season, x = item.tm?.type == 'tv' ? s.tm : null;
+  const s = season, x = item.tm?.type == 'tv' ? s.tm : item.tmWait ? undefined : null;
   const key = `${item.id}|${s.season}|${now?.id}|${now?.season}|${now?.episode}|${!!pending}|${JSON.stringify(item.progress)}|${x === undefined ? '?' : !!x}`;
   if (!how && $('eps').dataset.key == key) return;
   $('eps').dataset.key = key;
   const m = item, sn = s.season, cont = continueAt(m);
   // Until TMDB answers, the rows it is asked for have their stills to come.
-  const rich = x !== null && item.tm?.type == 'tv';
+  const rich = x !== null;
   const rows = s.episodes.map((e, i) => {
     const on = now?.id == m.id && now.season == sn && now.episode == e.episode;
     const p = m.progress?.eps?.[epKey({ season: sn, episode: e.episode })];
