@@ -92,9 +92,8 @@ header.stuck::before{bottom:-28px}
 /* The page of a title's cast, over the title's. */
 #cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* Someone's page, over the title's or its cast's: their photo glows with
-   the colour of its background (--g, see glow), which tints the line of
-   what they do too. */
-#person{--g:220 12% 78%;position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+   the accent (--g), which the line of what they do has too. */
+#person{--g:40 100% 56%;position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 #person .lhead small{font-size:14px}
 /* The header names the page under until their name scrolls away, then
    them. */
@@ -102,18 +101,16 @@ header.stuck::before{bottom:-28px}
 #person.scr .lhead b:not(:empty){display:block}
 #person.scr .lhead b:not(:empty)+small{display:none}
 #phero{position:relative;padding:4px 16px 0;text-align:center}
-#phero::before{content:'';position:absolute;left:50%;top:-40px;width:420px;height:440px;transform:translateX(-50%);background:radial-gradient(closest-side,hsl(var(--g) / .09),hsl(var(--g) / .03) 60%,transparent);opacity:0;transition:opacity .6s;pointer-events:none}
-#phero.lit::before{opacity:1}
+#phero::before{content:'';position:absolute;left:50%;top:-40px;width:420px;height:440px;transform:translateX(-50%);background:radial-gradient(closest-side,hsl(var(--g) / .09),hsl(var(--g) / .03) 60%,transparent);pointer-events:none}
 .pt{position:relative;display:grid;place-items:center;width:150px;aspect-ratio:2/3;margin:0 auto;overflow:hidden;border-radius:16px;background:var(--s2);color:#55555c;box-shadow:0 0 0 1px #ffffff12;transition:box-shadow .6s}
 .pt svg{width:56px;height:56px}
 .pt img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s}
 .pt img.ld{opacity:1}
 .pt.ph{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
-#phero.lit .pt{overflow:visible;box-shadow:0 0 0 1px hsl(var(--g) / .15),0 0 60px 4px hsl(var(--g) / .15),0 30px 80px -10px hsl(var(--g) / .15)}
-#phero.lit .pt img{border-radius:16px}
+.pt.lit{overflow:visible;box-shadow:0 0 0 1px hsl(var(--g) / .15),0 0 60px 4px hsl(var(--g) / .15),0 30px 80px -10px hsl(var(--g) / .15)}
+.pt.lit img{border-radius:inherit}
 .pmain{position:relative;min-width:0}
-.eb{margin-top:22px;color:var(--mu);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;transition:color .6s}
-#phero.lit .eb{color:hsl(var(--g))}
+.eb{margin-top:22px;color:hsl(var(--g));font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 #phero h1{margin:6px 0 2px;font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-.02em;overflow-wrap:anywhere}
 .og{color:#a6a6ae;font-size:15px}
 .pfacts{margin:12px 0 0;color:#c8c8cc;font-size:14px;line-height:1.5}
@@ -607,7 +604,6 @@ svg.spring{animation:spring .3s ease-out}
   #phero{display:grid;grid-template-columns:240px 1fr;gap:48px;align-items:end;padding:20px var(--gut) 0;text-align:left}
   #phero::before{left:calc(var(--gut) + 120px);top:-60px;width:620px;height:600px}
   .pt{width:240px;margin:0;border-radius:18px}
-  #phero.lit .pt img{border-radius:18px}
   .eb{margin-top:0;font-size:13px}
   #phero h1{margin:8px 0 4px;font-size:52px;line-height:1.02}
   .og{font-size:18px}
@@ -2412,46 +2408,9 @@ const creditNote = c => [c.character, ...c.jobs].filter(Boolean).join(', ');
 // a series only if they were in 5 episodes of it or more, not a guest.
 const knownFor = p => p.credits.filter(c => c.poster && !(c.type == 'tv' && c.episodes && c.episodes < 5));
 
-// The colour someone's photo glows with (an "h s% l%" of hsl()): that of
-// its background, the strip along its edges where the person mostly
-// isn't; its hue, brightened to glow on the dark page. A grey background
-// glows silver. Null if the photo can't be read (not through the
-// router's proxy).
-function glow(img) {
-  const c = document.createElement('canvas'), w = c.width = 36, h = c.height = 54;
-  const x = c.getContext('2d', { willReadFrequently: true });
-  x.drawImage(img, 0, 0, w, h);
-  let d;
-  try {
-    d = x.getImageData(0, 0, w, h).data;
-  } catch {
-    return null;
-  }
-  const bins = Array.from({ length: 36 }, () => [0, 0, 0, 0]);
-  let edge = 0, colored = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    const px = i / 4 % w, py = Math.floor(i / 4 / w);
-    if (px >= 6 && px < w - 6 && py >= 8) continue;
-    edge++;
-    const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    const ch = mx - mn, l = (mx + mn) / 2;
-    if (ch < .06 || l < .08 || l > .96) continue;
-    colored++;
-    const sat = ch / (1 - Math.abs(2 * l - 1));
-    const hue = ((mx == r ? (g - b) / ch % 6 : mx == g ? (b - r) / ch + 2 : (r - g) / ch + 4) * 60 + 360) % 360;
-    const bin = bins[Math.floor(hue / 10)], rad = hue * Math.PI / 180;
-    bin[0] += sat; bin[1] += Math.cos(rad) * sat; bin[2] += Math.sin(rad) * sat; bin[3]++;
-  }
-  if (colored < edge * .3) return '220 12% 78%';
-  const k = bins.reduce((best, b, i) => b[0] > bins[best][0] ? i : best, 0);
-  const near = [bins[(k + 35) % 36], bins[k], bins[(k + 1) % 36]], sum = j => near.reduce((t, b) => t + b[j], 0);
-  const hue = (Math.atan2(sum(2), sum(1)) * 180 / Math.PI + 360) % 360, sat = Math.min(Math.max(sum(0) / sum(3) * 1.25, .3), .8);
-  return `${hue.toFixed(0)} ${(sat * 100).toFixed(0)}% 70%`;
-}
-
-// Someone's photo, glowing once it has loaded (see glow); a silhouette
-// where TMDB has none.
-function portrait(src, p) {
+// Someone's photo, glowing once it has loaded; a silhouette where TMDB
+// has none.
+function portrait(src) {
   const frame = el('div', { className: 'pt' }, svgIcon('person'));
   if (!src) return frame;
   const img = el('img', { src, alt: '' });
@@ -2459,12 +2418,7 @@ function portrait(src, p) {
   img.onload = () => {
     img.classList.add('ld');
     frame.classList.remove('ph');
-    if (!p) return;
-    p.glow ??= glow(img);
-    if (p.glow && personShown == p.id) {
-      $('person').style.setProperty('--g', p.glow);
-      $('phero').classList.add('lit');
-    }
+    frame.classList.add('lit');
   };
   img.onerror = () => {
     img.remove();
@@ -2484,9 +2438,6 @@ function renderPerson(p, known) {
   $('pname').textContent = name;
   $('pcrumb').textContent = pageUnder();
   $('pattr').hidden = !p;
-  $('person').style.removeProperty('--g');
-  $('phero').classList.toggle('lit', !!p?.glow);
-  if (p?.glow) $('person').style.setProperty('--g', p.glow);
   if (p === null) {
     $('phero').replaceChildren();
     return $('pbody').replaceChildren(el('p', { className: 'note' }, 'TMDB ничего не знает об этом человеке'));
@@ -2501,7 +2452,7 @@ function renderPerson(p, known) {
   if (p?.place) fact('Место рождения', [p.place]);
   const famous = top.slice(0, 2).map(c => c.character ? `${c.character} в «${c.title}»` : `«${c.title}»`);
   if (famous.length) fact(she ? 'Известна по' : 'Известен по', [famous.join(', ')], 'kf');
-  $('phero').replaceChildren(portrait(p ? p.photo : known?.photo, p),
+  $('phero').replaceChildren(portrait(p ? p.photo : known?.photo),
     el('div', { className: 'pmain' }, ...[
       el('div', { className: 'eb' }, p?.profession || (p ? '' : skl(30))),
       el('h1', {}, name || skl(60)),
