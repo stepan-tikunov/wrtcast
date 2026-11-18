@@ -537,8 +537,13 @@ svg.spring{animation:spring .3s ease-out}
   #toast{bottom:112px}
 }
 @media (hover:hover){
-  .card img{transition:opacity .35s,transform .2s,filter .2s}
-  .card:hover img{transform:translateY(-3px);filter:brightness(1.12)}
+  /* The poster lifts with all that is over it; translate, so the buttons'
+     own transform (their press) stays theirs. */
+  .card img{transition:opacity .35s,filter .2s}
+  .card:hover img{filter:brightness(1.12)}
+  .card :is(.pf,.bar,.ov,.up,.badge){transition:translate .2s}
+  .card .sv{transition:transform .12s,translate .2s}
+  .card:hover :is(.pf,.bar,.sv,.ov,.up,.badge){translate:0 -3px}
   .card .cp:not(.busy){opacity:0}
   .card:hover .cp:not(:disabled),.cp:focus-visible{opacity:1}
   .card:hover .cp:disabled{opacity:.5}
