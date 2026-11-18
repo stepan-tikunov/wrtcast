@@ -2531,6 +2531,39 @@ function wake(key, token) {
 	}
 }
 
+// title-api's answers by title, as kept in kv (lost with a reboot):
+// { last: the provider's last episode, null if not told, seasons: its
+// episode numbers, [[season, [episode, …]], …], as last told, next: TMDB's
+// next episode, if the series is coming back, t: when told, movie: not a
+// series } (see series_updates).
+function kept_updates() {
+	let u = kv_get('updates');
+	u = u != null ? json(u) : null;
+	return type(u) == 'object' ? u : {};
+}
+
+// What a card names of a series once the episode watched last (r: its
+// season, episode, pos, dur, done) is watched or left past 90 %: the one
+// after it on the provider, as told last (x: kept_updates'), or false after
+// its last; null while the episode isn't watched or the provider's episodes
+// are not known.
+function up_next(r, x) {
+	if (r?.season == null || !(r.done || r.dur > 0 && r.pos >= r.dur * 0.9) || !x?.seasons)
+		return null;
+	let all = [];
+	for (let s in x.seasons)
+		for (let n in s[1])
+			push(all, { season: s[0], episode: n });
+	for (let i, y in all)
+		if (y.season == r.season && y.episode == `${r.episode}`)
+			return all[i + 1] ?? false;
+	return null;
+}
+
+// A row of the lists with done a boolean and upnext (see up_next) of the
+// answers of title-api kept (u).
+const with_next = u => r => ({ ...r, done: !!r.done, upnext: up_next({ ...r, done: !!r.done }, u[r.id]) });
+
 // The titles saved to watch, latest saved first, with the position of
 // those watched as in the recently watched list.
 function saved_rows() {
@@ -2538,7 +2571,7 @@ function saved_rows() {
 		coalesce(s.poster, t.poster) AS poster, s.t, t.season, t.episode, p.pos, p.dur, p.done
 		FROM saved s LEFT JOIN titles t ON t.id = s.id LEFT JOIN progress p
 		ON p.id = s.id AND p.ep = CASE WHEN t.season IS NULL THEN ''
-		ELSE t.season || ':' || t.episode END ORDER BY s.t DESC`), r => ({ ...r, done: !!r.done }));
+		ELSE t.season || ':' || t.episode END ORDER BY s.t DESC`), with_next(kept_updates()));
 }
 
 function recent_rows() {
@@ -2546,7 +2579,7 @@ function recent_rows() {
 		t.episode, p.pos, p.dur, p.done FROM titles t JOIN progress p
 		ON p.id = t.id AND p.ep = CASE WHEN t.season IS NULL THEN ''
 		ELSE t.season || ':' || t.episode END
-		WHERE t.title IS NOT NULL ORDER BY t.t DESC`), r => ({ ...r, done: !!r.done }));
+		WHERE t.title IS NOT NULL ORDER BY t.t DESC`), with_next(kept_updates()));
 }
 
 // ---- saved titles ------------------------------------------------------------
@@ -2603,16 +2636,6 @@ const ep_num = e => +(match(`${e}`, /^[0-9]+/)?.[0] ?? 0);
 const ep_after = (a, b) => a.season > b.season ||
 	a.season == b.season && ep_num(a.episode) > ep_num(b.episode);
 
-// title-api's answers by title, as kept in kv (lost with a reboot):
-// { last: the provider's last episode, null if not told, next: TMDB's next
-// episode, if the series is coming back, t: when told, movie: not a
-// series }.
-function kept_updates() {
-	let u = kv_get('updates');
-	u = u != null ? json(u) : null;
-	return type(u) == 'object' ? u : {};
-}
-
 // The provider's last episode of each series watched when /updates first
 // told it, kept on flash with the history: an episode is new only after
 // it, so that one that was there all along, left unwatched, isn't.
@@ -2647,6 +2670,8 @@ function series_updates() {
 			u[id] = {
 				// Not told in time: as told before, if it was.
 				last: x.lastEpisode ? { season: +x.lastSeason, episode: x.lastEpisode } : u[id]?.last,
+				seasons: length(x.seasons) ? map(x.seasons, s => [+s.seasonNumber, s.episodeNumbers ?? []]) :
+					u[id]?.seasons,
 				next: x.status == 'TMDB_STATUS_RETURNING' && n?.airDate ? {
 					season: +n.seasonNumber, episode: +n.episodeNumber,
 					date: n.airDate, title: n.name || null,
@@ -2665,7 +2690,7 @@ function series_updates() {
 				if (!told[id])
 					u[id] = { movie: true, t: now };
 	}
-	let out = {}, known = known_episodes(), was = sprintf('%J', known);
+	let out = {}, upnext = {}, known = known_episodes(), was = sprintf('%J', known);
 	for (let id in [...watched, ...others]) {
 		let x = u[id];
 		if (!x)
@@ -2674,6 +2699,8 @@ function series_updates() {
 		if (x.movie)
 			continue;
 		let e = index(watched, id) >= 0 ? title_row(id) : null, fresh = false;
+		if (e)
+			upnext[id] = up_next({ ...e, ...progress_row(id, ep_key(e.season, e.episode)) }, x);
 		if (e && x.last) {
 			known[id] ??= x.last;
 			let p = progress_row(id, ep_key(e.season, e.episode));
@@ -2689,7 +2716,7 @@ function series_updates() {
 	kv_set('updates', sprintf('%J', still));
 	if (sprintf('%J', known) != was)
 		set_setting('known', sprintf('%J', known));
-	return { updates: out, partial };
+	return { updates: out, upnext, partial };
 }
 
 

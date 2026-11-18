@@ -1285,6 +1285,18 @@ async function loadUpdates() {
     updating = api('updates');
     const r = await updating;
     updates = r.updates || {};
+    // The next episodes of the series watched, the provider's episodes
+    // having come with the badges.
+    let moved = false;
+    for (const x of [...recent, ...saved])
+      if (x.id in (r.upnext || {}) && JSON.stringify(x.upnext) != JSON.stringify(r.upnext[x.id])) {
+        x.upnext = r.upnext[x.id];
+        moved = true;
+      }
+    if (moved) {
+      if (!searching) renderRecent(false);
+      renderList();
+    }
     // Some came too late: once more, the router has them by then.
     if (r.partial && !updatesAgain) updatesAgain = setTimeout(loadUpdates, 20000);
   } catch {
@@ -1311,19 +1323,25 @@ function markUpdate(c) {
   }, text)));
 }
 
-// "7s17e" for a series, plus "просмотрено" once the episode is watched or
-// left past 90 % (the play button moves on to the next one). How far in
-// shows on the poster.
+// Whether a series' episode watched last is watched or left past 90 %:
+// the play button moves on to the next one.
+const epWatched = r => r.season != null && (r.done || r.dur && r.pos >= r.dur * 0.9);
+
+// "С7 Э17" for a series; once that is watched, the next one, as the router
+// knows it (upnext, see /progress), or "просмотрено" after the last, as a
+// movie watched; nothing while the router doesn't know which.
 function recentNote(r) {
-  const done = r.done || r.season != null && r.dur && r.pos >= r.dur * 0.9;
-  return [r.season != null ? epShort(r) : '', done ? 'просмотрено' : ''].filter(Boolean).join(' · ');
+  if (r.season == null) return r.done ? 'просмотрено' : '';
+  if (!epWatched(r)) return epShort(r);
+  return r.upnext ? epShort(r.upnext) : r.upnext === false ? 'просмотрено' : '';
 }
 
 const recentPart = r => r.done ? 1 : r.dur ? Math.min(1, r.pos / r.dur) : 0;
 
-// A card of the history or of the saved titles; a saved one never
-// watched has no progress.
-const rowCard = (r, i) => card(r, i, recentNote(r), r.pos != null ? recentPart(r) : null);
+// A card of the history or of the saved titles, with how far in on the
+// poster: none for a saved one never watched, nor for a series whose
+// episode is watched.
+const rowCard = (r, i) => card(r, i, recentNote(r), r.pos != null && !epWatched(r) ? recentPart(r) : null);
 
 function renderRecent(anim = true) {
   $('msg').hidden = recent.length + saved.length > 0;
