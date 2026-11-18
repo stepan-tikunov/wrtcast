@@ -547,12 +547,13 @@ svg.spring{animation:spring .3s ease-out}
   .tag{font-size:16px}
   .news{max-width:760px}
   #dattr{margin:36px var(--dgut) 0}
-  #pinfo,#pmore{padding-left:var(--dgut);padding-right:var(--dgut)}
-  #pmore .strip{margin:0 calc(-1 * var(--dgut));padding:0 var(--dgut) 4px}
+  /* By the header, as the pages of lists are (.lhead), not the title's. */
+  #pinfo,#pmore{padding-left:var(--gut);padding-right:var(--gut)}
+  #pmore .strip{--dgut:var(--gut);margin:0 calc(-1 * var(--gut));padding:0 var(--gut) 4px}
   .phero .st{width:160px}
   #pbio{max-width:760px;-webkit-line-clamp:6;font-size:16px}
   .works{max-width:760px}
-  #pattr{margin:36px var(--dgut) 0}
+  #pattr{margin:36px var(--gut) 0}
   #clist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));padding:0 calc(var(--gut) - 16px)}
   #ddesc{max-width:760px;-webkit-line-clamp:6;font-size:16px}
   #seasons{flex-wrap:wrap;padding:20px var(--dgut) 10px}
