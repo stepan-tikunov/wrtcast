@@ -22,11 +22,9 @@ svg{width:24px;height:24px;fill:currentColor;flex:none}
 .ib,.pill,.card,.ep{transition:transform .12s}
 
 header{position:sticky;top:0;z-index:2;display:flex;gap:8px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top))}
-/* Solid to the header's bottom, under the search's padding; once the page
-   is scrolled (.stuck), fading out below it over what scrolls under, not
-   over the first row at the top. */
-header::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(var(--bg) calc(100% - 28px),#0e0e10ff calc(100% - 28px),#0e0e10f4 calc(100% - 24.5px),#0e0e10d7 calc(100% - 21px),#0e0e10ae calc(100% - 17.5px),#0e0e1080 calc(100% - 14px),#0e0e1051 calc(100% - 10.5px),#0e0e1028 calc(100% - 7px),#0e0e100b calc(100% - 3.5px),#0e0e1000 calc(100% - 0px))}
-header.stuck::before{bottom:-28px}
+/* Solid, with a sharp edge once the page is scrolled under it (.stuck). */
+header::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:var(--bg)}
+header.stuck::before{border-bottom:1px solid #ffffff1f}
 #f{position:relative;flex:1}
 #devbtn,#mkbtn{width:46px;height:46px;border-radius:14px;background:var(--s2);color:var(--mu)}
 #devbtn.on{color:var(--ac)}
