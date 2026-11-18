@@ -91,29 +91,83 @@ header.stuck::before{bottom:-28px}
 #list{position:fixed;inset:0;z-index:3;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* The page of a title's cast, over the title's. */
 #cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
-/* Someone's page, over the title's or its cast's. */
-#person{position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
-#pinfo{padding:4px 16px}
-.phero{display:flex;gap:16px;align-items:flex-start}
-.phero .st{flex:none;width:112px;aspect-ratio:2/3;border-radius:12px}
-.phero .st svg{width:48px;height:48px;color:#55555c}
-.phero .facts{min-width:0;padding-top:2px}
-.phero .facts .orig{margin-bottom:6px;color:var(--mu)}
-/* Their pages elsewhere. */
-.links{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 4px}
-.links a{padding:7px 14px;border-radius:18px;background:var(--s2);color:var(--tx);font-size:14px;font-weight:550;text-decoration:none;transition:transform .12s}
-.links a:active{transform:scale(.96)}
-#pbio{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;margin:14px 0 0;color:#c8c8cc;font-size:15px;line-height:1.45;white-space:pre-line;cursor:pointer}
+/* Someone's page, over the title's or its cast's: their photo glows with
+   the colour of its background (--g, see glow), which tints the line of
+   what they do too. */
+#person{--g:220 12% 78%;position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+#person .lhead small{font-size:14px}
+/* The header names the page under until their name scrolls away, then
+   them. */
+#person .lhead b{display:none;overflow:hidden;font-size:17px;font-weight:650;white-space:nowrap;text-overflow:ellipsis;animation:pop .2s ease-out}
+#person.scr .lhead b:not(:empty){display:block}
+#person.scr .lhead b:not(:empty)+small{display:none}
+#phero{position:relative;padding:4px 16px 0;text-align:center}
+#phero::before{content:'';position:absolute;left:50%;top:-40px;width:420px;height:440px;transform:translateX(-50%);background:radial-gradient(closest-side,hsl(var(--g) / .09),hsl(var(--g) / .03) 60%,transparent);opacity:0;transition:opacity .6s;pointer-events:none}
+#phero.lit::before{opacity:1}
+.pt{position:relative;display:grid;place-items:center;width:150px;aspect-ratio:2/3;margin:0 auto;overflow:hidden;border-radius:16px;background:var(--s2);color:#55555c;box-shadow:0 0 0 1px #ffffff12;transition:box-shadow .6s}
+.pt svg{width:56px;height:56px}
+.pt img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s}
+.pt img.ld{opacity:1}
+.pt.ph{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
+#phero.lit .pt{overflow:visible;box-shadow:0 0 0 1px hsl(var(--g) / .15),0 0 60px 4px hsl(var(--g) / .15),0 30px 80px -10px hsl(var(--g) / .15)}
+#phero.lit .pt img{border-radius:16px}
+.pmain{position:relative;min-width:0}
+.eb{margin-top:22px;color:var(--mu);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;transition:color .6s}
+#phero.lit .eb{color:hsl(var(--g))}
+#phero h1{margin:6px 0 2px;font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-.02em;overflow-wrap:anywhere}
+.og{color:#a6a6ae;font-size:15px}
+.pfacts{margin:12px 0 0;color:#c8c8cc;font-size:14px;line-height:1.5}
+.pfacts dt,.pfacts .kf{display:none}
+.pfacts dd{margin:0}
+.pfacts em{font-style:normal;color:var(--mu)}
+/* Their pages elsewhere, each with its site's mark. */
+.plinks{display:flex;gap:8px;overflow-x:auto;margin:20px -16px 0;padding:0 16px;scrollbar-width:none}
+.plinks::-webkit-scrollbar{display:none}
+.plinks a{flex:none;display:flex;align-items:center;gap:8px;height:36px;padding:0 14px 0 7px;border-radius:11px;background:#ffffff0f;box-shadow:inset 0 0 0 1px #ffffff14;color:#e4e4e7;font-size:14px;font-weight:600;text-decoration:none;transition:transform .12s}
+.plinks a:active{transform:scale(.96)}
+.plinks i{display:grid;place-items:center;width:24px;height:24px;border-radius:6px;font-style:normal;font-size:12px;font-weight:800}
+.plinks .kinopoisk{border-radius:50%;background:#f60;color:#fff}
+.plinks .imdb{width:34px;background:#f5c518;color:#000;font-size:10px}
+.plinks .wikipedia{background:#fff;color:#111;font-family:Georgia,serif;font-size:15px}
+.plinks .tmdb{width:30px;height:14px;border-radius:4px;background:linear-gradient(90deg,#90cea1,#01b4e4)}
+.plinks .instagram{border-radius:7px;background:radial-gradient(circle at 30% 110%,#fdf497 0,#fd5949 45%,#d6249f 60%,#285aeb 90%)}
+.pstats{display:flex;justify-content:center;gap:22px;margin-top:20px}
+.pstats b{display:block;font-size:20px;font-weight:750}
+.pstats span{color:var(--mu);font-size:13px}
+#pbody{padding:0 16px}
+#pbio{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;margin:24px 0 0;color:#cfcfd4;font-size:15px;line-height:1.55;white-space:pre-line}
 #pbio.full{-webkit-line-clamp:unset}
-#pmore{padding:0 16px}
-#pmore .dh{margin-top:26px}
-/* All they are in or made, the latest first. */
-.works button{display:grid;grid-template-columns:48px 1fr;gap:10px;width:100%;padding:9px 0;border:0;border-bottom:1px solid var(--s2);background:none;color:var(--tx);font-size:15px;text-align:left;cursor:pointer}
-.works span{color:var(--mu);font-variant-numeric:tabular-nums}
-.works small{display:block;margin-top:2px;color:var(--mu);font-size:13px}
-.works .ok{display:inline-grid;place-items:center;width:16px;height:16px;margin-left:6px;vertical-align:-2px;color:var(--ac)}
-.works .ok svg{width:16px;height:16px}
-#pattr{margin:28px 16px 0;padding-top:12px;border-top:1px solid var(--s2)}
+.pmore{display:block;margin-top:6px;padding:0;border:0;background:none;color:var(--ac);font-size:15px;font-weight:600}
+#pbody .dh{display:flex;align-items:baseline;gap:8px;margin:32px 0 12px;font-size:19px}
+#pbody .dh small{color:var(--mu);font-size:14px;font-weight:500}
+/* What of theirs was watched here: wide frames, unlike the posters of what
+   they are known for. */
+.wtile{flex:none;width:260px;padding:0;border:0;background:none;color:var(--tx);font-size:14px;text-align:left;transition:transform .12s}
+.wtile:active{transform:scale(.97)}
+.wtile .st{border-radius:12px;box-shadow:0 0 0 1px #ffffff12}
+.wtile .st>b{color:#55555c;font-size:28px}
+.wtile>b{display:block;margin-top:8px;font-weight:600}
+.wtile>span{display:block;margin-top:2px;color:var(--mu);font-size:13px}
+.done{position:absolute;left:8px;top:8px;z-index:1;display:flex;align-items:center;gap:4px;padding:3px 8px 3px 5px;border-radius:8px;background:#000b;font-size:12px;font-weight:600}
+.done svg{width:14px;height:14px;color:var(--ac)}
+#pbody .tile.tall>span+span{margin-top:0;color:#6b6b72}
+/* All they are in or made, by year, the latest first. */
+.seg{display:flex;gap:6px;margin:0 0 6px}
+.seg button{padding:7px 14px;border:0;border-radius:18px;background:var(--s2);color:#c8c8cc;font-size:14px;font-weight:600}
+.seg button.on{background:var(--tx);color:#111}
+.seg em{margin-left:4px;font-style:normal;opacity:.55}
+.yg>.y{margin:16px 0 2px;color:var(--mu);font-size:13px;font-weight:700;letter-spacing:.04em}
+.work{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:12px;width:100%;padding:8px 0;border:0;border-bottom:1px solid #ffffff0d;background:none;color:var(--tx);text-align:left}
+.work .th{width:34px;aspect-ratio:2/3;border-radius:5px;background:var(--s2) center/cover}
+.work .th.none{background:repeating-linear-gradient(135deg,var(--s2) 0 6px,var(--s1) 6px 12px)}
+.work>div{min-width:0}
+.work b{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600}
+.work b svg{flex:none;width:16px;height:16px;color:var(--ac)}
+.work span{display:block;overflow:hidden;color:var(--mu);font-size:13px;white-space:nowrap;text-overflow:ellipsis}
+.work small{color:#6b6b72;font-size:12px;white-space:nowrap}
+.soon{margin-right:6px;padding:2px 6px;border-radius:6px;background:#ffb02024;color:var(--ac);font-weight:600}
+.pall{display:block;width:100%;margin-top:14px;padding:11px;border:0;border-radius:12px;background:var(--s2);font-size:14px;font-weight:600}
+#pattr{margin:32px 16px 0;padding-top:12px;border-top:1px solid var(--s2)}
 #person .skl{display:inline-block;vertical-align:middle;height:.8em;margin:0;border-radius:.4em}
 /* Names that lead to someone's page. */
 .cast [role=button],.person[role=button]{cursor:pointer}
@@ -451,7 +505,8 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .badge.on{animation:bounce .35s ease-out}
 #det,#list,#cast,#person{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
 #det.out,#list.out,#cast.out,#person.out{animation:slideout .2s ease-in forwards}
-#pinfo>*,#pmore>*{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
+#phero .pmain>*,#pbody>*{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
+#person .still,#person .still *{animation:none}
 #dposter{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards}
 #dinfo>*,#dmore>*,.rt,#dlogo,#dacts>*{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
 /* Drawn again as TMDB answers, what was there doesn't pop up anew. */
@@ -547,13 +602,42 @@ svg.spring{animation:spring .3s ease-out}
   .tag{font-size:16px}
   .news{max-width:760px}
   #dattr{margin:36px var(--dgut) 0}
-  /* By the header, as the pages of lists are (.lhead), not the title's. */
-  #pinfo,#pmore{padding-left:var(--gut);padding-right:var(--gut)}
-  #pmore .strip{--dgut:var(--gut);margin:0 calc(-1 * var(--gut));padding:0 var(--gut) 4px}
-  .phero .st{width:160px}
-  #pbio{max-width:760px;-webkit-line-clamp:6;font-size:16px}
-  .works{max-width:760px}
-  #pattr{margin:36px var(--gut) 0}
+  /* By the header, as the pages of lists are (.lhead), not the title's:
+     the photo beside who they are. */
+  #phero{display:grid;grid-template-columns:240px 1fr;gap:48px;align-items:end;padding:20px var(--gut) 0;text-align:left}
+  #phero::before{left:calc(var(--gut) + 120px);top:-60px;width:620px;height:600px}
+  .pt{width:240px;margin:0;border-radius:18px}
+  #phero.lit .pt img{border-radius:18px}
+  .eb{margin-top:0;font-size:13px}
+  #phero h1{margin:8px 0 4px;font-size:52px;line-height:1.02}
+  .og{font-size:18px}
+  .pfacts{display:grid;grid-template-columns:auto 1fr;gap:8px 22px;margin-top:24px;font-size:15px}
+  .pfacts dt,.pfacts .kf{display:block}
+  .pfacts dt{color:var(--mu)}
+  .pfacts dd{color:#e4e4e7}
+  .plinks{flex-wrap:wrap;overflow:visible;margin:24px 0 0;padding:0}
+  .plinks a{height:38px}
+  .plinks a:hover{background:#ffffff1a}
+  #pbody{padding:0 var(--gut)}
+  #pbio{max-width:760px;margin-top:36px;font-size:17px;line-height:1.6;-webkit-line-clamp:3}
+  .pstats{justify-content:flex-start;gap:28px;margin-top:28px}
+  .pstats b{font-size:24px}
+  #pbody .dh{margin:44px 0 16px;font-size:22px}
+  #pbody .strip{--dgut:var(--gut);margin:0 calc(-1 * var(--gut));padding:0 var(--gut) 4px}
+  .wtile{width:320px;font-size:15px}
+  .wtile:hover .st,#pbody .tile:hover .st{box-shadow:0 0 0 2px #ffffff40}
+  #pbody .tile.tall{width:156px}
+  .works{max-width:900px}
+  .seg{margin-bottom:10px}
+  .yg{display:grid;grid-template-columns:64px 1fr;border-top:1px solid #ffffff1f}
+  .yg>.y{margin:0;padding-top:17px;font-size:15px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums}
+  .work{grid-template-columns:40px 1fr auto;gap:16px;padding:9px 0}
+  .work .th{width:40px}
+  .work small{font-size:13px}
+  .work:hover b{color:hsl(var(--g))}
+  .yg .work:last-child{border-bottom:0}
+  .pall{display:inline-block;width:auto;padding:10px 18px}
+  #pattr{margin:40px var(--gut) 0}
   #clist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));padding:0 calc(var(--gut) - 16px)}
   #ddesc{max-width:760px;-webkit-line-clamp:6;font-size:16px}
   #seasons{flex-wrap:wrap;padding:20px var(--dgut) 10px}
@@ -649,9 +733,9 @@ svg.spring{animation:spring .3s ease-out}
 </section>
 
 <section id="person" hidden>
-  <div class="lhead"><button class="ib" id="pback" aria-label="Назад"><svg><use href="#i-back"/></svg></button><h1><span id="pname"></span><small id="pjob"></small></h1></div>
-  <div id="pinfo"></div>
-  <div id="pmore"></div>
+  <div class="lhead"><button class="ib" id="pback" aria-label="Назад"><svg><use href="#i-back"/></svg></button><h1><b id="pname"></b><small id="pcrumb"></small></h1></div>
+  <div id="phero"></div>
+  <div id="pbody"></div>
   <p class="attr" id="pattr" hidden><b>TMDB</b>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
 </section>
 
@@ -2307,7 +2391,7 @@ async function showPerson(id, known) {
   if (personShown == id) renderPerson(people[id], known);
 }
 
-const LINKS = { kinopoisk: 'Кинопоиск', imdb: 'IMDb', wikipedia: 'Википедия', tmdb: 'TMDB', instagram: 'Instagram' };
+const LINKS = { kinopoisk: ['Кинопоиск', 'К'], imdb: ['IMDb', 'IMDb'], wikipedia: ['Википедия', 'W'], tmdb: ['TMDB', ''], instagram: ['Instagram', ''] };
 
 // A date of TMDB (1969-08-18) in full, "18 августа 1969".
 const fullDay = date => date.length < 10 ? date :
@@ -2319,57 +2403,186 @@ function age(from, to = today()) {
   return ty - y - (tmd < md ? 1 : 0);
 }
 const years = n => `${n} ${plural(n, 'год', 'года', 'лет')}`;
+const episodes = n => `${n} ${plural(n, 'серия', 'серии', 'серий')}`;
 
 // What they were in a title: whom they played, what else they did.
 const creditNote = c => [c.character, ...c.jobs].filter(Boolean).join(', ');
 
+// What someone is known for: the best known of what they played or made,
+// a series only if they were in 5 episodes of it or more, not a guest.
+const knownFor = p => p.credits.filter(c => c.poster && !(c.type == 'tv' && c.episodes && c.episodes < 5));
+
+// The colour someone's photo glows with (an "h s% l%" of hsl()): that of
+// its background, the strip along its edges where the person mostly
+// isn't; its hue, brightened to glow on the dark page. A grey background
+// glows silver. Null if the photo can't be read (not through the
+// router's proxy).
+function glow(img) {
+  const c = document.createElement('canvas'), w = c.width = 36, h = c.height = 54;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(img, 0, 0, w, h);
+  let d;
+  try {
+    d = x.getImageData(0, 0, w, h).data;
+  } catch {
+    return null;
+  }
+  const bins = Array.from({ length: 36 }, () => [0, 0, 0, 0]);
+  let edge = 0, colored = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const px = i / 4 % w, py = Math.floor(i / 4 / w);
+    if (px >= 6 && px < w - 6 && py >= 8) continue;
+    edge++;
+    const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const ch = mx - mn, l = (mx + mn) / 2;
+    if (ch < .06 || l < .08 || l > .96) continue;
+    colored++;
+    const sat = ch / (1 - Math.abs(2 * l - 1));
+    const hue = ((mx == r ? (g - b) / ch % 6 : mx == g ? (b - r) / ch + 2 : (r - g) / ch + 4) * 60 + 360) % 360;
+    const bin = bins[Math.floor(hue / 10)], rad = hue * Math.PI / 180;
+    bin[0] += sat; bin[1] += Math.cos(rad) * sat; bin[2] += Math.sin(rad) * sat; bin[3]++;
+  }
+  if (colored < edge * .3) return '220 12% 78%';
+  const k = bins.reduce((best, b, i) => b[0] > bins[best][0] ? i : best, 0);
+  const near = [bins[(k + 35) % 36], bins[k], bins[(k + 1) % 36]], sum = j => near.reduce((t, b) => t + b[j], 0);
+  const hue = (Math.atan2(sum(2), sum(1)) * 180 / Math.PI + 360) % 360, sat = Math.min(Math.max(sum(0) / sum(3) * 1.25, .3), .8);
+  return `${hue.toFixed(0)} ${(sat * 100).toFixed(0)}% 70%`;
+}
+
+// Someone's photo, glowing once it has loaded (see glow); a silhouette
+// where TMDB has none.
+function portrait(src, p) {
+  const frame = el('div', { className: 'pt' }, svgIcon('person'));
+  if (!src) return frame;
+  const img = el('img', { src, alt: '' });
+  frame.classList.add('ph');
+  img.onload = () => {
+    img.classList.add('ld');
+    frame.classList.remove('ph');
+    if (!p) return;
+    p.glow ??= glow(img);
+    if (p.glow && personShown == p.id) {
+      $('person').style.setProperty('--g', p.glow);
+      $('phero').classList.add('lit');
+    }
+  };
+  img.onerror = () => {
+    img.remove();
+    frame.classList.remove('ph');
+  };
+  frame.append(img);
+  return frame;
+}
+
+// The page under someone's, as their header names it.
+const pageUnder = () => [item?.title || $('dtitle').textContent, layers.includes('cast') && 'В ролях'].filter(Boolean).join(' · ');
+
 // p: /tmdb/person's answer, undefined while it comes, null if there is
 // none.
 function renderPerson(p, known) {
-  $('pname').textContent = p?.name || known?.name || '';
-  $('pjob').textContent = p?.profession || '';
+  const name = p?.name || known?.name || '';
+  $('pname').textContent = name;
+  $('pcrumb').textContent = pageUnder();
   $('pattr').hidden = !p;
+  $('person').style.removeProperty('--g');
+  $('phero').classList.toggle('lit', !!p?.glow);
+  if (p?.glow) $('person').style.setProperty('--g', p.glow);
   if (p === null) {
-    $('pinfo').replaceChildren(el('p', { className: 'note' }, 'TMDB ничего не знает об этом человеке'));
-    return $('pmore').replaceChildren();
+    $('phero').replaceChildren();
+    return $('pbody').replaceChildren(el('p', { className: 'note' }, 'TMDB ничего не знает об этом человеке'));
   }
-  const she = p?.gender == 'female', facts = [];
-  if (p?.original && p.original != p.name) facts.push(el('div', { className: 'orig' }, p.original));
-  if (p?.birthday) facts.push(el('div', {}, `${she ? 'Родилась' : 'Родился'} ${fullDay(p.birthday)}` +
-    (p.deathday || p.birthday.length < 10 ? '' : ` · ${years(age(p.birthday))}`)));
-  if (p?.deathday) facts.push(el('div', {}, `${she ? 'Умерла' : 'Умер'} ${fullDay(p.deathday)}` +
-    (p.birthday?.length == 10 && p.deathday.length == 10 ? ` · ${years(age(p.birthday, p.deathday))}` : '')));
-  if (p?.place) facts.push(el('div', {}, p.place));
-  const bio = p?.biography && el('p', { id: 'pbio' }, p.biography);
-  if (bio) bio.onclick = () => bio.classList.toggle('full');
-  $('pinfo').replaceChildren(...[
-    el('div', { className: 'phero' }, still(p ? p.photo : known?.photo, svgIcon('person')),
-      el('div', { className: 'facts' }, ...(p ? facts : sklLines(70, 50, 60)))),
-    p?.links.length && el('div', { className: 'links' }, ...p.links.map(l =>
-      el('a', { href: l.url, target: '_blank', rel: 'noopener' }, LINKS[l.site] || l.site))),
-    bio,
-  ].filter(Boolean));
-  if (!p) return $('pmore').replaceChildren();
-  const under = c => [when(c), c.character || c.jobs[0]].filter(Boolean).join(' · ');
+  const she = p?.gender == 'female', top = p ? knownFor(p) : [];
+  const facts = [];
+  const fact = (k, v, cls) => facts.push(el('dt', { className: cls || '' }, k), el('dd', { className: cls || '' }, ...v));
+  if (p?.birthday) fact(she ? 'Родилась' : 'Родился', [fullDay(p.birthday),
+    ...(p.deathday || p.birthday.length < 10 ? [] : [el('em', {}, ' · ' + years(age(p.birthday)))])]);
+  if (p?.deathday) fact(she ? 'Умерла' : 'Умер', [fullDay(p.deathday),
+    ...(p.birthday?.length == 10 && p.deathday.length == 10 ? [el('em', {}, ' · ' + years(age(p.birthday, p.deathday)))] : [])]);
+  if (p?.place) fact('Место рождения', [p.place]);
+  const famous = top.slice(0, 2).map(c => c.character ? `${c.character} в «${c.title}»` : `«${c.title}»`);
+  if (famous.length) fact(she ? 'Известна по' : 'Известен по', [famous.join(', ')], 'kf');
+  $('phero').replaceChildren(portrait(p ? p.photo : known?.photo, p),
+    el('div', { className: 'pmain' }, ...[
+      el('div', { className: 'eb' }, p?.profession || (p ? '' : skl(30))),
+      el('h1', {}, name || skl(60)),
+      p?.original && p.original != p.name && el('div', { className: 'og' }, p.original),
+      el('dl', { className: 'pfacts' }, ...(p ? facts : sklLines(50, 40))),
+      p?.links.length && el('div', { className: 'plinks' }, ...p.links.map(l => el('a', { href: l.url, target: '_blank', rel: 'noopener' },
+        el('i', { className: l.site }, LINKS[l.site]?.[1] ?? ''), LINKS[l.site]?.[0] || l.site))),
+    ].filter(Boolean)));
+  if (!p) return $('pbody').replaceChildren();
+
+  const bio = p.biography && el('p', { id: 'pbio' }, p.biography);
+  const more = bio && el('button', { className: 'pmore', hidden: true, onclick: () => {
+    bio.classList.add('full');
+    more.hidden = true;
+  } }, 'Читать полностью');
+  const seen = p.credits.filter(c => c.seen), series = p.credits.filter(c => c.type == 'tv').length;
+  const first = p.credits.map(c => c.year).filter(Boolean).sort()[0];
+  const stat = (n, label) => el('div', {}, el('b', {}, n), el('span', {}, label));
   const row = (head, list) => list.length && el('section', {},
     el('h2', { className: 'dh' }, head), el('div', { className: 'strip' }, ...list));
-  // Those not out yet first, the latest of the rest next.
-  const works = p.credits.slice().sort((a, b) => (b.date || '9999').localeCompare(a.date || '9999'));
-  $('pmore').replaceChildren(...[
-    row('Вы смотрели', p.credits.filter(c => c.seen).map(c => related(c, false, under(c), false, true, openCredit))),
-    row('Известные работы', p.credits.filter(c => c.poster && !c.seen).slice(0, 20)
-      .map(c => related(c, false, under(c), false, true, openCredit))),
-    works.length && el('section', {}, el('h2', { className: 'dh' }, 'Фильмография'),
-      el('div', { className: 'works' }, ...works.map(c => {
-        const note = [creditNote(c), c.episodes && `${c.episodes} ${plural(c.episodes, 'серия', 'серии', 'серий')}`].filter(Boolean).join(' · ');
-        const b = el('button', {}, el('span', {}, c.year || '—'), el('div', {}, c.title || '',
-          ...(c.seen ? [el('i', { className: 'ok', title: 'Смотрели' }, svgIcon('check'))] : []),
-          ...(note ? [el('small', {}, note)] : [])));
-        b.onclick = () => openCredit(c);
-        return b;
-      }))),
+  $('pbody').replaceChildren(...[
+    bio, more,
+    el('div', { className: 'pstats' }, ...[
+      stat(p.credits.length, plural(p.credits.length, 'работа', 'работы', 'работ')),
+      series && stat(series, plural(series, 'сериал', 'сериала', 'сериалов')),
+      first && stat(first, p.credits.some(c => c.acting) ? 'первая роль' : 'первая работа'),
+      seen.length && stat(seen.length, 'вы смотрели'),
+    ].filter(Boolean)),
+    row('Вы смотрели', seen.map(c => {
+      const done = recent.some(e => e.id == c.title_id && e.done), pic = still(c.backdrop || c.poster, (c.title || '?')[0]);
+      if (done) pic.append(el('span', { className: 'done' }, svgIcon('check'), 'Просмотрено'));
+      const b = el('button', { className: 'wtile' }, pic, el('b', {}, c.title || ''),
+        el('span', {}, [c.character || c.jobs[0], c.episodes ? episodes(c.episodes) : c.year].filter(Boolean).join(' · ')));
+      b.onclick = () => openCredit(c);
+      return b;
+    })),
+    row(she ? 'Известна по' : 'Известен по', top.filter(c => !c.seen).slice(0, 12).map(c => {
+      const t = related(c, false, c.character || c.jobs.join(', '), false, true, openCredit);
+      t.append(el('span', {}, [c.year || 'Скоро', c.type == 'tv' && 'сериал'].filter(Boolean).join(' · ')));
+      return t;
+    })),
+    p.credits.length && works(p),
   ].filter(Boolean));
+  // "Читать полностью" only for what doesn't fit.
+  if (bio) requestAnimationFrame(() => more.hidden = bio.scrollHeight <= bio.clientHeight + 2);
 }
+
+// All they are in or made, by year, the latest first and those to come
+// before them: films or series alone, as chosen; 12 until all are asked
+// for.
+function works(p, kind = 'all', all = false) {
+  const movies = p.credits.filter(c => c.type == 'movie').length, series = p.credits.length - movies;
+  const list = p.credits.filter(c => kind == 'all' || c.type == kind)
+    .sort((a, b) => (b.date || '9999').localeCompare(a.date || '9999'));
+  const shown = all ? list : list.slice(0, 12), groups = [];
+  for (const c of shown) {
+    const y = c.year && c.date <= today() ? c.year : 'Скоро';
+    if (groups.at(-1)?.y != y) groups.push({ y, list: [] });
+    groups.at(-1).list.push(c);
+  }
+  const sec = el('section', { className: 'works' });
+  const redraw = (k, a) => sec.replaceWith(works(p, k, a));
+  const chip = (k, label, n) => el('button', { className: k == kind ? 'on' : '', onclick: () => redraw(k, false) }, label, el('em', {}, n));
+  sec.append(el('h2', { className: 'dh' }, 'Фильмография', el('small', {}, p.credits.length)),
+    ...(movies && series ? [el('div', { className: 'seg' }, chip('all', 'Все', p.credits.length), chip('movie', 'Фильмы', movies), chip('tv', 'Сериалы', series))] : []),
+    ...groups.map(g => el('div', { className: 'yg' }, el('div', { className: 'y' }, g.y), el('div', {}, ...g.list.map(c => {
+      const note = [creditNote(c), c.episodes && episodes(c.episodes)].filter(Boolean).join(' · ');
+      const b = el('button', { className: 'work' },
+        el('i', { className: 'th' + (c.poster ? '' : ' none'), style: c.poster ? `background-image:url("${c.poster}")` : '' }),
+        el('div', {}, el('b', {}, c.title || '', ...(c.seen ? [svgIcon('check')] : [])), el('span', {}, note || '—')),
+        el('small', {}, ...(g.y == 'Скоро' ? [el('span', { className: 'soon' }, 'Скоро')] : []), c.type == 'tv' ? 'Сериал' : 'Фильм'));
+      b.onclick = () => openCredit(c);
+      return b;
+    })))),
+    ...(list.length > shown.length ? [el('button', { className: 'pall', onclick: () => redraw(kind, true) }, `Показать все ${list.length}`)] : []));
+  return sec;
+}
+
+// The header names them once their name has scrolled away.
+$('person').addEventListener('scroll', () =>
+  $('person').classList.toggle('scr', $('person').scrollTop > ($('phero').querySelector('h1')?.offsetTop ?? 200)), { passive: true });
 
 // A title from someone's page: over the title's page they were opened
 // from, as another title of it (see openRelated), so back leads to them
