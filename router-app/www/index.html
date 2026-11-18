@@ -87,7 +87,7 @@ header.stuck::before{bottom:-28px}
 .lhead h1{margin:0;font-size:20px}
 .pw{position:relative}
 .pw .bar{position:absolute;left:6px;right:6px;bottom:6px;height:4px;border-radius:2px;background:#000a;overflow:hidden}
-.pw .bar div{height:100%;background:var(--ac)}
+.pw .bar div{min-width:6px;height:100%;background:var(--ac)} /* a few seconds watched show too */
 .note{padding:56px 24px;color:var(--mu);text-align:center}
 .note svg{display:block;width:48px;height:48px;margin:0 auto 12px;opacity:.5}
 
@@ -199,7 +199,6 @@ header.stuck::before{bottom:-28px}
    was watched. */
 #dplay{position:relative;flex:1 1 100%;min-width:0;overflow:hidden}
 #dplay small{font-weight:600;opacity:.7}
-#dpbar{position:absolute;left:0;bottom:0;width:0;height:3px;background:#111a}
 /* Under it, buttons with their names: save, the trailer, from the start. */
 #dacts{display:flex;justify-content:space-around;width:100%}
 .act{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:84px;padding:6px 4px;border:0;border-radius:12px;background:none;color:#c8c8cc;font-size:12px;text-decoration:none;transition:transform .12s}
@@ -569,7 +568,7 @@ svg.spring{animation:spring .3s ease-out}
     <div id="dbd"><img alt=""></div>
     <div class="nav"><button class="ib" id="dback" aria-label="Назад"><svg><use href="#i-back"/></svg></button></div>
     <div class="hero"><img id="dposter" alt=""><div><img id="dlogo" alt="" hidden><h1 id="dtitle"></h1><div id="dmeta"></div></div></div>
-    <div class="acts"><button class="pill ac" id="dplay"><svg><use href="#i-play"/></svg><span id="dplab">Смотреть на ТВ</span><i id="dpbar"></i></button>
+    <div class="acts"><button class="pill ac" id="dplay"><svg><use href="#i-play"/></svg><span id="dplab">Смотреть на ТВ</span></button>
       <div id="dacts"><button class="sv act" id="dsave"><svg><use href="#i-mark"/></svg><span>Сохранить</span></button><a class="act" id="dtrailer" target="_blank" rel="noopener" hidden><svg><use href="#i-film"/></svg><span>Трейлер</span></a><button class="act" id="dfrom0" hidden><svg><use href="#i-restart"/></svg><span>С начала</span></button></div></div>
   </div>
   <div id="dinfo"></div>
@@ -1722,7 +1721,6 @@ function skeleton(m) {
   $('dplay').hidden = false;
   $('dplay').disabled = true;
   $('dplab').textContent = 'Смотреть на ТВ'; // the width of the button on desktop
-  $('dpbar').style.width = 0;
   clearArt();
   m.tm = null;
   $('dsave').dataset.id = m.id;
@@ -1901,8 +1899,7 @@ function renderDetails() {
     $('dplay').disabled = true;
     $('dplay').classList.remove('ac');
     $('dplab').textContent = item.lookup == 'pending' ? 'Ищем у провайдера…' : 'Нет у провайдера';
-    $('dpbar').style.width = 0;
-    $('dfrom0').hidden = true;
+      $('dfrom0').hidden = true;
     return;
   }
   const on = st?.media && st.now?.id == item.id;
@@ -1917,7 +1914,6 @@ function renderDetails() {
   $('dplab').replaceChildren(...starting ? ['Запускаю…'] : on ? ['Воспроизводится'] :
     t.resume ? ['Продолжить ', small([ep, left ? 'ещё ' + duration(left) : 'с ' + fmt(t.resume)].filter(Boolean).join(' · '))] :
     series ? ['Смотреть ', small(ep)] : ['Смотреть на ТВ']);
-  $('dpbar').style.width = t.resume && p?.dur && !on && !starting ? 100 * Math.min(1, t.resume / p.dur) + '%' : 0;
   $('dplay').disabled = $('dfrom0').disabled = !!pending || !!asking;
   $('dplay').classList.toggle('ac', !on || starting);
   if (on && !starting) $('dplay').disabled = true;
