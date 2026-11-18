@@ -167,8 +167,9 @@ func (s *Service) relatedTitleIDs(ctx context.Context, related []*Related) {
 }
 
 // personVersion changes the key a person is cached by when what is kept
-// of them changes.
-const personVersion = 1
+// of them changes: 2 has their place of birth in Russian and their
+// biography cleaned.
+const personVersion = 2
 
 // Person is someone on TMDB by their ID, as cached, with their pages that
 // Wikidata knows, and title-api's titles of those they are in.
@@ -185,11 +186,13 @@ func (s *Service) Person(ctx context.Context, id uint64) (PersonDetails, error) 
 			}
 			person := pickPerson(raw)
 			if person.Wikidata != "" {
-				person.Wikipedia, person.Kinopoisk, err = s.personLinks(ctx, person.Wikidata)
+				found, err := s.personWikidata(ctx, person.Wikidata)
 				if err != nil {
 					log.Printf("tmdb person %d: %v", id, err)
 					person.Partial = true
 				}
+				person.Wikipedia, person.Kinopoisk = found.Wikipedia, found.Kinopoisk
+				person.PlaceOfBirth = cmp.Or(found.Place, person.PlaceOfBirth)
 			}
 			return person, nil
 		})

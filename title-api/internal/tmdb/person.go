@@ -203,7 +203,7 @@ func pickPerson(raw rawPerson) PersonDetails {
 	result := PersonDetails{
 		ID: raw.ID, Name: strings.TrimSpace(raw.Name), Profile: file(raw.ProfilePath),
 		Birthday: raw.Birthday, Deathday: raw.Deathday, PlaceOfBirth: strings.TrimSpace(raw.PlaceOfBirth),
-		Biography: text(cmp.Or(raw.Biography, texts["ru"].Data.Biography, texts["en"].Data.Biography)),
+		Biography: biography(cmp.Or(raw.Biography, texts["ru"].Data.Biography, texts["en"].Data.Biography)),
 		Gender:    raw.Gender, IMDb: raw.ExternalIDs.IMDb, Instagram: raw.ExternalIDs.Instagram,
 		Wikidata: raw.ExternalIDs.Wikidata, Credits: pickCredits(raw),
 	}
@@ -292,6 +292,37 @@ func jobName(tmdb string) string {
 
 func jobRank(name string) int {
 	return slices.IndexFunc(jobs, func(j job) bool { return j.name == name })
+}
+
+// The heads of the lists some biographies on TMDB go on with ("Фильмография
+// - :", "Награды:"): they end the biography.
+var listHead = regexp.MustCompile(`(?i)^(избранная\s+)?(фильмография|награды|премии|номинации|filmography|awards)\s*[-–—:]|\s-\s*:`)
+
+var spaces = regexp.MustCompile(`[ \t]{2,}`)
+
+// biography is a biography of TMDB as plain text: without the marks of
+// Markdown (**, __) and the emoji some are written with, and without the
+// lists of films and awards some go on with.
+func biography(value string) string {
+	value = strings.NewReplacer("**", "", "__", "").Replace(text(value))
+	value = strings.Map(func(r rune) rune {
+		if r == 0xfe0f || r == 0x200d || r == 0x20e3 || r >= 0x2300 && (unicode.Is(unicode.So, r) || unicode.Is(unicode.Sk, r)) {
+			return -1
+		}
+		return r
+	}, value)
+	var kept []string
+	for _, paragraph := range strings.Split(value, "\n\n") {
+		paragraph = strings.TrimSpace(spaces.ReplaceAllString(paragraph, " "))
+		paragraph = strings.NewReplacer(" .", ".", " ,", ",", " ;", ";", " :", ":", " )", ")", "( ", "(").Replace(paragraph)
+		if listHead.MatchString(paragraph) {
+			break
+		}
+		if paragraph != "" {
+			kept = append(kept, paragraph)
+		}
+	}
+	return strings.Join(kept, "\n\n")
 }
 
 func (p PersonDetails) ttl(time.Time) time.Duration {

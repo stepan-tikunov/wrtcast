@@ -429,3 +429,17 @@ func TestAsSelf(t *testing.T) {
 		}
 	}
 }
+
+func TestBiography(t *testing.T) {
+	for in, want := range map[string]string{
+		"💥 **Робин Танни** — американская актриса, родившаяся **19 июня 1972 года в Чикаго, США 🇺🇸**. Играет в покер.\r\n\r\n" +
+			"Фильмография - :  🎬 Магазин «Империя» (1995)\n\n🎬 Колдовство (1996)\n\nНаграды - : 🏆 Кубок Вольпи": "Робин Танни — американская актриса, родившаяся 19 июня 1972 года в Чикаго, США. Играет в покер.",
+		"Edward Harrison Norton is an American actor.\n\nHe was born in Boston.":                "Edward Harrison Norton is an American actor.\n\nHe was born in Boston.",
+		"Родилась в 1990-х, № 1 в рейтинге, 25°C.\n\nРоли в кино и на ТВ сделали её известной.": "Родилась в 1990-х, № 1 в рейтинге, 25°C.\n\nРоли в кино и на ТВ сделали её известной.",
+		"🎬 Избранная фильмография:\n\n🎬 Фильм":                                                  "",
+	} {
+		if got := biography(in); got != want {
+			t.Errorf("%q:\n%q\nwant\n%q", in, got, want)
+		}
+	}
+}

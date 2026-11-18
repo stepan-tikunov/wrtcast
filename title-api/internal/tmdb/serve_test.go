@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -295,18 +296,24 @@ func fakeWikidata(t *testing.T, fail *atomic.Bool, hits *atomic.Int32) string {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		switch query.Get("action") {
-		case "wbgetentities":
-			if query.Get("ids") != "Q177311" || query.Get("sitefilter") != "ruwiki|enwiki" {
+		switch query.Get("action") + " " + query.Get("ids") + query.Get("entity") + " " + query.Get("property") {
+		case "wbgetentities Q1297|Q30 ":
+			if query.Get("props") != "labels" || query.Get("languages") != "ru" {
+				t.Errorf("labels %s", r.URL)
+			}
+			_, _ = w.Write([]byte(`{"entities":{"Q1297":{"labels":{"ru":{"language":"ru","value":"Чикаго"}}},"Q30":{"labels":{"ru":{"language":"ru","value":"США"}}}}}`))
+		case "wbgetclaims Q177311 P19":
+			_, _ = w.Write([]byte(`{"claims":{"P19":[{"mainsnak":{"datavalue":{"value":{"entity-type":"item","numeric-id":1297,"id":"Q1297"},"type":"wikibase-entityid"}}}]}}`))
+		case "wbgetclaims Q1297 P17":
+			_, _ = w.Write([]byte(`{"claims":{"P17":[{"mainsnak":{"datavalue":{"value":{"entity-type":"item","numeric-id":30,"id":"Q30"},"type":"wikibase-entityid"}}}]}}`))
+		case "wbgetentities Q177311 ":
+			if query.Get("sitefilter") != "ruwiki|enwiki" {
 				t.Errorf("entities %s", r.URL)
 			}
 			_, _ = w.Write([]byte(`{"entities":{"Q177311":{"sitelinks":{
 				"enwiki":{"site":"enwiki","title":"Edward Norton","url":"https://en.wikipedia.org/wiki/Edward_Norton"},
 				"ruwiki":{"site":"ruwiki","title":"Нортон, Эдвард","url":"https://ru.wikipedia.org/wiki/%D0%9D%D0%BE%D1%80%D1%82%D0%BE%D0%BD"}}}}}`))
-		case "wbgetclaims":
-			if query.Get("entity") != "Q177311" || query.Get("property") != "P2604" {
-				t.Errorf("claims %s", r.URL)
-			}
+		case "wbgetclaims Q177311 P2604":
 			_, _ = w.Write([]byte(`{"claims":{"P2604":[{"mainsnak":{"snaktype":"value","property":"P2604","datavalue":{"value":"4434","type":"string"}}}]}}`))
 		default:
 			t.Errorf("action %s", r.URL)
@@ -333,7 +340,8 @@ func TestPerson(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if person.Name != "Эдвард Нортон" || person.Kinopoisk != "" || person.Wikipedia != "" || !person.Partial {
+	if person.Name != "Эдвард Нортон" || person.Kinopoisk != "" || person.Wikipedia != "" || !person.Partial ||
+		person.PlaceOfBirth != "Boston, Massachusetts, USA" {
 		t.Fatalf("person %q, kinopoisk %q, wikipedia %q, partial %t", person.Name, person.Kinopoisk, person.Wikipedia, person.Partial)
 	}
 	if person.Credits[0].TitleID != "fight-club" || person.Credits[1].TitleID != "" {
@@ -345,11 +353,12 @@ func TestPerson(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, "the refresh to be kept", func() bool {
-		data, _, _, _ := service.cache.read(ctx, "person:819:v1")
+		data, _, _, _ := service.cache.read(ctx, fmt.Sprintf("person:819:v%d", personVersion))
 		return strings.Contains(string(data), `"kinopoisk":"4434"`)
 	})
 	person, err = service.Person(ctx, 819)
-	if err != nil || person.Partial || person.Kinopoisk != "4434" || !strings.HasPrefix(person.Wikipedia, "https://ru.wikipedia.org/") {
+	if err != nil || person.Partial || person.Kinopoisk != "4434" || !strings.HasPrefix(person.Wikipedia, "https://ru.wikipedia.org/") ||
+		person.PlaceOfBirth != "Чикаго, США" {
 		t.Fatalf("person %+v, %v", person, err)
 	}
 	// Then for a month.
@@ -360,7 +369,7 @@ func TestPerson(t *testing.T) {
 	if n := fake.count("/person/819"); n != 2 {
 		t.Errorf("%d requests of TMDB", n)
 	}
-	if n := wikidataHits.Load(); n != 3 {
+	if n := wikidataHits.Load(); n != 6 {
 		t.Errorf("%d requests of Wikidata", n)
 	}
 
