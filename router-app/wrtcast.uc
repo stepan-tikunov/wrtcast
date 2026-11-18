@@ -16,7 +16,6 @@ const MAX_TITLES = 200;                      // progress kept for this many titl
 const MAX_EPISODES = 50;                     // and this many episodes of each
 const FLUSH = 300;                           // seconds between flash writes
 const DONE = 0.85;                           // an episode left this far in is watched
-const TTL = 30 * 86400;                      // progress older than this is forgotten
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
 const HORIZON = 75;                          // seconds ahead a section is waited for (see plan)
 const AHEAD = 120;                           // and the next episode is prepared (see ahead)
@@ -1037,8 +1036,8 @@ function cache_mark(c, starts) {
 // episode and the position in each of its episodes (titles, progress).
 // Copied to flash every few minutes, or right away when a title or an
 // episode starts or gets watched. Beyond MAX_TITLES and MAX_EPISODES the
-// least recently watched ones are dropped, and anything untouched for TTL is
-// forgotten (see tick), so a title opened a month later starts over.
+// least recently watched ones are dropped; however long ago a title was
+// watched, it is kept.
 
 // The progress row of a movie ('') or an episode.
 const ep_key = (season, episode) => season == null ? '' : `${season}:${episode}`;
@@ -1453,13 +1452,9 @@ function tick() {
 		if (misses == 5)
 			media_end(now.media);
 	}
-	// Progress untouched for TTL; the headers, positions and bytes of media
-	// not played for a day, what /play started and the leveler's playlists
-	// of a day ago.
+	// The headers, positions and bytes of media not played for a day, what
+	// /play started and the leveler's playlists of a day ago.
 	let t = time();
-	if (sql_do('DELETE FROM titles WHERE t < ?', t - TTL))
-		sql_do('DELETE FROM progress WHERE id NOT IN (SELECT id FROM titles)');
-	sql_do('DELETE FROM progress WHERE t < ?', t - TTL);
 	sql_do('DELETE FROM media WHERE t < ?', t - 86400);
 	sql_do('DELETE FROM segments WHERE t < ?', t - 86400);
 	sql_do('DELETE FROM played WHERE t < ?', t - 86400);
