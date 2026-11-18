@@ -172,9 +172,11 @@ header.stuck::before{bottom:-28px}
 .person div{min-width:0;overflow-wrap:anywhere}
 .person b{display:block;font-weight:550}
 .person span{color:var(--mu);font-size:14px}
-.lhead{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:4px;padding:max(8px,env(safe-area-inset-top)) 12px 8px 4px;background:var(--bg)}
-/* What scrolls under the header fades out on the way, not cut off at its edge. */
-.lhead::after{content:'';position:absolute;left:0;right:0;top:100%;height:10px;background:linear-gradient(var(--bg),#0e0e1000);pointer-events:none}
+.lhead{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:4px;padding:max(8px,env(safe-area-inset-top)) 12px 8px 4px}
+/* No bar: what scrolls under the header darkens towards the top, across a
+   wide gradient, so the white of the header reads over a photo too. */
+.lhead::after{content:'';position:absolute;z-index:-1;left:0;right:0;top:0;height:calc(100% + 56px);background:linear-gradient(#0e0e10f2,#0e0e10e0 35%,#0e0e10a0 60%,#0e0e1040 82%,#0e0e1000);pointer-events:none}
+.lhead h1{text-shadow:0 1px 10px #0009}
 .lhead h1{margin:0;font-size:20px}
 .pw{position:relative}
 /* How far a title was watched: a strip along the poster's whole bottom
