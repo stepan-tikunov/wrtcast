@@ -93,12 +93,9 @@ header.stuck::before{bottom:-28px}
 #cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* Someone's page, over the title's or its cast's. */
 #person{position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
-#person .lhead small{font-size:14px}
-/* The header names the page under until their name scrolls away, then
-   them. */
+/* The header names them once their name has scrolled away. */
 #person .lhead b{display:none;overflow:hidden;font-size:17px;font-weight:650;white-space:nowrap;text-overflow:ellipsis;animation:pop .2s ease-out}
 #person.scr .lhead b:not(:empty){display:block}
-#person.scr .lhead b:not(:empty)+small{display:none}
 #phero{position:relative;padding:4px 16px 0;text-align:center}
 .pt{position:relative;display:grid;place-items:center;width:150px;aspect-ratio:2/3;margin:0 auto;overflow:hidden;border-radius:16px;background:var(--s2);color:#55555c;box-shadow:0 0 0 1px #ffffff12;transition:box-shadow .6s}
 .pt svg{width:56px;height:56px}
@@ -728,7 +725,7 @@ svg.spring{animation:spring .3s ease-out}
 </section>
 
 <section id="person" hidden>
-  <div class="lhead"><button class="ib" id="pback" aria-label="Назад"><svg><use href="#i-back"/></svg></button><h1><b id="pname"></b><small id="pcrumb"></small></h1></div>
+  <div class="lhead"><button class="ib" id="pback" aria-label="Назад"><svg><use href="#i-back"/></svg></button><h1><b id="pname"></b></h1></div>
   <div id="phero"></div>
   <div id="pbody"></div>
   <p class="attr" id="pattr" hidden><b>TMDB</b>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
@@ -2426,15 +2423,11 @@ function portrait(src) {
   return frame;
 }
 
-// The page under someone's, as their header names it.
-const pageUnder = () => [item?.title || $('dtitle').textContent, layers.includes('cast') && 'В ролях'].filter(Boolean).join(' · ');
-
 // p: /tmdb/person's answer, undefined while it comes, null if there is
 // none.
 function renderPerson(p, known) {
   const name = p?.name || known?.name || '';
   $('pname').textContent = name;
-  $('pcrumb').textContent = pageUnder();
   $('pattr').hidden = !p;
   if (p === null) {
     $('phero').replaceChildren();
