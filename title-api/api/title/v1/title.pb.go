@@ -2616,8 +2616,10 @@ type SeriesUpdate struct {
 	LastEpisode string `protobuf:"bytes,3,opt,name=last_episode,json=lastEpisode,proto3" json:"last_episode,omitempty"`
 	// As TMDB has the series, of the details kept of it: unspecified, and no
 	// next episode, until it is matched and its details are kept.
-	Status        TmdbStatus      `protobuf:"varint,4,opt,name=status,proto3,enum=title.v1.TmdbStatus" json:"status,omitempty"`
-	NextEpisode   *TmdbEpisodeRef `protobuf:"bytes,5,opt,name=next_episode,json=nextEpisode,proto3" json:"next_episode,omitempty"`
+	Status      TmdbStatus      `protobuf:"varint,4,opt,name=status,proto3,enum=title.v1.TmdbStatus" json:"status,omitempty"`
+	NextEpisode *TmdbEpisodeRef `protobuf:"bytes,5,opt,name=next_episode,json=nextEpisode,proto3" json:"next_episode,omitempty"`
+	// The provider's episodes by season, in order, as last_* tell them.
+	Seasons       []*SeriesSeason `protobuf:"bytes,6,rep,name=seasons,proto3" json:"seasons,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2687,6 +2689,65 @@ func (x *SeriesUpdate) GetNextEpisode() *TmdbEpisodeRef {
 	return nil
 }
 
+func (x *SeriesUpdate) GetSeasons() []*SeriesSeason {
+	if x != nil {
+		return x.Seasons
+	}
+	return nil
+}
+
+type SeriesSeason struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SeasonNumber   int32                  `protobuf:"varint,1,opt,name=season_number,json=seasonNumber,proto3" json:"season_number,omitempty"`
+	EpisodeNumbers []string               `protobuf:"bytes,2,rep,name=episode_numbers,json=episodeNumbers,proto3" json:"episode_numbers,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SeriesSeason) Reset() {
+	*x = SeriesSeason{}
+	mi := &file_api_title_v1_title_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SeriesSeason) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SeriesSeason) ProtoMessage() {}
+
+func (x *SeriesSeason) ProtoReflect() protoreflect.Message {
+	mi := &file_api_title_v1_title_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SeriesSeason.ProtoReflect.Descriptor instead.
+func (*SeriesSeason) Descriptor() ([]byte, []int) {
+	return file_api_title_v1_title_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *SeriesSeason) GetSeasonNumber() int32 {
+	if x != nil {
+		return x.SeasonNumber
+	}
+	return 0
+}
+
+func (x *SeriesSeason) GetEpisodeNumbers() []string {
+	if x != nil {
+		return x.EpisodeNumbers
+	}
+	return nil
+}
+
 type SearchTitlesQueryResponse_SearchResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TitleId       string                 `protobuf:"bytes,1,opt,name=title_id,json=titleId,proto3" json:"title_id,omitempty"`
@@ -2699,7 +2760,7 @@ type SearchTitlesQueryResponse_SearchResult struct {
 
 func (x *SearchTitlesQueryResponse_SearchResult) Reset() {
 	*x = SearchTitlesQueryResponse_SearchResult{}
-	mi := &file_api_title_v1_title_proto_msgTypes[36]
+	mi := &file_api_title_v1_title_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2711,7 +2772,7 @@ func (x *SearchTitlesQueryResponse_SearchResult) String() string {
 func (*SearchTitlesQueryResponse_SearchResult) ProtoMessage() {}
 
 func (x *SearchTitlesQueryResponse_SearchResult) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[36]
+	mi := &file_api_title_v1_title_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2765,7 +2826,7 @@ type GetTitleDetailsQueryResponse_Rating struct {
 
 func (x *GetTitleDetailsQueryResponse_Rating) Reset() {
 	*x = GetTitleDetailsQueryResponse_Rating{}
-	mi := &file_api_title_v1_title_proto_msgTypes[37]
+	mi := &file_api_title_v1_title_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2777,7 +2838,7 @@ func (x *GetTitleDetailsQueryResponse_Rating) String() string {
 func (*GetTitleDetailsQueryResponse_Rating) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Rating) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[37]
+	mi := &file_api_title_v1_title_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2817,7 +2878,7 @@ type GetTitleDetailsQueryResponse_Season struct {
 
 func (x *GetTitleDetailsQueryResponse_Season) Reset() {
 	*x = GetTitleDetailsQueryResponse_Season{}
-	mi := &file_api_title_v1_title_proto_msgTypes[38]
+	mi := &file_api_title_v1_title_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2829,7 +2890,7 @@ func (x *GetTitleDetailsQueryResponse_Season) String() string {
 func (*GetTitleDetailsQueryResponse_Season) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Season) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[38]
+	mi := &file_api_title_v1_title_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2872,7 +2933,7 @@ type GetTitleDetailsQueryResponse_Season_Episode struct {
 
 func (x *GetTitleDetailsQueryResponse_Season_Episode) Reset() {
 	*x = GetTitleDetailsQueryResponse_Season_Episode{}
-	mi := &file_api_title_v1_title_proto_msgTypes[39]
+	mi := &file_api_title_v1_title_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2884,7 +2945,7 @@ func (x *GetTitleDetailsQueryResponse_Season_Episode) String() string {
 func (*GetTitleDetailsQueryResponse_Season_Episode) ProtoMessage() {}
 
 func (x *GetTitleDetailsQueryResponse_Season_Episode) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[39]
+	mi := &file_api_title_v1_title_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2938,7 +2999,7 @@ type MediaStream_ProxyHeader struct {
 
 func (x *MediaStream_ProxyHeader) Reset() {
 	*x = MediaStream_ProxyHeader{}
-	mi := &file_api_title_v1_title_proto_msgTypes[40]
+	mi := &file_api_title_v1_title_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2950,7 +3011,7 @@ func (x *MediaStream_ProxyHeader) String() string {
 func (*MediaStream_ProxyHeader) ProtoMessage() {}
 
 func (x *MediaStream_ProxyHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[40]
+	mi := &file_api_title_v1_title_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2993,7 +3054,7 @@ type MediaStream_AudioTrack struct {
 
 func (x *MediaStream_AudioTrack) Reset() {
 	*x = MediaStream_AudioTrack{}
-	mi := &file_api_title_v1_title_proto_msgTypes[41]
+	mi := &file_api_title_v1_title_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3005,7 +3066,7 @@ func (x *MediaStream_AudioTrack) String() string {
 func (*MediaStream_AudioTrack) ProtoMessage() {}
 
 func (x *MediaStream_AudioTrack) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[41]
+	mi := &file_api_title_v1_title_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3069,7 +3130,7 @@ type MediaStream_SubtitleTrack struct {
 
 func (x *MediaStream_SubtitleTrack) Reset() {
 	*x = MediaStream_SubtitleTrack{}
-	mi := &file_api_title_v1_title_proto_msgTypes[42]
+	mi := &file_api_title_v1_title_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3081,7 +3142,7 @@ func (x *MediaStream_SubtitleTrack) String() string {
 func (*MediaStream_SubtitleTrack) ProtoMessage() {}
 
 func (x *MediaStream_SubtitleTrack) ProtoReflect() protoreflect.Message {
-	mi := &file_api_title_v1_title_proto_msgTypes[42]
+	mi := &file_api_title_v1_title_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3370,14 +3431,18 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\ttitle_ids\x18\x01 \x03(\tR\btitleIds\x12,\n" +
 	"\x12upcoming_title_ids\x18\x02 \x03(\tR\x10upcomingTitleIds\"Q\n" +
 	"\x1dGetSeriesUpdatesQueryResponse\x120\n" +
-	"\aupdates\x18\x01 \x03(\v2\x16.title.v1.SeriesUpdateR\aupdates\"\xd8\x01\n" +
+	"\aupdates\x18\x01 \x03(\v2\x16.title.v1.SeriesUpdateR\aupdates\"\x8a\x02\n" +
 	"\fSeriesUpdate\x12\x19\n" +
 	"\btitle_id\x18\x01 \x01(\tR\atitleId\x12\x1f\n" +
 	"\vlast_season\x18\x02 \x01(\x05R\n" +
 	"lastSeason\x12!\n" +
 	"\flast_episode\x18\x03 \x01(\tR\vlastEpisode\x12,\n" +
 	"\x06status\x18\x04 \x01(\x0e2\x14.title.v1.TmdbStatusR\x06status\x12;\n" +
-	"\fnext_episode\x18\x05 \x01(\v2\x18.title.v1.TmdbEpisodeRefR\vnextEpisode*T\n" +
+	"\fnext_episode\x18\x05 \x01(\v2\x18.title.v1.TmdbEpisodeRefR\vnextEpisode\x120\n" +
+	"\aseasons\x18\x06 \x03(\v2\x16.title.v1.SeriesSeasonR\aseasons\"\\\n" +
+	"\fSeriesSeason\x12#\n" +
+	"\rseason_number\x18\x01 \x01(\x05R\fseasonNumber\x12'\n" +
+	"\x0fepisode_numbers\x18\x02 \x03(\tR\x0eepisodeNumbers*T\n" +
 	"\tMediaType\x12\x1a\n" +
 	"\x16MEDIA_TYPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10MEDIA_TYPE_MOVIE\x10\x01\x12\x15\n" +
@@ -3420,7 +3485,7 @@ func file_api_title_v1_title_proto_rawDescGZIP() []byte {
 }
 
 var file_api_title_v1_title_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_api_title_v1_title_proto_msgTypes = make([]protoimpl.MessageInfo, 43)
+var file_api_title_v1_title_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_api_title_v1_title_proto_goTypes = []any{
 	(MediaType)(0),                                      // 0: title.v1.MediaType
 	(TmdbStatus)(0),                                     // 1: title.v1.TmdbStatus
@@ -3462,29 +3527,30 @@ var file_api_title_v1_title_proto_goTypes = []any{
 	(*GetSeriesUpdatesQuery)(nil),                       // 37: title.v1.GetSeriesUpdatesQuery
 	(*GetSeriesUpdatesQueryResponse)(nil),               // 38: title.v1.GetSeriesUpdatesQueryResponse
 	(*SeriesUpdate)(nil),                                // 39: title.v1.SeriesUpdate
-	(*SearchTitlesQueryResponse_SearchResult)(nil),      // 40: title.v1.SearchTitlesQueryResponse.SearchResult
-	(*GetTitleDetailsQueryResponse_Rating)(nil),         // 41: title.v1.GetTitleDetailsQueryResponse.Rating
-	(*GetTitleDetailsQueryResponse_Season)(nil),         // 42: title.v1.GetTitleDetailsQueryResponse.Season
-	(*GetTitleDetailsQueryResponse_Season_Episode)(nil), // 43: title.v1.GetTitleDetailsQueryResponse.Season.Episode
-	(*MediaStream_ProxyHeader)(nil),                     // 44: title.v1.MediaStream.ProxyHeader
-	(*MediaStream_AudioTrack)(nil),                      // 45: title.v1.MediaStream.AudioTrack
-	(*MediaStream_SubtitleTrack)(nil),                   // 46: title.v1.MediaStream.SubtitleTrack
+	(*SeriesSeason)(nil),                                // 40: title.v1.SeriesSeason
+	(*SearchTitlesQueryResponse_SearchResult)(nil),      // 41: title.v1.SearchTitlesQueryResponse.SearchResult
+	(*GetTitleDetailsQueryResponse_Rating)(nil),         // 42: title.v1.GetTitleDetailsQueryResponse.Rating
+	(*GetTitleDetailsQueryResponse_Season)(nil),         // 43: title.v1.GetTitleDetailsQueryResponse.Season
+	(*GetTitleDetailsQueryResponse_Season_Episode)(nil), // 44: title.v1.GetTitleDetailsQueryResponse.Season.Episode
+	(*MediaStream_ProxyHeader)(nil),                     // 45: title.v1.MediaStream.ProxyHeader
+	(*MediaStream_AudioTrack)(nil),                      // 46: title.v1.MediaStream.AudioTrack
+	(*MediaStream_SubtitleTrack)(nil),                   // 47: title.v1.MediaStream.SubtitleTrack
 }
 var file_api_title_v1_title_proto_depIdxs = []int32{
-	40, // 0: title.v1.SearchTitlesQueryResponse.results:type_name -> title.v1.SearchTitlesQueryResponse.SearchResult
+	41, // 0: title.v1.SearchTitlesQueryResponse.results:type_name -> title.v1.SearchTitlesQueryResponse.SearchResult
 	16, // 1: title.v1.GetPlaybackStreamsQueryResponse.streams:type_name -> title.v1.MediaStream
 	0,  // 2: title.v1.GetTitleDetailsQueryResponse.media_type:type_name -> title.v1.MediaType
-	41, // 3: title.v1.GetTitleDetailsQueryResponse.ratings:type_name -> title.v1.GetTitleDetailsQueryResponse.Rating
-	42, // 4: title.v1.GetTitleDetailsQueryResponse.seasons:type_name -> title.v1.GetTitleDetailsQueryResponse.Season
+	42, // 3: title.v1.GetTitleDetailsQueryResponse.ratings:type_name -> title.v1.GetTitleDetailsQueryResponse.Rating
+	43, // 4: title.v1.GetTitleDetailsQueryResponse.seasons:type_name -> title.v1.GetTitleDetailsQueryResponse.Season
 	15, // 5: title.v1.GetTitleDetailsQueryResponse.sections:type_name -> title.v1.Section
 	14, // 6: title.v1.GetTitleDetailsQueryResponse.tmdb:type_name -> title.v1.TmdbTitle
 	14, // 7: title.v1.TmdbMatch.tmdb:type_name -> title.v1.TmdbTitle
 	2,  // 8: title.v1.TmdbLookup.state:type_name -> title.v1.TmdbLookup.State
 	0,  // 9: title.v1.TmdbTitle.media_type:type_name -> title.v1.MediaType
 	3,  // 10: title.v1.Section.kind:type_name -> title.v1.Section.Kind
-	45, // 11: title.v1.MediaStream.audio_tracks:type_name -> title.v1.MediaStream.AudioTrack
-	46, // 12: title.v1.MediaStream.subtitles:type_name -> title.v1.MediaStream.SubtitleTrack
-	44, // 13: title.v1.MediaStream.proxy_headers:type_name -> title.v1.MediaStream.ProxyHeader
+	46, // 11: title.v1.MediaStream.audio_tracks:type_name -> title.v1.MediaStream.AudioTrack
+	47, // 12: title.v1.MediaStream.subtitles:type_name -> title.v1.MediaStream.SubtitleTrack
+	45, // 13: title.v1.MediaStream.proxy_headers:type_name -> title.v1.MediaStream.ProxyHeader
 	15, // 14: title.v1.MediaStream.sections:type_name -> title.v1.Section
 	14, // 15: title.v1.TmdbDetails.title:type_name -> title.v1.TmdbTitle
 	1,  // 16: title.v1.TmdbDetails.status:type_name -> title.v1.TmdbStatus
@@ -3502,41 +3568,42 @@ var file_api_title_v1_title_proto_depIdxs = []int32{
 	39, // 28: title.v1.GetSeriesUpdatesQueryResponse.updates:type_name -> title.v1.SeriesUpdate
 	1,  // 29: title.v1.SeriesUpdate.status:type_name -> title.v1.TmdbStatus
 	28, // 30: title.v1.SeriesUpdate.next_episode:type_name -> title.v1.TmdbEpisodeRef
-	43, // 31: title.v1.GetTitleDetailsQueryResponse.Season.episodes:type_name -> title.v1.GetTitleDetailsQueryResponse.Season.Episode
-	15, // 32: title.v1.GetTitleDetailsQueryResponse.Season.Episode.sections:type_name -> title.v1.Section
-	4,  // 33: title.v1.TitleService.SearchTitles:input_type -> title.v1.SearchTitlesQuery
-	6,  // 34: title.v1.TitleService.GetPlaybackStreams:input_type -> title.v1.GetPlaybackStreamsQuery
-	8,  // 35: title.v1.TitleService.GetTitleDetails:input_type -> title.v1.GetTitleDetailsQuery
-	17, // 36: title.v1.TitleService.GetMarkingSettings:input_type -> title.v1.GetMarkingSettingsQuery
-	19, // 37: title.v1.TitleService.UpdateMarkingSettings:input_type -> title.v1.UpdateMarkingSettingsCommand
-	20, // 38: title.v1.TitleService.MarkEpisode:input_type -> title.v1.MarkEpisodeCommand
-	22, // 39: title.v1.TitleService.GetTmdbSettings:input_type -> title.v1.GetTmdbSettingsQuery
-	24, // 40: title.v1.TitleService.UpdateTmdbSettings:input_type -> title.v1.UpdateTmdbSettingsCommand
-	25, // 41: title.v1.TitleService.GetTmdbDetails:input_type -> title.v1.GetTmdbDetailsQuery
-	34, // 42: title.v1.TitleService.GetTmdbSeason:input_type -> title.v1.GetTmdbSeasonQuery
-	25, // 43: title.v1.TitleService.GetTmdbCast:input_type -> title.v1.GetTmdbDetailsQuery
-	10, // 44: title.v1.TitleService.WaitTmdbMatch:input_type -> title.v1.WaitTmdbMatchQuery
-	12, // 45: title.v1.TitleService.LookupTmdbTitle:input_type -> title.v1.LookupTmdbTitleCommand
-	37, // 46: title.v1.TitleService.GetSeriesUpdates:input_type -> title.v1.GetSeriesUpdatesQuery
-	5,  // 47: title.v1.TitleService.SearchTitles:output_type -> title.v1.SearchTitlesQueryResponse
-	7,  // 48: title.v1.TitleService.GetPlaybackStreams:output_type -> title.v1.GetPlaybackStreamsQueryResponse
-	9,  // 49: title.v1.TitleService.GetTitleDetails:output_type -> title.v1.GetTitleDetailsQueryResponse
-	18, // 50: title.v1.TitleService.GetMarkingSettings:output_type -> title.v1.MarkingSettings
-	18, // 51: title.v1.TitleService.UpdateMarkingSettings:output_type -> title.v1.MarkingSettings
-	21, // 52: title.v1.TitleService.MarkEpisode:output_type -> title.v1.MarkEpisodeCommandResponse
-	23, // 53: title.v1.TitleService.GetTmdbSettings:output_type -> title.v1.TmdbSettings
-	23, // 54: title.v1.TitleService.UpdateTmdbSettings:output_type -> title.v1.TmdbSettings
-	26, // 55: title.v1.TitleService.GetTmdbDetails:output_type -> title.v1.TmdbDetails
-	35, // 56: title.v1.TitleService.GetTmdbSeason:output_type -> title.v1.TmdbSeason
-	27, // 57: title.v1.TitleService.GetTmdbCast:output_type -> title.v1.TmdbCast
-	11, // 58: title.v1.TitleService.WaitTmdbMatch:output_type -> title.v1.TmdbMatch
-	13, // 59: title.v1.TitleService.LookupTmdbTitle:output_type -> title.v1.TmdbLookup
-	38, // 60: title.v1.TitleService.GetSeriesUpdates:output_type -> title.v1.GetSeriesUpdatesQueryResponse
-	47, // [47:61] is the sub-list for method output_type
-	33, // [33:47] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	40, // 31: title.v1.SeriesUpdate.seasons:type_name -> title.v1.SeriesSeason
+	44, // 32: title.v1.GetTitleDetailsQueryResponse.Season.episodes:type_name -> title.v1.GetTitleDetailsQueryResponse.Season.Episode
+	15, // 33: title.v1.GetTitleDetailsQueryResponse.Season.Episode.sections:type_name -> title.v1.Section
+	4,  // 34: title.v1.TitleService.SearchTitles:input_type -> title.v1.SearchTitlesQuery
+	6,  // 35: title.v1.TitleService.GetPlaybackStreams:input_type -> title.v1.GetPlaybackStreamsQuery
+	8,  // 36: title.v1.TitleService.GetTitleDetails:input_type -> title.v1.GetTitleDetailsQuery
+	17, // 37: title.v1.TitleService.GetMarkingSettings:input_type -> title.v1.GetMarkingSettingsQuery
+	19, // 38: title.v1.TitleService.UpdateMarkingSettings:input_type -> title.v1.UpdateMarkingSettingsCommand
+	20, // 39: title.v1.TitleService.MarkEpisode:input_type -> title.v1.MarkEpisodeCommand
+	22, // 40: title.v1.TitleService.GetTmdbSettings:input_type -> title.v1.GetTmdbSettingsQuery
+	24, // 41: title.v1.TitleService.UpdateTmdbSettings:input_type -> title.v1.UpdateTmdbSettingsCommand
+	25, // 42: title.v1.TitleService.GetTmdbDetails:input_type -> title.v1.GetTmdbDetailsQuery
+	34, // 43: title.v1.TitleService.GetTmdbSeason:input_type -> title.v1.GetTmdbSeasonQuery
+	25, // 44: title.v1.TitleService.GetTmdbCast:input_type -> title.v1.GetTmdbDetailsQuery
+	10, // 45: title.v1.TitleService.WaitTmdbMatch:input_type -> title.v1.WaitTmdbMatchQuery
+	12, // 46: title.v1.TitleService.LookupTmdbTitle:input_type -> title.v1.LookupTmdbTitleCommand
+	37, // 47: title.v1.TitleService.GetSeriesUpdates:input_type -> title.v1.GetSeriesUpdatesQuery
+	5,  // 48: title.v1.TitleService.SearchTitles:output_type -> title.v1.SearchTitlesQueryResponse
+	7,  // 49: title.v1.TitleService.GetPlaybackStreams:output_type -> title.v1.GetPlaybackStreamsQueryResponse
+	9,  // 50: title.v1.TitleService.GetTitleDetails:output_type -> title.v1.GetTitleDetailsQueryResponse
+	18, // 51: title.v1.TitleService.GetMarkingSettings:output_type -> title.v1.MarkingSettings
+	18, // 52: title.v1.TitleService.UpdateMarkingSettings:output_type -> title.v1.MarkingSettings
+	21, // 53: title.v1.TitleService.MarkEpisode:output_type -> title.v1.MarkEpisodeCommandResponse
+	23, // 54: title.v1.TitleService.GetTmdbSettings:output_type -> title.v1.TmdbSettings
+	23, // 55: title.v1.TitleService.UpdateTmdbSettings:output_type -> title.v1.TmdbSettings
+	26, // 56: title.v1.TitleService.GetTmdbDetails:output_type -> title.v1.TmdbDetails
+	35, // 57: title.v1.TitleService.GetTmdbSeason:output_type -> title.v1.TmdbSeason
+	27, // 58: title.v1.TitleService.GetTmdbCast:output_type -> title.v1.TmdbCast
+	11, // 59: title.v1.TitleService.WaitTmdbMatch:output_type -> title.v1.TmdbMatch
+	13, // 60: title.v1.TitleService.LookupTmdbTitle:output_type -> title.v1.TmdbLookup
+	38, // 61: title.v1.TitleService.GetSeriesUpdates:output_type -> title.v1.GetSeriesUpdatesQueryResponse
+	48, // [48:62] is the sub-list for method output_type
+	34, // [34:48] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_api_title_v1_title_proto_init() }
@@ -3552,7 +3619,7 @@ func file_api_title_v1_title_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_title_v1_title_proto_rawDesc), len(file_api_title_v1_title_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   43,
+			NumMessages:   44,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

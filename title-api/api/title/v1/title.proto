@@ -503,4 +503,11 @@ message SeriesUpdate {
   // next episode, until it is matched and its details are kept.
   TmdbStatus status = 4;
   TmdbEpisodeRef next_episode = 5;
+  // The provider's episodes by season, in order, as last_* tell them.
+  repeated SeriesSeason seasons = 6;
+}
+
+message SeriesSeason {
+  int32 season_number = 1;
+  repeated string episode_numbers = 2;
 }

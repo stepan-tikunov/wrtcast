@@ -295,6 +295,7 @@ func (s *Server) GetSeriesUpdates(
 			}
 			if err == nil {
 				update.LastSeason, update.LastEpisode = lastEpisode(seasons)
+				update.Seasons = seriesSeasons(seasons)
 			}
 		}
 		response.Updates = append(response.Updates, update)
@@ -306,6 +307,19 @@ func (s *Server) GetSeriesUpdates(
 		update(id, false)
 	}
 	return response, nil
+}
+
+// seriesSeasons are a series' episode numbers by season.
+func seriesSeasons(seasons []provider.Season) []*titlev1.SeriesSeason {
+	response := make([]*titlev1.SeriesSeason, 0, len(seasons))
+	for _, season := range seasons {
+		numbers := make([]string, 0, len(season.Episodes))
+		for _, episode := range season.Episodes {
+			numbers = append(numbers, episode.Number)
+		}
+		response = append(response, &titlev1.SeriesSeason{SeasonNumber: season.Number, EpisodeNumbers: numbers})
+	}
+	return response
 }
 
 // lastEpisode is a series' last episode on the provider: that of its last

@@ -205,6 +205,13 @@ func TestGetSeriesUpdates(t *testing.T) {
 		updates[0].GetLastSeason() != 2 || updates[0].GetLastEpisode() != "1" || updates[1].GetLastEpisode() != "" {
 		t.Fatalf("updates %v", updates)
 	}
+	var seasons []string
+	for _, season := range updates[0].GetSeasons() {
+		seasons = append(seasons, fmt.Sprint(season.GetSeasonNumber(), season.GetEpisodeNumbers()))
+	}
+	if fmt.Sprint(seasons) != "[1 [2 10] 2 [1]]" {
+		t.Errorf("seasons %v", seasons)
+	}
 
 	ids := make([]string, seriesUpdatesMax+1)
 	for i := range ids {

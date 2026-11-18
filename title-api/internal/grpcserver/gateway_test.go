@@ -239,7 +239,10 @@ func (gatewayTestService) GetSeriesUpdates(
 ) (*titlev1.GetSeriesUpdatesQueryResponse, error) {
 	response := &titlev1.GetSeriesUpdatesQueryResponse{}
 	for _, id := range query.GetTitleIds() {
-		response.Updates = append(response.Updates, &titlev1.SeriesUpdate{TitleId: id, LastSeason: 2, LastEpisode: "1"})
+		response.Updates = append(response.Updates, &titlev1.SeriesUpdate{
+			TitleId: id, LastSeason: 2, LastEpisode: "1",
+			Seasons: []*titlev1.SeriesSeason{{SeasonNumber: 2, EpisodeNumbers: []string{"1"}}},
+		})
 	}
 	for _, id := range query.GetUpcomingTitleIds() {
 		response.Updates = append(response.Updates, &titlev1.SeriesUpdate{
@@ -256,9 +259,10 @@ func TestSeriesUpdatesHTTPAnnotation(t *testing.T) {
 		strings.NewReader(`{"titleIds":["a"],"upcomingTitleIds":["b"]}`))
 	response := httptest.NewRecorder()
 	testGateway(t).ServeHTTP(response, request)
-	want := `{"updates":[{"titleId":"a","lastSeason":2,"lastEpisode":"1","status":"TMDB_STATUS_UNSPECIFIED","nextEpisode":null},` +
+	want := `{"updates":[{"titleId":"a","lastSeason":2,"lastEpisode":"1","status":"TMDB_STATUS_UNSPECIFIED","nextEpisode":null,` +
+		`"seasons":[{"seasonNumber":2,"episodeNumbers":["1"]}]},` +
 		`{"titleId":"b","lastSeason":0,"lastEpisode":"","status":"TMDB_STATUS_RETURNING",` +
-		`"nextEpisode":{"seasonNumber":3,"episodeNumber":1,"airDate":"2027-01-16","name":""}}]}`
+		`"nextEpisode":{"seasonNumber":3,"episodeNumber":1,"airDate":"2027-01-16","name":""},"seasons":[]}]}`
 	var got, wanted any
 	if err := json.Unmarshal(response.Body.Bytes(), &got); err != nil || response.Code != http.StatusOK {
 		t.Fatalf("%d %s", response.Code, response.Body.String())
