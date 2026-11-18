@@ -91,9 +91,8 @@ header.stuck::before{bottom:-28px}
 #list{position:fixed;inset:0;z-index:3;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* The page of a title's cast, over the title's. */
 #cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
-/* Someone's page, over the title's or its cast's: their photo glows with
-   the accent (--g), which the line of what they do has too. */
-#person{--g:40 100% 56%;position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+/* Someone's page, over the title's or its cast's. */
+#person{position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 #person .lhead small{font-size:14px}
 /* The header names the page under until their name scrolls away, then
    them. */
@@ -101,16 +100,13 @@ header.stuck::before{bottom:-28px}
 #person.scr .lhead b:not(:empty){display:block}
 #person.scr .lhead b:not(:empty)+small{display:none}
 #phero{position:relative;padding:4px 16px 0;text-align:center}
-#phero::before{content:'';position:absolute;left:50%;top:-40px;width:420px;height:440px;transform:translateX(-50%);background:radial-gradient(closest-side,hsl(var(--g) / .09),hsl(var(--g) / .03) 60%,transparent);pointer-events:none}
 .pt{position:relative;display:grid;place-items:center;width:150px;aspect-ratio:2/3;margin:0 auto;overflow:hidden;border-radius:16px;background:var(--s2);color:#55555c;box-shadow:0 0 0 1px #ffffff12;transition:box-shadow .6s}
 .pt svg{width:56px;height:56px}
 .pt img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s}
 .pt img.ld{opacity:1}
 .pt.ph{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
-.pt.lit{overflow:visible;box-shadow:0 0 0 1px hsl(var(--g) / .15),0 0 60px 4px hsl(var(--g) / .15),0 30px 80px -10px hsl(var(--g) / .15)}
-.pt.lit img{border-radius:inherit}
 .pmain{position:relative;min-width:0}
-.eb{margin-top:22px;color:hsl(var(--g));font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.eb{margin-top:22px;color:var(--ac);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 #phero h1{margin:6px 0 2px;font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-.02em;overflow-wrap:anywhere}
 .og{color:#a6a6ae;font-size:15px}
 .pfacts{margin:12px 0 0;color:#c8c8cc;font-size:14px;line-height:1.5}
@@ -602,8 +598,7 @@ svg.spring{animation:spring .3s ease-out}
   /* By the header, as the pages of lists are (.lhead), not the title's:
      the photo beside who they are. */
   #phero{display:grid;grid-template-columns:240px 1fr;gap:48px;align-items:end;padding:20px var(--gut) 0;text-align:left}
-  #phero::before{left:calc(var(--gut) + 120px);top:-60px;width:620px;height:600px}
-  .pt{width:240px;margin:0;border-radius:18px}
+    .pt{width:240px;margin:0;border-radius:18px}
   .eb{margin-top:0;font-size:13px}
   #phero h1{margin:8px 0 4px;font-size:52px;line-height:1.02}
   .og{font-size:18px}
@@ -630,7 +625,7 @@ svg.spring{animation:spring .3s ease-out}
   .work{grid-template-columns:40px 1fr auto;gap:16px;padding:9px 0}
   .work .th{width:40px}
   .work small{font-size:13px}
-  .work:hover b{color:hsl(var(--g))}
+  .work:hover b{color:var(--ac)}
   .yg .work:last-child{border-bottom:0}
   .pall{display:inline-block;width:auto;padding:10px 18px}
   #pattr{margin:40px var(--gut) 0}
@@ -2408,7 +2403,7 @@ const creditNote = c => [c.character, ...c.jobs].filter(Boolean).join(', ');
 // a series only if they were in 5 episodes of it or more, not a guest.
 const knownFor = p => p.credits.filter(c => c.poster && !(c.type == 'tv' && c.episodes && c.episodes < 5));
 
-// Someone's photo, glowing once it has loaded; a silhouette where TMDB
+// Someone's photo, faded in once it has loaded; a silhouette where TMDB
 // has none.
 function portrait(src) {
   const frame = el('div', { className: 'pt' }, svgIcon('person'));
@@ -2418,7 +2413,6 @@ function portrait(src) {
   img.onload = () => {
     img.classList.add('ld');
     frame.classList.remove('ph');
-    frame.classList.add('lit');
   };
   img.onerror = () => {
     img.remove();
