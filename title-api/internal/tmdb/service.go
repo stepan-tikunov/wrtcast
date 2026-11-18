@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"title-api/internal/llmlog"
+
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
@@ -29,6 +31,10 @@ const (
 	retryAfter  = 30 * time.Minute
 	maxAttempts = 3
 )
+
+// askClaude is whether Claude settles the titles TMDB's search can't; for
+// now it doesn't, and they stay unmatched.
+var askClaude = false
 
 // Settings are the settings of matching, the key told only by its end.
 type Settings struct {
@@ -54,8 +60,10 @@ type Service struct {
 	http        *http.Client
 	baseURL     string
 	wikidataURL string
-	// The Claude API key, of marking, if there is one.
+	// The Claude API key, of marking, if there is one, and where Claude's
+	// requests are kept.
 	claudeKey func(context.Context) (string, error)
+	requests  *llmlog.Log
 
 	mu    sync.Mutex
 	queue []Title
@@ -78,12 +86,16 @@ func New(ctx context.Context, db *sql.DB, claudeKey func(context.Context) (strin
 	if err != nil {
 		return nil, err
 	}
+	requests, err := llmlog.Open(ctx, db)
+	if err != nil {
+		return nil, err
+	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	return &Service{
 		store: store, cache: newCache(db), http: &http.Client{Transport: transport}, baseURL: apiURL,
 		wikidataURL: wikidataURL,
-		claudeKey:   claudeKey, wake: make(chan struct{}, 1), changed: make(chan struct{}),
+		claudeKey:   claudeKey, requests: requests, wake: make(chan struct{}, 1), changed: make(chan struct{}),
 		lookupWake: make(chan struct{}, 1), now: time.Now,
 	}, nil
 }
@@ -267,6 +279,10 @@ func (s *Service) Run(ctx context.Context) {
 // to settle it.
 var errNoClaude = errors.New("TMDB's search can't tell which title it is, and there is no Claude API key to settle it")
 
+// errUnsettled is a title the search can't settle while Claude isn't asked
+// (see askClaude).
+var errUnsettled = errors.New("TMDB's search can't tell which title it is")
+
 func (s *Service) matchTitle(ctx context.Context, t Title) {
 	key, err := s.store.setting(ctx, "key")
 	if err != nil || key == "" || !s.due(ctx, t.ID) {
@@ -281,6 +297,9 @@ func (s *Service) matchTitle(ctx context.Context, t Title) {
 	var apiErr *anthropic.Error
 	switch {
 	// Left untried, the title is tried when opened again.
+	case errors.Is(err, errUnsettled):
+		log.Printf("tmdb %s: %v", name, err)
+		return
 	case errors.Is(err, errNoClaude):
 		log.Printf("tmdb %s: %v", name, err)
 		s.setError(ctx, "Поиск TMDB не нашёл тайтл однозначно, а ключа Claude нет")
@@ -341,6 +360,9 @@ func (s *Service) match(ctx context.Context, tmdb *client, t Title) (Candidate, 
 // candidates of and didn't settle, or none (ID 0); why, and the dollars it
 // cost.
 func (s *Service) ask(ctx context.Context, tmdb *client, t Title, candidates []Candidate) (Candidate, string, string, float64, error) {
+	if !askClaude {
+		return Candidate{}, "", "", 0, errUnsettled
+	}
 	key, err := s.claudeKey(ctx)
 	if err != nil {
 		return Candidate{}, "", "", 0, err
@@ -349,7 +371,7 @@ func (s *Service) ask(ctx context.Context, tmdb *client, t Title, candidates []C
 		return Candidate{}, "", "", 0, errNoClaude
 	}
 	claude := anthropic.NewClient(option.WithAPIKey(key), option.WithHTTPClient(s.http))
-	result, cost, err := ask(ctx, claude, tmdb, t, candidates[:min(len(candidates), 15)])
+	result, cost, err := ask(ctx, claude, s.requests, tmdb, t, candidates[:min(len(candidates), 15)])
 	if err != nil {
 		return Candidate{}, "", "", cost, err
 	}

@@ -8,16 +8,21 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
+
+	"title-api/internal/llmlog"
 
 	"github.com/anthropics/anthropic-sdk-go"
 )
 
 // Marker asks Claude through client: each stage the model Stages has for
-// it, else Model.
+// it, else Model. Record, if set, is told of each request: its stage, the
+// model asked, when, and the answer, as much of it as came, or the error.
 type Marker struct {
 	Client anthropic.Client
 	Model  Model
 	Stages map[Stage]Model
+	Record func(stage Stage, model string, started time.Time, response *anthropic.Message, err error)
 
 	mu    sync.Mutex
 	usage map[string]Usage
@@ -68,6 +73,7 @@ func (m *Marker) Usage() map[string]Usage {
 // and reads the answer, which the schema shapes, into result.
 func (m *Marker) ask(ctx context.Context, stage Stage, system string, content []anthropic.ContentBlockParamUnion, schema map[string]any, result any) error {
 	model := m.model(stage)
+	started := time.Now()
 	// Streamed, so that the thinking of a high effort has room without
 	// the request timing out.
 	stream := m.Client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
@@ -81,12 +87,17 @@ func (m *Marker) ask(ctx context.Context, stage Stage, system string, content []
 		},
 	})
 	response := anthropic.Message{}
-	for stream.Next() {
-		if err := response.Accumulate(stream.Current()); err != nil {
-			return err
-		}
+	var err error
+	for err == nil && stream.Next() {
+		err = response.Accumulate(stream.Current())
 	}
-	if err := stream.Err(); err != nil {
+	if err == nil {
+		err = stream.Err()
+	}
+	if m.Record != nil {
+		m.Record(stage, model.ID, started, &response, err)
+	}
+	if err != nil {
 		return err
 	}
 	m.mu.Lock()
@@ -139,17 +150,10 @@ func typed(kind, description string) map[string]any {
 	return map[string]any{"type": kind, "description": description}
 }
 
-// Prices are the dollars a million input and output tokens of a model cost.
-var Prices = map[string][2]float64{
-	"claude-opus-5-5":   {4, 20},
-	"claude-sonnet-5-5": {2, 10},
-	"claude-haiku-4-5":  {1, 5},
-	// For prompts up to 100k tokens, which these are.
-	"claude-haiku-5-5": {0.10, 0.50},
-}
-
 // Cost is the dollars usage of a model took.
 func (u Usage) Cost(model string) float64 {
-	price := Prices[model]
-	return float64(u.InputTokens)/1e6*price[0] + float64(u.OutputTokens)/1e6*price[1]
+	return llmlog.Cost(model, anthropic.Usage{
+		InputTokens: u.InputTokens, OutputTokens: u.OutputTokens,
+		CacheReadInputTokens: u.CacheRead, CacheCreationInputTokens: u.CacheWrite,
+	})
 }

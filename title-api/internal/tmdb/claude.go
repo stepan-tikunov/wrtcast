@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
-	"title-api/internal/marker"
+	"title-api/internal/llmlog"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -22,8 +23,6 @@ const (
 	// The turns of the conversation at most, and the web searches.
 	maxTurns    = 12
 	maxSearches = 5
-	// The dollars a web search costs.
-	searchPrice = 0.01
 )
 
 const system = `You match a title of a Russian streaming site with its entry on TMDB (themoviedb.org). You are given what the site tells of the title and the candidates TMDB's search found by its names; the site's names and year may differ a little from TMDB's (ё written as е, another translation, the year of another release).
@@ -71,8 +70,9 @@ type answer struct {
 }
 
 // ask has Claude settle which of the candidates, or of what it finds
-// itself, is the title: its answer and the dollars it cost.
-func ask(ctx context.Context, claude anthropic.Client, tmdb *client, t Title, candidates []Candidate) (answer, float64, error) {
+// itself, is the title, each request kept in requests: its answer and the
+// dollars it cost.
+func ask(ctx context.Context, claude anthropic.Client, requests *llmlog.Log, tmdb *client, t Title, candidates []Candidate) (answer, float64, error) {
 	input, _ := json.Marshal(map[string]any{"title": t, "candidates": candidates})
 	messages := []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock(string(input)))}
 	tools := []anthropic.ToolUnionParam{
@@ -82,6 +82,7 @@ func ask(ctx context.Context, claude anthropic.Client, tmdb *client, t Title, ca
 	}
 	cost := 0.0
 	for turn := 0; turn < maxTurns; turn++ {
+		started := time.Now()
 		response, err := claude.Messages.New(ctx, anthropic.MessageNewParams{
 			Model:        model,
 			MaxTokens:    16000,
@@ -94,14 +95,16 @@ func ask(ctx context.Context, claude anthropic.Client, tmdb *client, t Title, ca
 			option.WithHeaderAdd("anthropic-beta", "server-side-fallback-2026-07-01"),
 			option.WithJSONSet("fallbacks", "default"),
 		)
+		requests.Add(llmlog.Request{Purpose: "tmdb", Subject: fmt.Sprintf("%s %q", t.ID, t.Title), Model: model, Started: started, Response: response, Err: err})
 		if err != nil {
 			return answer{}, cost, err
 		}
-		price := marker.Prices[model]
-		cost += float64(response.Usage.InputTokens+response.Usage.CacheCreationInputTokens)/1e6*price[0] +
-			float64(response.Usage.CacheReadInputTokens)/1e6*price[0]/10 +
-			float64(response.Usage.OutputTokens)/1e6*price[1] +
-			float64(response.Usage.ServerToolUse.WebSearchRequests)*searchPrice
+		// A refusal may have been answered by another model.
+		answered := model
+		if response.Model != "" {
+			answered = string(response.Model)
+		}
+		cost += llmlog.Cost(answered, response.Usage)
 		switch response.StopReason {
 		case anthropic.StopReasonRefusal:
 			return answer{}, cost, fmt.Errorf("refused (%s)", response.StopDetails.Category)

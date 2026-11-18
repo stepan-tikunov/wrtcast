@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"title-api/internal/llmlog"
 	"title-api/internal/marker"
 	"title-api/internal/provider"
 
@@ -70,8 +71,9 @@ type Source interface {
 type Service struct {
 	store *store
 	// Claude's API is asked directly, not through the proxy the provider
-	// is reached by.
-	http *http.Client
+	// is reached by; its requests are kept in requests.
+	http     *http.Client
+	requests *llmlog.Log
 
 	mu    sync.Mutex
 	queue []provider.UnmarkedEpisode
@@ -83,9 +85,13 @@ func New(ctx context.Context, db *sql.DB) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	requests, err := llmlog.Open(ctx, db)
+	if err != nil {
+		return nil, err
+	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
-	return &Service{store: store, http: &http.Client{Transport: transport}, wake: make(chan struct{}, 1)}, nil
+	return &Service{store: store, http: &http.Client{Transport: transport}, requests: requests, wake: make(chan struct{}, 1)}, nil
 }
 
 func (s *Service) claude(key string) anthropic.Client {
@@ -325,7 +331,14 @@ var errNoSubtitles = errors.New("no full subtitles")
 // mark marks an episode: its sections, the duration of its video, the
 // marker that asked Claude and what it found.
 func (s *Service) mark(ctx context.Context, source Source, client anthropic.Client, e provider.UnmarkedEpisode) ([]provider.Section, float64, *marker.Marker, marker.Result, error) {
-	m := &marker.Marker{Client: client, Model: model, Stages: stages}
+	m := &marker.Marker{Client: client, Model: model, Stages: stages,
+		Record: func(stage marker.Stage, model string, started time.Time, response *anthropic.Message, err error) {
+			s.requests.Add(llmlog.Request{
+				Purpose: "marking " + string(stage), Subject: label(e.Title, e.Season, e.Episode),
+				Model: model, Started: started, Response: response, Err: err,
+			})
+		},
+	}
 	segments, err := source.VideoSegments(ctx, e.Master)
 	if err != nil {
 		return nil, 0, m, marker.Result{}, err

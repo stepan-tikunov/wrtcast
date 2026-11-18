@@ -224,7 +224,7 @@ func (s *Service) lookUp(ctx context.Context, provider Provider, l lookup) {
 // asked at once), those of its year, the likeliest first, are opened and
 // matched by name with TMDB, all at once; the first matched with it is
 // found, unless one likelier is still being. Those TMDB's search can't
-// settle are then settled by Claude, one at a time, the likeliest first,
+// settle are then settled by Claude (if it is asked), one at a time, the likeliest first,
 // until one is matched with it. How it was.
 func (s *Service) find(ctx context.Context, provider Provider, l lookup) (string, string, error) {
 	tmdb, err := s.keyed(ctx)
@@ -279,6 +279,9 @@ func (s *Service) find(ctx context.Context, provider Provider, l lookup) (string
 			continue
 		}
 		match, how, err := s.byClaude(ctx, tmdb, *r.open)
+		if errors.Is(err, errUnsettled) {
+			break
+		}
 		if err != nil {
 			log.Printf("tmdb lookup %s: %s %q: %v", l, likely[i].ID, likely[i].Title, err)
 			continue
