@@ -1,0 +1,36 @@
+{
+  "id": 819,
+  "name": "Edward Norton",
+  "also_known_as": ["Edward Harrison Norton", "Едвард Нортон", "Эдвард Нортон", "에드워드 노튼"],
+  "biography": "",
+  "birthday": "1969-08-18",
+  "deathday": null,
+  "place_of_birth": "Boston, Massachusetts, USA ",
+  "profile_path": "/8nytsqL59SFJTVYVrN72k6qkGgJ.jpg",
+  "known_for_department": "Acting",
+  "gender": 2,
+  "external_ids": {"imdb_id": "nm0001570", "wikidata_id": "Q177311", "instagram_id": null},
+  "combined_credits": {
+    "cast": [
+      {"id": 550, "media_type": "movie", "title": "Бойцовский клуб", "release_date": "1999-10-15", "poster_path": "/fc.jpg", "character": "Narrator", "vote_count": 31000, "genre_ids": [18]},
+      {"id": 120467, "media_type": "movie", "title": "Отель «Гранд Будапешт»", "release_date": "2014-02-26", "poster_path": "/gb.jpg", "character": "Henckels", "vote_count": 15000, "genre_ids": [35]},
+      {"id": 1234, "media_type": "tv", "name": "Шоу Ночью", "first_air_date": "1990-01-01", "poster_path": "/talk.jpg", "character": "Guest", "vote_count": 900, "genre_ids": [10767]},
+      {"id": 2345, "media_type": "movie", "title": "Церемония", "release_date": "2000-03-26", "character": "Self - Presenter", "vote_count": 50, "genre_ids": []},
+      {"id": 3456, "media_type": "movie", "title": "Взрослое", "release_date": "2001-01-01", "character": "X", "vote_count": 99999, "adult": true},
+      {"id": 4567, "media_type": "tv", "name": "Сериал", "first_air_date": "2020-01-01", "poster_path": "/s.jpg", "character": "", "episode_count": 3, "vote_count": 200, "genre_ids": [18]}
+    ],
+    "crew": [
+      {"id": 9294, "media_type": "movie", "title": "Сиротский Бруклин", "release_date": "2019-10-31", "poster_path": "/mb.jpg", "job": "Producer", "vote_count": 2000},
+      {"id": 9294, "media_type": "movie", "title": "Сиротский Бруклин", "release_date": "2019-10-31", "poster_path": "/mb.jpg", "job": "Screenplay", "vote_count": 2000},
+      {"id": 9294, "media_type": "movie", "title": "Сиротский Бруклин", "release_date": "2019-10-31", "poster_path": "/mb.jpg", "job": "Director", "vote_count": 2000},
+      {"id": 550, "media_type": "movie", "title": "Бойцовский клуб", "release_date": "1999-10-15", "poster_path": "/fc.jpg", "job": "Thanks", "vote_count": 31000},
+      {"id": 5678, "media_type": "movie", "title": "Скрытое", "release_date": "2005-01-01", "job": "Executive Producer", "vote_count": 10}
+    ]
+  },
+  "translations": {
+    "translations": [
+      {"iso_639_1": "en", "iso_3166_1": "US", "data": {"name": "Edward Norton", "biography": "Edward Harrison Norton is an American actor.\r\n\r\nHe was born in Boston."}},
+      {"iso_639_1": "ru", "iso_3166_1": "RU", "data": {"name": "", "biography": ""}}
+    ]
+  }
+}

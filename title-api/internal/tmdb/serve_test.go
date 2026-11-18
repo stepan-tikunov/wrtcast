@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -32,6 +33,7 @@ func newFakeTMDB(t *testing.T) *fakeTMDB {
 		"/movie/693134":            "dune-part-two",
 		"/collection/726871":       "dune-collection",
 		"/tv/1405":                 "dexter",
+		"/person/819":              "person-norton",
 		"/tv/1405/season/1":        "dexter-s1",
 		"/tv/95603/season/1 ru-RU": "osman-s1",
 		"/tv/95603/season/1 en-US": "osman-s1-en",
@@ -110,6 +112,8 @@ func newServingService(t *testing.T, fake *fakeTMDB, key string) (*Service, *clo
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
+	// As title-api opens it: the background fetches write one at a time.
+	db.SetMaxOpenConns(1)
 	ctx := context.Background()
 	service, err := New(ctx, db, func(context.Context) (string, error) { return "", nil })
 	if err != nil {
@@ -173,7 +177,7 @@ func TestDetailsCached(t *testing.T) {
 	fake.holding(nil)
 	close(hold)
 	waitFor(t, "the refresh to be kept", func() bool {
-		_, fetched, _, _ := service.cache.read(ctx, "movie:550:v2")
+		_, fetched, _, _ := service.cache.read(ctx, detailsKey(KindMovie, 550))
 		return fetched.Equal(now.Now().Truncate(time.Second))
 	})
 	if n := fake.count("/movie/550"); n != 2 {
@@ -275,6 +279,93 @@ func TestDetailsTitleIDs(t *testing.T) {
 		if r.TitleID != want {
 			t.Errorf("recommendation %d %s: %q, want %q", r.ID, r.Kind, r.TitleID, want)
 		}
+	}
+}
+
+// fakeWikidata answers of Q177311 (Edward Norton), failing while fail is
+// set.
+func fakeWikidata(t *testing.T, fail *atomic.Bool, hits *atomic.Int32) string {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		query := r.URL.Query()
+		if r.Header.Get("User-Agent") == "" || query.Get("format") != "json" {
+			t.Errorf("request %s, User-Agent %q", r.URL, r.Header.Get("User-Agent"))
+		}
+		if fail.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		switch query.Get("action") {
+		case "wbgetentities":
+			if query.Get("ids") != "Q177311" || query.Get("sitefilter") != "ruwiki|enwiki" {
+				t.Errorf("entities %s", r.URL)
+			}
+			_, _ = w.Write([]byte(`{"entities":{"Q177311":{"sitelinks":{
+				"enwiki":{"site":"enwiki","title":"Edward Norton","url":"https://en.wikipedia.org/wiki/Edward_Norton"},
+				"ruwiki":{"site":"ruwiki","title":"Нортон, Эдвард","url":"https://ru.wikipedia.org/wiki/%D0%9D%D0%BE%D1%80%D1%82%D0%BE%D0%BD"}}}}}`))
+		case "wbgetclaims":
+			if query.Get("entity") != "Q177311" || query.Get("property") != "P2604" {
+				t.Errorf("claims %s", r.URL)
+			}
+			_, _ = w.Write([]byte(`{"claims":{"P2604":[{"mainsnak":{"snaktype":"value","property":"P2604","datavalue":{"value":"4434","type":"string"}}}]}}`))
+		default:
+			t.Errorf("action %s", r.URL)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+func TestPerson(t *testing.T) {
+	fake := newFakeTMDB(t)
+	service, now := newServingService(t, fake, "key")
+	var wikidataFails atomic.Bool
+	var wikidataHits atomic.Int32
+	service.wikidataURL = fakeWikidata(t, &wikidataFails, &wikidataHits)
+	ctx := context.Background()
+	if err := service.store.matched(ctx, "fight-club", 550, KindMovie, byName, "", 0); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wikidata failing: kept for a day.
+	wikidataFails.Store(true)
+	person, err := service.Person(ctx, 819)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if person.Name != "Эдвард Нортон" || person.Kinopoisk != "" || person.Wikipedia != "" || !person.Partial {
+		t.Fatalf("person %q, kinopoisk %q, wikipedia %q, partial %t", person.Name, person.Kinopoisk, person.Wikipedia, person.Partial)
+	}
+	if person.Credits[0].TitleID != "fight-club" || person.Credits[1].TitleID != "" {
+		t.Errorf("titles %q, %q", person.Credits[0].TitleID, person.Credits[1].TitleID)
+	}
+	wikidataFails.Store(false)
+	now.advance(25 * time.Hour)
+	if _, err := service.Person(ctx, 819); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the refresh to be kept", func() bool {
+		data, _, _, _ := service.cache.read(ctx, "person:819:v1")
+		return strings.Contains(string(data), `"kinopoisk":"4434"`)
+	})
+	person, err = service.Person(ctx, 819)
+	if err != nil || person.Partial || person.Kinopoisk != "4434" || !strings.HasPrefix(person.Wikipedia, "https://ru.wikipedia.org/") {
+		t.Fatalf("person %+v, %v", person, err)
+	}
+	// Then for a month.
+	now.advance(29 * 24 * time.Hour)
+	if _, err := service.Person(ctx, 819); err != nil {
+		t.Fatal(err)
+	}
+	if n := fake.count("/person/819"); n != 2 {
+		t.Errorf("%d requests of TMDB", n)
+	}
+	if n := wikidataHits.Load(); n != 3 {
+		t.Errorf("%d requests of Wikidata", n)
+	}
+
+	if _, err := service.Person(ctx, 1); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such person: %v", err)
 	}
 }
 

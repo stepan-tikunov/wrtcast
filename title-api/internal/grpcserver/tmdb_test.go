@@ -41,6 +41,12 @@ func TestGetTmdbDetails(t *testing.T) {
 			t.Errorf("%v: %v, want %s", test.query, err, test.code)
 		}
 	}
+	if _, err := server.GetTmdbPerson(ctx, &titlev1.GetTmdbPersonQuery{}); status.Code(err) != codes.InvalidArgument {
+		t.Errorf("person with no ID: %v", err)
+	}
+	if _, err := server.GetTmdbPerson(ctx, &titlev1.GetTmdbPersonQuery{TmdbId: 819}); status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("person: %v", err)
+	}
 	if _, err := server.GetTmdbSeason(ctx, &titlev1.GetTmdbSeasonQuery{TmdbId: 1405, SeasonNumber: 1}); status.Code(err) != codes.FailedPrecondition {
 		t.Errorf("season: %v", err)
 	}
@@ -91,5 +97,23 @@ func TestTmdbDetailsResponse(t *testing.T) {
 	}
 	if r := response.GetRecommendations()[0]; r.GetTitle().GetMediaType() != titlev1.MediaType_MEDIA_TYPE_SERIES {
 		t.Errorf("recommendation %v", r)
+	}
+}
+
+func TestTmdbPersonResponse(t *testing.T) {
+	t.Parallel()
+	response := tmdbPerson(tmdb.PersonDetails{
+		ID: 819, Name: "Эдвард Нортон", Gender: tmdb.GenderMale, IMDb: "nm0001570",
+		Credits: []tmdb.Credit{{
+			Related: tmdb.Related{ID: 9294, Kind: tmdb.KindMovie, Date: "2019-10-31", TitleID: "x"},
+			Jobs:    []string{"Режиссёр"},
+		}},
+	})
+	if response.GetGender() != titlev1.TmdbGender_TMDB_GENDER_MALE || len(response.GetLinks()) != 2 ||
+		response.GetLinks()[1].GetSite() != "imdb" {
+		t.Errorf("response %v", response)
+	}
+	if c := response.GetCredits()[0]; c.GetTitle().GetYear() != "2019" || c.GetTitle().GetTitleId() != "x" || c.GetJobs()[0] != "Режиссёр" {
+		t.Errorf("credit %v", c)
 	}
 }

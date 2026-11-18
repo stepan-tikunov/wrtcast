@@ -468,6 +468,45 @@ func local_request_TitleService_GetTmdbCast_0(ctx context.Context, marshaler run
 	return msg, metadata, err
 }
 
+func request_TitleService_GetTmdbPerson_0(ctx context.Context, marshaler runtime.Marshaler, client TitleServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq GetTmdbPersonQuery
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["tmdb_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "tmdb_id")
+	}
+	protoReq.TmdbId, err = runtime.Uint64(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "tmdb_id", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	msg, err := client.GetTmdbPerson(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_TitleService_GetTmdbPerson_0(ctx context.Context, marshaler runtime.Marshaler, server TitleServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq GetTmdbPersonQuery
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["tmdb_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "tmdb_id")
+	}
+	protoReq.TmdbId, err = runtime.Uint64(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "tmdb_id", err)
+	}
+	msg, err := server.GetTmdbPerson(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 func request_TitleService_WaitTmdbMatch_0(ctx context.Context, marshaler runtime.Marshaler, client TitleServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq WaitTmdbMatchQuery
@@ -815,6 +854,26 @@ func RegisterTitleServiceHandlerServer(ctx context.Context, mux *runtime.ServeMu
 		}
 		forward_TitleService_GetTmdbCast_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_TitleService_GetTmdbPerson_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/title.v1.TitleService/GetTmdbPerson", runtime.WithHTTPPathPattern("/v1/tmdb/person/{tmdb_id}"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_TitleService_GetTmdbPerson_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_TitleService_GetTmdbPerson_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_TitleService_WaitTmdbMatch_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1102,6 +1161,23 @@ func RegisterTitleServiceHandlerClient(ctx context.Context, mux *runtime.ServeMu
 		}
 		forward_TitleService_GetTmdbCast_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_TitleService_GetTmdbPerson_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/title.v1.TitleService/GetTmdbPerson", runtime.WithHTTPPathPattern("/v1/tmdb/person/{tmdb_id}"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_TitleService_GetTmdbPerson_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_TitleService_GetTmdbPerson_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_TitleService_WaitTmdbMatch_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1168,6 +1244,7 @@ var (
 	pattern_TitleService_GetTmdbDetails_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 1, 0, 4, 1, 5, 3}, []string{"v1", "tmdb", "media_type", "tmdb_id"}, ""))
 	pattern_TitleService_GetTmdbSeason_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"v1", "tmdb", "tv", "tmdb_id", "seasons", "season_number"}, ""))
 	pattern_TitleService_GetTmdbCast_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"v1", "tmdb", "media_type", "tmdb_id", "cast"}, ""))
+	pattern_TitleService_GetTmdbPerson_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"v1", "tmdb", "person", "tmdb_id"}, ""))
 	pattern_TitleService_WaitTmdbMatch_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"v1", "titles", "title_id", "tmdb"}, ""))
 	pattern_TitleService_LookupTmdbTitle_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"v1", "tmdb", "media_type", "tmdb_id", "lookup"}, ""))
 	pattern_TitleService_GetSeriesUpdates_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "series", "updates"}, ""))
@@ -1185,6 +1262,7 @@ var (
 	forward_TitleService_GetTmdbDetails_0        = runtime.ForwardResponseMessage
 	forward_TitleService_GetTmdbSeason_0         = runtime.ForwardResponseMessage
 	forward_TitleService_GetTmdbCast_0           = runtime.ForwardResponseMessage
+	forward_TitleService_GetTmdbPerson_0         = runtime.ForwardResponseMessage
 	forward_TitleService_WaitTmdbMatch_0         = runtime.ForwardResponseMessage
 	forward_TitleService_LookupTmdbTitle_0       = runtime.ForwardResponseMessage
 	forward_TitleService_GetSeriesUpdates_0      = runtime.ForwardResponseMessage

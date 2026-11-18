@@ -12,8 +12,8 @@ import (
 var (
 	// ErrNoKey is a request for TMDB's data with no key set.
 	ErrNoKey = errors.New("no TMDB key is set")
-	// ErrNotFound is a title TMDB doesn't have.
-	ErrNotFound = errors.New("TMDB has no such title")
+	// ErrNotFound is a title or a person TMDB doesn't have.
+	ErrNotFound = errors.New("TMDB has no such title or person")
 )
 
 // countryNames are the countries TMDB names otherwise than the provider.
@@ -70,8 +70,9 @@ func (s *Service) Details(ctx context.Context, kind string, id uint64) (Details,
 }
 
 // detailsVersion changes the key Details are cached by when what is kept
-// of a title changes: 2 keeps the whole cast, not 12 with photos.
-const detailsVersion = 2
+// of a title changes: 2 keeps the whole cast, not 12 with photos; 3 the
+// people's IDs.
+const detailsVersion = 3
 
 // details are a title on TMDB as cached.
 func (s *Service) details(ctx context.Context, tmdb *client, kind string, id uint64) (Details, error) {
@@ -131,7 +132,8 @@ func (s *Service) Cast(ctx context.Context, kind string, id uint64) ([]Person, e
 // titleIDs tells title-api's titles of a title and of those it lists, of
 // them that are matched.
 func (s *Service) titleIDs(ctx context.Context, details *Details) {
-	related := []*Related{}
+	self := Related{ID: details.ID, Kind: details.Kind}
+	related := []*Related{&self}
 	for i := range details.Recommendations {
 		related = append(related, &details.Recommendations[i])
 	}
@@ -140,7 +142,14 @@ func (s *Service) titleIDs(ctx context.Context, details *Details) {
 			related = append(related, &details.Collection.Parts[i])
 		}
 	}
-	ids := map[string][]uint64{details.Kind: {details.ID}}
+	s.relatedTitleIDs(ctx, related)
+	details.TitleID = self.TitleID
+}
+
+// relatedTitleIDs tells title-api's titles of those of TMDB's that are
+// matched.
+func (s *Service) relatedTitleIDs(ctx context.Context, related []*Related) {
+	ids := map[string][]uint64{}
 	for _, r := range related {
 		ids[r.Kind] = append(ids[r.Kind], r.ID)
 	}
@@ -152,10 +161,50 @@ func (s *Service) titleIDs(ctx context.Context, details *Details) {
 		}
 		titles[kind] = found
 	}
-	details.TitleID = titles[details.Kind][details.ID]
 	for _, r := range related {
 		r.TitleID = titles[r.Kind][r.ID]
 	}
+}
+
+// personVersion changes the key a person is cached by when what is kept
+// of them changes.
+const personVersion = 1
+
+// Person is someone on TMDB by their ID, as cached, with their pages that
+// Wikidata knows, and title-api's titles of those they are in.
+func (s *Service) Person(ctx context.Context, id uint64) (PersonDetails, error) {
+	tmdb, err := s.keyed(ctx)
+	if err != nil {
+		return PersonDetails{}, err
+	}
+	person, err := cached(ctx, s.cache, fmt.Sprintf("person:%d:v%d", id, personVersion), PersonDetails.ttl,
+		func(ctx context.Context) (PersonDetails, error) {
+			raw, err := tmdb.person(ctx, id)
+			if err != nil {
+				return PersonDetails{}, err
+			}
+			person := pickPerson(raw)
+			if person.Wikidata != "" {
+				person.Wikipedia, person.Kinopoisk, err = s.personLinks(ctx, person.Wikidata)
+				if err != nil {
+					log.Printf("tmdb person %d: %v", id, err)
+					person.Partial = true
+				}
+			}
+			return person, nil
+		})
+	if errors.Is(err, errNotFound) {
+		return PersonDetails{}, ErrNotFound
+	}
+	if err != nil {
+		return PersonDetails{}, err
+	}
+	related := make([]*Related, len(person.Credits))
+	for i := range person.Credits {
+		related[i] = &person.Credits[i].Related
+	}
+	s.relatedTitleIDs(ctx, related)
+	return person, nil
 }
 
 // Season is a season of a series on TMDB, as cached; one TMDB doesn't

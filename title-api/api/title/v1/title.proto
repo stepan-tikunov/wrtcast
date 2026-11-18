@@ -76,6 +76,14 @@ service TitleService {
     };
   }
 
+  // After GetTmdbDetails, so that the gateway tries it first: its path
+  // would be a details' of media type "person".
+  rpc GetTmdbPerson(GetTmdbPersonQuery) returns (TmdbPersonDetails) {
+    option (google.api.http) = {
+      get: "/v1/tmdb/person/{tmdb_id}"
+    };
+  }
+
   rpc WaitTmdbMatch(WaitTmdbMatchQuery) returns (TmdbMatch) {
     option (google.api.http) = {
       get: "/v1/titles/{title_id}/tmdb"
@@ -368,7 +376,6 @@ message TmdbDetails {
   TmdbEpisodeRef next_episode = 17;
   TmdbEpisodeRef last_episode = 18;
   uint32 number_of_seasons = 19;
-  repeated string creators = 20;
   // The first 12 billed, with a photo or not; GetTmdbCast tells them all.
   repeated TmdbPerson cast = 21;
   // Up to 4 trailers and teasers on YouTube, Russian and official first.
@@ -378,13 +385,18 @@ message TmdbDetails {
   repeated TmdbRelated recommendations = 24;
   // title-api's title of it, if it is matched.
   string title_id = 25;
-  // A movie's.
-  repeated string directors = 26;
   // A series' seasons, the specials left out.
   repeated TmdbSeasonRef seasons = 27;
   string release_date = 28;
   // How many people GetTmdbCast tells.
   uint32 cast_total = 29;
+  // A series'.
+  repeated TmdbPerson creators = 30;
+  // A movie's.
+  repeated TmdbPerson directors = 31;
+
+  // Names alone, before people had their IDs.
+  reserved 20, 26;
 }
 
 // Who is in a title on TMDB, as billed.
@@ -421,6 +433,63 @@ message TmdbPerson {
   string character = 2;
   // Empty when TMDB has no photo.
   string profile_path = 3;
+  // GetTmdbPerson tells of the person by it.
+  uint64 id = 4;
+}
+
+// A person on TMDB by their ID. NOT_FOUND when TMDB doesn't have them,
+// FAILED_PRECONDITION with no TMDB key.
+message GetTmdbPersonQuery {
+  uint64 tmdb_id = 1;
+}
+
+// What a person's page shows of someone on TMDB, in Russian, chosen by
+// title-api; what TMDB lacks is empty.
+message TmdbPersonDetails {
+  uint64 id = 1;
+  string name = 2;
+  // Their name in English when it is not the same.
+  string original_name = 3;
+  string profile_path = 4;
+  // What they are known for, in Russian: "Актриса", "Режиссёр".
+  string profession = 5;
+  // 2006-01-02, or a year alone.
+  string birthday = 6;
+  string deathday = 7;
+  string place_of_birth = 8;
+  // In English where TMDB has none in Russian.
+  string biography = 9;
+  TmdbGender gender = 10;
+  repeated TmdbLink links = 11;
+  // The titles they are in or made, the best known first: each title once,
+  // with all they were in it; appearances as themselves left out.
+  repeated TmdbCredit credits = 12;
+}
+
+enum TmdbGender {
+  TMDB_GENDER_UNSPECIFIED = 0;
+  TMDB_GENDER_FEMALE = 1;
+  TMDB_GENDER_MALE = 2;
+  TMDB_GENDER_NON_BINARY = 3;
+}
+
+// A page of a person elsewhere.
+message TmdbLink {
+  // "tmdb", "imdb", "kinopoisk", "wikipedia" or "instagram".
+  string site = 1;
+  string url = 2;
+}
+
+message TmdbCredit {
+  TmdbRelated title = 1;
+  // Whom they play, empty when they don't or TMDB doesn't tell.
+  string character = 2;
+  // What else they did in it, in Russian: "Режиссёр", "Сценарий".
+  repeated string jobs = 3;
+  // A series' episodes they are in, if TMDB tells.
+  uint32 episodes = 4;
+  // Played in it, whether TMDB tells whom or not.
+  bool acting = 5;
 }
 
 message TmdbVideo {

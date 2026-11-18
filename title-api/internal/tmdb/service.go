@@ -51,8 +51,9 @@ type Service struct {
 	cache *cache
 	// TMDB's and Claude's APIs are asked directly, not through the proxy
 	// the provider is reached by.
-	http    *http.Client
-	baseURL string
+	http        *http.Client
+	baseURL     string
+	wikidataURL string
 	// The Claude API key, of marking, if there is one.
 	claudeKey func(context.Context) (string, error)
 
@@ -81,7 +82,8 @@ func New(ctx context.Context, db *sql.DB, claudeKey func(context.Context) (strin
 	transport.Proxy = nil
 	return &Service{
 		store: store, cache: newCache(db), http: &http.Client{Transport: transport}, baseURL: apiURL,
-		claudeKey: claudeKey, wake: make(chan struct{}, 1), changed: make(chan struct{}),
+		wikidataURL: wikidataURL,
+		claudeKey:   claudeKey, wake: make(chan struct{}, 1), changed: make(chan struct{}),
 		lookupWake: make(chan struct{}, 1), now: time.Now,
 	}, nil
 }

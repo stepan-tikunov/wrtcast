@@ -29,6 +29,7 @@ type video struct {
 }
 
 type castMember struct {
+	ID          uint64 `json:"id"`
 	Name        string `json:"name"`
 	ProfilePath string `json:"profile_path"`
 	// A movie's.
@@ -40,8 +41,10 @@ type castMember struct {
 }
 
 type crewMember struct {
-	Name string `json:"name"`
-	Job  string `json:"job"`
+	ID          uint64 `json:"id"`
+	Name        string `json:"name"`
+	ProfilePath string `json:"profile_path"`
+	Job         string `json:"job"`
 }
 
 type episodeRef struct {
@@ -90,7 +93,9 @@ type rawDetails struct {
 	Last      *episodeRef `json:"last_episode_to_air"`
 	Seasons   int32       `json:"number_of_seasons"`
 	CreatedBy []struct {
-		Name string `json:"name"`
+		ID          uint64 `json:"id"`
+		Name        string `json:"name"`
+		ProfilePath string `json:"profile_path"`
 	} `json:"created_by"`
 	SeasonList []struct {
 		SeasonNumber int32  `json:"season_number"`

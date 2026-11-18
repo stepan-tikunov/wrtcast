@@ -2,6 +2,7 @@ package tmdb
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -39,7 +40,7 @@ func TestPickDetails(t *testing.T) {
 				if strings.Contains(d.Overview, "\r") {
 					t.Errorf("overview has \\r: %q", d.Overview)
 				}
-				if len(d.Directors) != 1 || d.Directors[0] != "Дэвид Финчер" || d.Runtime != 139 || d.Year() != "1999" {
+				if len(d.Directors) != 1 || d.Directors[0].Name != "Дэвид Финчер" || d.Runtime != 139 || d.Year() != "1999" {
 					t.Errorf("directors %v, runtime %d, year %s", d.Directors, d.Runtime, d.Year())
 				}
 				if d.Series != nil || d.CollectionID != 0 {
@@ -338,5 +339,93 @@ func TestDetailsTTL(t *testing.T) {
 	collection := Collection{Parts: []Related{{Date: "2021-09-15"}, {Date: "2026-12-15"}}}
 	if collection.ttl(now) != shortTTL || (Collection{Parts: collection.Parts[:1]}).ttl(now) != longTTL {
 		t.Errorf("collection TTLs")
+	}
+}
+
+func TestPickPerson(t *testing.T) {
+	p := pickPerson(fixture[rawPerson](t, "person-norton"))
+	// TMDB's name is in English: the Russian one of the names they are
+	// known by, not the Ukrainian.
+	if p.Name != "Эдвард Нортон" || p.OriginalName != "Edward Norton" || p.Profession != "Актёр" {
+		t.Errorf("name %q, original %q, profession %q", p.Name, p.OriginalName, p.Profession)
+	}
+	// No biography in Russian: the English one.
+	if p.Biography != "Edward Harrison Norton is an American actor.\n\nHe was born in Boston." ||
+		p.PlaceOfBirth != "Boston, Massachusetts, USA" || p.Birthday != "1969-08-18" || p.Deathday != "" {
+		t.Errorf("biography %q, born %q in %q, died %q", p.Biography, p.Birthday, p.PlaceOfBirth, p.Deathday)
+	}
+	// Each title once, the best known first; the talk show, the ceremony,
+	// the adult movie and the jobs not told left out.
+	var got []string
+	for _, c := range p.Credits {
+		got = append(got, fmt.Sprintf("%s:%d %q %v %d %t", c.Kind, c.ID, c.Character, c.Jobs, c.Episodes, c.Acting))
+	}
+	want := []string{
+		`movie:550 "Narrator" [] 0 true`,
+		`movie:120467 "Henckels" [] 0 true`,
+		`movie:9294 "" [Режиссёр Сценарий Продюсер] 0 false`,
+		`tv:4567 "" [] 3 true`,
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("credits\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if c := p.Credits[0]; c.Name != "Бойцовский клуб" || c.Year() != "1999" || c.Poster != "fc.jpg" {
+		t.Errorf("credit %+v", c)
+	}
+	if c := p.Credits[3]; c.Name != "Сериал" || c.Date != "2020-01-01" {
+		t.Errorf("series %+v", c)
+	}
+}
+
+func TestPersonName(t *testing.T) {
+	for _, test := range []struct {
+		raw            rawPerson
+		ru             string
+		name, original string
+		profession     string
+	}{
+		// In Russian on TMDB.
+		{rawPerson{Name: "Константин Хабенский", KnownFor: "Acting"}, "", "Константин Хабенский", "", "Актёр"},
+		{rawPerson{Name: "Ксения Раппопорт", KnownFor: "Acting", Gender: GenderFemale}, "", "Ксения Раппопорт", "", "Актриса"},
+		// None in Russian: as TMDB has it.
+		{rawPerson{Name: "Bong Joon-ho", AlsoKnownAs: []string{"봉준호", "Бон Чжун-хо"}, KnownFor: "Directing"}, "", "Бон Чжун-хо", "Bong Joon-ho", "Режиссёр"},
+		{rawPerson{Name: "Some One", AlsoKnownAs: []string{"Сом Ўан", "Кристофър Нолан"}, KnownFor: "Lighting"}, "", "Some One", "", ""},
+		// The Russian translation first.
+		{rawPerson{Name: "Christopher Nolan", AlsoKnownAs: []string{"Кристофер Нолан"}}, "Кристофер Джонатан Нолан", "Кристофер Джонатан Нолан", "Christopher Nolan", ""},
+		{rawPerson{Name: "Christopher Nolan", AlsoKnownAs: []string{"Крістофер Нолан", "Кристофер Нолан"}}, "", "Кристофер Нолан", "Christopher Nolan", ""},
+	} {
+		if test.ru != "" {
+			ru := personTranslation{Language: "ru"}
+			ru.Data.Name = test.ru
+			test.raw.Translations.Translations = []personTranslation{ru}
+		}
+		p := pickPerson(test.raw)
+		if p.Name != test.name || p.OriginalName != test.original || p.Profession != test.profession {
+			t.Errorf("%q: %q, %q, %q", test.raw.Name, p.Name, p.OriginalName, p.Profession)
+		}
+	}
+}
+
+func TestPersonLinks(t *testing.T) {
+	links := PersonDetails{ID: 819, IMDb: "nm0001570", Kinopoisk: "4434", Wikipedia: "https://ru.wikipedia.org/wiki/x"}.Links()
+	var got []string
+	for _, l := range links {
+		got = append(got, l.Site+" "+l.URL)
+	}
+	want := "tmdb https://www.themoviedb.org/person/819\nkinopoisk https://www.kinopoisk.ru/name/4434/\n" +
+		"imdb https://www.imdb.com/name/nm0001570/\nwikipedia https://ru.wikipedia.org/wiki/x"
+	if strings.Join(got, "\n") != want {
+		t.Errorf("links\n%s", strings.Join(got, "\n"))
+	}
+}
+
+func TestAsSelf(t *testing.T) {
+	for character, want := range map[string]bool{
+		"Self": true, "Self - Host": true, "Himself (archive footage)": true, "Сам себя": true, "Себя": true,
+		"Selfie": false, "Самурай": false, "Narrator": false, "": false,
+	} {
+		if asSelf.MatchString(character) != want {
+			t.Errorf("%q: %t", character, !want)
+		}
 	}
 }

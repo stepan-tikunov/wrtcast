@@ -48,7 +48,7 @@ type Details struct {
 	Genres      []string `json:"genres,omitempty"`
 	// Codes as kept, their Russian names as served.
 	Countries       []string  `json:"countries,omitempty"`
-	Directors       []string  `json:"directors,omitempty"`
+	Directors       []Person  `json:"directors,omitempty"`
 	Cast            []Person  `json:"cast,omitempty"`
 	Videos          []Video   `json:"videos,omitempty"`
 	CollectionID    uint64    `json:"collection_id,omitempty"`
@@ -69,7 +69,7 @@ type Series struct {
 	Next     *EpisodeRef `json:"next,omitempty"`
 	Last     *EpisodeRef `json:"last,omitempty"`
 	Seasons  int32       `json:"seasons"`
-	Creators []string    `json:"creators,omitempty"`
+	Creators []Person    `json:"creators,omitempty"`
 	// The seasons, the specials (season 0) left out.
 	SeasonList []SeasonRef `json:"season_list,omitempty"`
 }
@@ -88,7 +88,9 @@ type SeasonRef struct {
 	Name     string `json:"name,omitempty"`
 }
 
+// Person is someone in a title, of the cast or of those who made it.
 type Person struct {
+	ID        uint64 `json:"id,omitempty"`
 	Name      string `json:"name"`
 	Character string `json:"character,omitempty"`
 	Profile   string `json:"profile"`
@@ -184,8 +186,8 @@ func pickDetails(kind string, raw rawDetails) Details {
 		result.Countries = raw.OriginCountry
 	}
 	for _, member := range raw.Credits.Crew {
-		if member.Job == "Director" && !slices.Contains(result.Directors, member.Name) {
-			result.Directors = append(result.Directors, member.Name)
+		if member.Job == "Director" && !slices.ContainsFunc(result.Directors, func(p Person) bool { return p.ID == member.ID && p.Name == member.Name }) {
+			result.Directors = append(result.Directors, Person{ID: member.ID, Name: member.Name, Profile: file(member.ProfilePath)})
 		}
 	}
 	if raw.BelongsToCollection != nil {
@@ -207,7 +209,7 @@ func pickSeries(raw rawDetails) *Series {
 	}
 	series.Next, series.Last = ref(raw.Next), ref(raw.Last)
 	for _, creator := range raw.CreatedBy {
-		series.Creators = append(series.Creators, creator.Name)
+		series.Creators = append(series.Creators, Person{ID: creator.ID, Name: creator.Name, Profile: file(creator.ProfilePath)})
 	}
 	for _, season := range raw.SeasonList {
 		if season.SeasonNumber > 0 {
@@ -363,7 +365,7 @@ func pickCast(kind string, raw rawDetails) []Person {
 		if len(member.Roles) > 0 {
 			character = member.Roles[0].Character
 		}
-		result = append(result, Person{Name: member.Name, Character: strings.TrimSpace(character), Profile: file(member.ProfilePath)})
+		result = append(result, Person{ID: member.ID, Name: member.Name, Character: strings.TrimSpace(character), Profile: file(member.ProfilePath)})
 		if len(result) == castKept {
 			break
 		}

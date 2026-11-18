@@ -219,6 +219,13 @@ func (gatewayTestService) GetTmdbCast(
 	return &titlev1.TmdbCast{Cast: []*titlev1.TmdbPerson{{Name: query.GetMediaType()}}}, nil
 }
 
+func (gatewayTestService) GetTmdbPerson(
+	_ context.Context,
+	query *titlev1.GetTmdbPersonQuery,
+) (*titlev1.TmdbPersonDetails, error) {
+	return &titlev1.TmdbPersonDetails{Id: query.GetTmdbId(), Name: "person"}, nil
+}
+
 func (gatewayTestService) WaitTmdbMatch(
 	_ context.Context,
 	query *titlev1.WaitTmdbMatchQuery,
@@ -282,7 +289,10 @@ func TestTmdbHTTPAnnotations(t *testing.T) {
 		{"/v1/tmdb/tv/1405", "name", "tv"},
 		{"/v1/titles/64aee42620222/tmdb", "tmdb", "map[id:1405 mediaType:MEDIA_TYPE_SERIES]"},
 		{"/v1/titles/wait/tmdb", "pending", "true"},
-		{"/v1/tmdb/tv/1405/cast", "cast", "[map[character: name:tv profilePath:]]"},
+		{"/v1/tmdb/tv/1405/cast", "cast", "[map[character: id:0 name:tv profilePath:]]"},
+		// Not the details of a title of media type "person".
+		{"/v1/tmdb/person/819", "name", "person"},
+		{"/v1/tmdb/person/819", "id", "819"},
 		{"POST /v1/tmdb/tv/1405/lookup", "titleId", "tv1405"},
 		{"POST /v1/tmdb/tv/1405/lookup", "state", "STATE_FOUND"},
 		{"/v1/tmdb/tv/1405/seasons/2", "episodes", "[map[airDate: episodeNumber:2 name:Пилот overview: runtimeMinutes:0 stillPath:x.jpg upcoming:true]]"},

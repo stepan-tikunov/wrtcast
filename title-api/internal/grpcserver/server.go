@@ -419,6 +419,50 @@ func (s *Server) GetTmdbCast(
 	return &titlev1.TmdbCast{Cast: tmdbPeople(cast)}, nil
 }
 
+// GetTmdbPerson tells of someone on TMDB by their ID, and of the titles
+// they are in.
+func (s *Server) GetTmdbPerson(
+	ctx context.Context,
+	query *titlev1.GetTmdbPersonQuery,
+) (*titlev1.TmdbPersonDetails, error) {
+	if s.tmdb == nil {
+		return nil, status.Error(codes.Unimplemented, "TMDB is off")
+	}
+	if query.GetTmdbId() == 0 {
+		return nil, status.Error(codes.InvalidArgument, "tmdb_id is required")
+	}
+	person, err := s.tmdb.Person(ctx, query.GetTmdbId())
+	if err != nil {
+		return nil, tmdbStatus(err)
+	}
+	return tmdbPerson(person), nil
+}
+
+var tmdbGenders = map[int]titlev1.TmdbGender{
+	tmdb.GenderFemale:    titlev1.TmdbGender_TMDB_GENDER_FEMALE,
+	tmdb.GenderMale:      titlev1.TmdbGender_TMDB_GENDER_MALE,
+	tmdb.GenderNonBinary: titlev1.TmdbGender_TMDB_GENDER_NON_BINARY,
+}
+
+func tmdbPerson(person tmdb.PersonDetails) *titlev1.TmdbPersonDetails {
+	response := &titlev1.TmdbPersonDetails{
+		Id: person.ID, Name: person.Name, OriginalName: person.OriginalName, ProfilePath: person.Profile,
+		Profession: person.Profession, Birthday: person.Birthday, Deathday: person.Deathday,
+		PlaceOfBirth: person.PlaceOfBirth, Biography: person.Biography, Gender: tmdbGenders[person.Gender],
+		Credits: make([]*titlev1.TmdbCredit, 0, len(person.Credits)),
+	}
+	for _, link := range person.Links() {
+		response.Links = append(response.Links, &titlev1.TmdbLink{Site: link.Site, Url: link.URL})
+	}
+	for _, credit := range person.Credits {
+		response.Credits = append(response.Credits, &titlev1.TmdbCredit{
+			Title: tmdbRelated([]tmdb.Related{credit.Related})[0], Character: credit.Character,
+			Jobs: credit.Jobs, Episodes: credit.Episodes, Acting: credit.Acting,
+		})
+	}
+	return response
+}
+
 // tmdbQuery is the kind of the title a query is of, checked.
 func tmdbQuery(query *titlev1.GetTmdbDetailsQuery) (string, error) {
 	kind := query.GetMediaType()
@@ -474,7 +518,7 @@ func tmdbPeople(people []tmdb.Person) []*titlev1.TmdbPerson {
 	result := make([]*titlev1.TmdbPerson, 0, len(people))
 	for _, person := range people {
 		result = append(result, &titlev1.TmdbPerson{
-			Name: person.Name, Character: person.Character, ProfilePath: person.Profile,
+			Id: person.ID, Name: person.Name, Character: person.Character, ProfilePath: person.Profile,
 		})
 	}
 	return result
@@ -487,7 +531,7 @@ func tmdbDetails(details tmdb.Details) *titlev1.TmdbDetails {
 		BackdropPath: details.Backdrop, LogoPath: details.Logo, LogoAspect: details.LogoAspect,
 		PosterPath: details.Poster, Age: details.Age, VoteAverage: details.VoteAverage,
 		RuntimeMinutes: details.Runtime, Genres: details.Genres, Countries: details.Countries,
-		Directors: details.Directors, TitleId: details.TitleID,
+		Directors: tmdbPeople(details.Directors), TitleId: details.TitleID,
 		Recommendations: tmdbRelated(details.Recommendations),
 	}
 	response.Cast, response.CastTotal = tmdbPeople(details.Cast[:min(len(details.Cast), tmdb.CastShown)]), uint32(len(details.Cast))
@@ -505,7 +549,7 @@ func tmdbDetails(details tmdb.Details) *titlev1.TmdbDetails {
 		response.Status = tmdbStatuses[series.Status]
 		response.NextEpisode, response.LastEpisode = tmdbEpisodeRef(series.Next), tmdbEpisodeRef(series.Last)
 		response.NumberOfSeasons = uint32(max(series.Seasons, 0))
-		response.Creators = series.Creators
+		response.Creators = tmdbPeople(series.Creators)
 		for _, season := range series.SeasonList {
 			response.Seasons = append(response.Seasons, &titlev1.TmdbSeasonRef{
 				SeasonNumber: season.Number, EpisodeCount: season.Episodes, AirDate: season.AirDate, Name: season.Name,
