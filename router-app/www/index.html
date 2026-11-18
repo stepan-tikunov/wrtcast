@@ -114,7 +114,8 @@ header.stuck::before{bottom:-28px}
 #det.bd #dbd{position:relative;display:block;margin:calc(-1 * max(8px,env(safe-area-inset-top))) -16px 0;aspect-ratio:16/10}
 #dbd img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s}
 #dbd.ld img{opacity:1}
-#dbg{transition:opacity .4s}
+/* The blurred poster goes at once as the backdrop comes (fading in over
+   the page's own dark), not fading out under the page's text. */
 #dbd::after{content:'';position:absolute;inset:0;background:linear-gradient(#0e0e1099,#0e0e1000 30%,#0e0e1000 50%,var(--bg))}
 #det.bd:has(#dbd.ld) #dbg{opacity:0}
 #det.bd .nav{position:absolute;z-index:1;top:max(8px,env(safe-area-inset-top));left:8px;margin:0}
