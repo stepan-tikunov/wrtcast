@@ -190,6 +190,7 @@ header.stuck::before{bottom:-28px}
 #det .skl{display:inline-block;vertical-align:middle;height:.8em;margin:0;border-radius:.4em}
 #det .rt .skl{width:58px;height:22px;padding:0;border-radius:7px}
 #det h1 .skl{max-width:12em}
+.ep .eh .skl{max-width:14em}
 #dmeta .skl{max-width:20em}
 .facts .skl{max-width:50em}
 .pill{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;padding:0 20px;border:0;border-radius:26px;background:var(--s2);font-weight:600}
@@ -2058,13 +2059,15 @@ function renderEpisodes(how) {
       b.onclick = play;
       return b;
     }
+    // Until TMDB's come, the episode's number and a bar for its title.
     const name = epTitle(t?.title, e.title);
+    const head = x ? [name ? `${e.episode}. ${name}` : `Серия ${e.episode}`] : [`${e.episode}. `, skl(60)];
     const frame = x ? still(t.still, e.episode) : el('span', { className: 'st ph' });
     if (part && !on) frame.append(el('i', { className: 'pb', style: `width:${100 * part}%` }));
     if (p?.done) frame.append(el('i', { className: 'ok' }, svgIcon('check')));
     const desc = t?.overview && el('p', { className: 'eo' }, t.overview);
     const row = el('div', { className: cls + ' x', role: 'button', tabIndex: 0 }, frame,
-      el('div', { className: 'eh' }, el('b', {}, name ? `${e.episode}. ${name}` : `Серия ${e.episode}`),
+      el('div', { className: 'eh' }, el('b', {}, ...head),
         el('small', {}, state || [dur && duration(dur), t?.date && aired(t.date)].filter(Boolean).join(' · '))),
       ...(desc ? [desc] : []));
     row.onclick = play;
