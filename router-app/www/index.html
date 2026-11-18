@@ -191,6 +191,7 @@ header.stuck::before{bottom:-28px}
 #det .rt .skl{width:58px;height:22px;padding:0;border-radius:7px}
 #det h1 .skl{max-width:12em}
 .ep .eh .skl{max-width:14em}
+.ep .eh small .skl{max-width:9em}
 #dmeta .skl{max-width:20em}
 .facts .skl{max-width:50em}
 .pill{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;padding:0 20px;border:0;border-radius:26px;background:var(--s2);font-weight:600}
@@ -2030,6 +2031,9 @@ function still(src, n) {
   return frame;
 }
 
+// An episode's overview to come: bars for its lines, as many as it shows.
+const sklDesc = () => el('p', { className: 'eo' }, skl(100), skl(100), skl(60));
+
 // Called on every status poll; rebuilds the list only when the highlighted
 // episode or the progress changes so a tap in progress isn't lost. how:
 // anim, as the season is shown; again, as TMDB's comes over it.
@@ -2063,7 +2067,8 @@ function renderEpisodes(how) {
       b.onclick = play;
       return b;
     }
-    // Until TMDB's come, the episode's number and a bar for its title.
+    // Until TMDB's come, the episode's number and bars for its title, its
+    // length and date, and its overview.
     const name = epTitle(t?.title, e.title);
     const head = x ? [name ? `${e.episode}. ${name}` : `Серия ${e.episode}`] : [`${e.episode}. `, skl(60)];
     const frame = x ? still(t.still, e.episode) : el('span', { className: 'st ph' });
@@ -2072,8 +2077,9 @@ function renderEpisodes(how) {
     const desc = t?.overview && el('p', { className: 'eo' }, t.overview);
     const row = el('div', { className: cls + ' x', role: 'button', tabIndex: 0 }, frame,
       el('div', { className: 'eh' }, el('b', {}, ...head),
-        el('small', {}, state || [dur && duration(dur), t?.date && aired(t.date)].filter(Boolean).join(' · '))),
-      ...(desc ? [desc] : []));
+        el('small', {}, ...x ? [state || [dur && duration(dur), t?.date && aired(t.date)].filter(Boolean).join(' · ')] :
+          [state || skl(40)])),
+      ...(desc ? [desc] : x ? [] : [sklDesc()]));
     row.onclick = play;
     row.onkeydown = ev => ev.key == 'Enter' && play();
     if (desc) desc.onclick = ev => {
@@ -2095,7 +2101,8 @@ function renderEpisodes(how) {
   }));
   // A season of TMDB alone, until it comes.
   if (s.only && x === undefined) rows.push(...[0, 1, 2].map(() => el('div', { className: 'ep x info' },
-    el('span', { className: 'st ph' }), el('div', { className: 'eh' }, skl(60), skl(30)))));
+    el('span', { className: 'st ph' }), el('div', { className: 'eh' }, el('b', {}, skl(60)), el('small', {}, skl(40))),
+    sklDesc())));
   rows.forEach((r, i) => {
     if (how == 'anim') r.classList.add('anim');
     r.style.setProperty('--i', i);
