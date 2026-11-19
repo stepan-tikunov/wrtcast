@@ -30,14 +30,17 @@ func newFakeTMDB(t *testing.T) *fakeTMDB {
 	fake := &fakeTMDB{hits: map[string]int{}}
 	// By path, or by path and language; the rest are not on TMDB.
 	files := map[string]string{
-		"/movie/550":               "fight-club",
-		"/movie/693134":            "dune-part-two",
-		"/collection/726871":       "dune-collection",
-		"/tv/1405":                 "dexter",
-		"/person/819":              "person-norton",
-		"/tv/1405/season/1":        "dexter-s1",
-		"/tv/95603/season/1 ru-RU": "osman-s1",
-		"/tv/95603/season/1 en-US": "osman-s1-en",
+		"/movie/550":                          "fight-club",
+		"/movie/693134":                       "dune-part-two",
+		"/collection/726871":                  "dune-collection",
+		"/tv/1405":                            "dexter",
+		"/person/819":                         "person-norton",
+		"/tv/1405/season/1":                   "dexter-s1",
+		"/person/819/images":                  "person-norton-images",
+		"/person/819/tagged_images":           "person-norton-tagged",
+		"/tv/1405/season/1/episode/2/credits": "dexter-s1e2-credits",
+		"/tv/95603/season/1 ru-RU":            "osman-s1",
+		"/tv/95603/season/1 en-US":            "osman-s1-en",
 	}
 	fake.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fake.mu.Lock()

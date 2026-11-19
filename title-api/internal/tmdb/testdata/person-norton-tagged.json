@@ -1,0 +1,6 @@
+{"id":819,"page":1,"results":[
+ {"aspect_ratio":0.667,"file_path":"/poster.jpg","height":1500,"id":"p1","iso_639_1":"en","vote_average":5.3,"vote_count":3,"width":1000,"image_type":"poster","media":{"id":550,"title":"Fight Club"},"media_type":"movie"},
+ {"aspect_ratio":1.778,"file_path":"/backdrop.jpg","height":1080,"id":"b1","iso_639_1":null,"vote_average":5.1,"vote_count":1,"width":1920,"image_type":"backdrop","media":{"id":550,"title":"Fight Club"},"media_type":"movie"},
+ {"aspect_ratio":1.778,"file_path":"/still.jpg","height":720,"id":"s1","iso_639_1":null,"vote_average":0,"vote_count":0,"width":1280,"image_type":"still","media":{"id":1405,"name":"Dexter"},"media_type":"tv"},
+ {"aspect_ratio":1.778,"file_path":"/season.jpg","height":720,"id":"x1","iso_639_1":null,"vote_average":0,"vote_count":0,"width":1280,"image_type":"backdrop","media":{"id":3},"media_type":"season"}
+],"total_pages":1,"total_results":4}

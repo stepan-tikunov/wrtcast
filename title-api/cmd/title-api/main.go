@@ -17,6 +17,7 @@ import (
 	"time"
 
 	titlev1 "title-api/api/title/v1"
+	"title-api/internal/faces"
 	"title-api/internal/grpcserver"
 	"title-api/internal/marking"
 	"title-api/internal/provider"
@@ -95,6 +96,18 @@ func run() error {
 	go marks.Run(ctx, client)
 	go matches.Run(ctx)
 	go images.Run(ctx)
+	// Who is on the screen on a pause, with the faces service (faces/ in
+	// the repository) at FACES_URL; without it, the faces requests answer
+	// 503.
+	var faceService *faces.Service
+	if facesURL := os.Getenv("FACES_URL"); facesURL != "" {
+		faceService, err = faces.New(ctx, urlStore.DB(), facesURL,
+			envOrDefault("TITLE_API_FACES", filepath.Join(filepath.Dir(stateDBPath), "faces")), matches, images)
+		if err != nil {
+			return err
+		}
+		go faceService.Run(ctx)
+	}
 
 	grpcListener, err := net.Listen("tcp", grpcAddress)
 	if err != nil {
@@ -134,6 +147,12 @@ func run() error {
 		// The same for clients that can only GET and POST, like the router's
 		// uclient-fetch.
 		{http.MethodPost, "/v1/media/{id}/session/end", mediaSessionHandler(client)},
+		{http.MethodPost, "/v1/faces", facesHandler(faceService)},
+		{http.MethodPost, "/v1/faces/prepare", facesPrepareHandler(faceService)},
+		{http.MethodGet, "/v1/faces/pauses/{id}", facesAgainHandler(faceService)},
+		{http.MethodGet, "/v1/faces/frames/{file}", facesPictureHandler(faceService, "frames")},
+		{http.MethodGet, "/v1/faces/crops/{file}", facesPictureHandler(faceService, "crops")},
+		{http.MethodGet, "/v1/faces/portraits/{scope}/{person}", facesPortraitHandler(faceService)},
 	} {
 		if err := gateway.HandlePath(route.method, route.path, route.handler); err != nil {
 			_ = grpcListener.Close()

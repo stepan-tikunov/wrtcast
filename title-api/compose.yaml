@@ -26,6 +26,9 @@ services:
       # The time zone the alternative player's page is told, which should
       # be the home IP's (see README).
       TZ: ${PLAYER_TZ:-Europe/Moscow}
+      # The faces service (faces/ in the repository) that tells who is on
+      # the screen on a pause; empty, there is none.
+      FACES_URL: ${FACES_URL:-}
     volumes:
       - title-api-state:/var/lib/title-api
 
