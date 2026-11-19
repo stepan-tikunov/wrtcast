@@ -988,7 +988,9 @@ function cache_room() {
 // Keeps file f, a segment of n bytes loaded with media m, as key k; keep
 // marks it where a playback would start. Beyond CACHE_MB others go: those
 // behind what the TV plays, those of other videos, those furthest ahead of
-// it, and of those where a playback would start the oldest. Where the TV
+// it, of those where a playback would start the oldest, and last those
+// around where the TV is (from 10 s behind to 30 s ahead) and its init
+// segment, which a pause is looked at by (see /faces). Where the TV
 // is runs on from where it was last seen playing: with the page closed
 // that is up to a minute ago (see tick), and the segments where it is now
 // are the ones the next mark wants (see cache_mark).
@@ -1011,8 +1013,10 @@ function cache_put(k, f, n, m, keep) {
 	if (now && seen?.url == now.url)
 		pos = +(seen.pos ?? 0) + (seen.playing ? min(max(time() - seen.t, 0), 300) : 0);
 	for (let r in sql_rows(`SELECT key, bytes FROM cache ORDER BY
-			CASE WHEN keep = 1 THEN 3 WHEN c = ? AND stop <= ? THEN 0 WHEN c != ? THEN 1 ELSE 2 END,
-			CASE WHEN keep = 0 AND c = ? AND stop > ? THEN -start ELSE t END`, c, pos - 10, c, c, pos - 10)) {
+			CASE WHEN c = ? AND (start IS NULL OR stop > ? AND start < ?) THEN 4
+				WHEN keep = 1 THEN 3 WHEN c = ? AND stop <= ? THEN 0 WHEN c != ? THEN 1 ELSE 2 END,
+			CASE WHEN keep = 0 AND c = ? AND stop > ? THEN -start ELSE t END`,
+			c, pos - 10, pos + 30, c, pos - 10, c, c, pos - 10)) {
 		if (over <= 0)
 			break;
 		cache_drop(r.key);
