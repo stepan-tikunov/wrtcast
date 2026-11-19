@@ -1,0 +1,15 @@
+# Next to title-api on the same host; title-api reaches it on loopback
+# (FACES_URL=http://127.0.0.1:50060). Limited so that it never starves
+# title-api or the rest of the server.
+#
+#   docker build -t wrtcast/faces:latest . && docker compose up -d
+services:
+  faces:
+    image: wrtcast/faces:latest
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      FACES_ADDR: 127.0.0.1:50060
+      FACES_THREADS: "2"
+    cpus: 2
+    mem_limit: 1536m
