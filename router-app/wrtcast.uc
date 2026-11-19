@@ -916,10 +916,12 @@ function plan(key, now, m) {
 // the source and the variant, see cache_id), the durations of its
 // playlist's segments (another cut gets other keys) and its times in it
 // (see seg_keys); the router adds the keys to the playlists it relays
-// (see rewrite_playlist). CACHE_MB bound the files (see cache_put), and
-// the tick leaves of the videos no TV plays only the segments where a
-// playback would start (see cache_trim). A boot empties it with the rest
-// of /tmp.
+// (see rewrite_playlist). The primary player's videos, which the router
+// loads from their CDN at once, pass through it as well: the segment a TV
+// is paused in tells who is on the screen (see /faces). CACHE_MB bound the
+// files (see cache_put), and the tick leaves of the videos no TV plays only
+// the segments where a playback would start (see cache_trim). A boot
+// empties it with the rest of /tmp.
 
 const cache_id = (id, season, episode, source, width) =>
 	hash(`${id}|${season}:${episode}|${source}|${width}`);
@@ -2031,7 +2033,7 @@ function proxy(name, u, q, h, drc, m, pv, c, k) {
 	unlink(err);
 	media_head(200, MIME[e] ?? 'application/octet-stream');
 	let part = CACHE + k + '.' + clock()[1];
-	let tee = k && !pv && valid_media(m) && cache_room() ? open(part, 'w') : null;
+	let tee = k && !pv && cache_room() ? open(part, 'w') : null;
 	let n = 0;
 	while (chunk != null && chunk != '') {
 		stdout.write(chunk);
@@ -2224,7 +2226,7 @@ function prepare(dev, p, keep) {
 	let drc = p.drc == '1' && !!s.drc;
 	// The video's segments are cached (see "segment cache"), of a known
 	// variant: with auto quality the TV picks.
-	let c = PROXY && m && width ? cache_id(id, season, episode, s.name, width) : null;
+	let c = PROXY && width ? cache_id(id, season, episode, s.name, width) : null;
 	if (c)
 		kv_set('c:' + c, { id, season, episode });
 	let url = PROXY ? purl(s.url, public_base(), null, h, m) +
@@ -2827,6 +2829,61 @@ function tmdb_details(type, id, r) {
 	};
 }
 
+// ---- who is on the screen -------------------------------------------------
+//
+// On a pause the page asks who is in the paused frame (/faces): the router
+// sends title-api the segment the TV is paused in, as it kept it (see
+// "segment cache"), and where in it the pause is; title-api cuts the frame
+// out, finds the faces and tells them by the cast's photos on TMDB.
+
+// A POST of files, one after another, to title-api: { status, out } as
+// api_post has them.
+function api_upload(path, files) {
+	let f = ERR + clock()[1];
+	system(`cat ${join(' ', map(files, shq))} | uclient-fetch -T 30 -O ${shq(f)} ` +
+		`--header='Content-Type: application/octet-stream' --post-file=/dev/stdin ${shq(API + path)} 2>${shq(f + '.e')}`);
+	let m = match(readfile(f + '.e') ?? '', /HTTP error ([0-9]+)/), out = trim(readfile(f) ?? '');
+	unlink(f);
+	unlink(f + '.e');
+	return { status: m ? +m[1] : out == '' ? 0 : 200, out };
+}
+
+// A picture of title-api's faces (a path), through the router; null for
+// none.
+function face_img(path) {
+	if (!match(path ?? '', /^\/v1\/faces\/(frames|crops|portraits)\/[0-9a-z:\/]+\.jpg$/))
+		return null;
+	return PROXY ? purl(API + path, null, replace(path, /^.*\//, '')) : API + path;
+}
+
+// The query title-api's faces take of what a TV plays.
+const faces_query = now => sprintf('title_id=%s&season=%d&episode=%d', urlenc(now.id),
+	+(now.season ?? 0), +(match(`${now.episode ?? ''}`, /^[0-9]+/)?.[0] ?? 0));
+
+// Who title-api told is in a pause, its pictures as URLs: the frame and
+// its size, each face's box in it, a picture of the face, and whom it
+// was taken for, surely or not, or the two most alike; preparing while the
+// cast's photos are still being looked at, to be asked again (see
+// /faces/pause).
+function faces_reply(r) {
+	let person = x => x?.id ? {
+		id: +x.id, name: x.name, character: x.character || null,
+		photo: tmdb_img(x.profile, 'w185'), portrait: face_img(x.portrait),
+	} : null;
+	return {
+		pause: +r.pause, frame: face_img(r.frame), width: +r.width, height: +r.height,
+		preparing: !!r.preparing,
+		faces: map(r.faces ?? [], f => ({
+			box: f.box, crop: face_img(f.crop), person: person(f.person),
+			score: f.score ?? null, sure: !!f.sure,
+			alternatives: map(f.alternatives ?? [], a => ({ ...person(a.person), score: a.score })),
+		})),
+	};
+}
+
+// No faces, and why: title-api's status of a faces request, else null.
+const faces_reason = status => ({ '409': 'not_matched', '422': 'no_segment', '503': 'off', '404': 'gone' })[`${status}`];
+
 // A TMDB ID the page sent.
 function tmdb_id(p) {
 	if (!match(p.id ?? '', /^[1-9][0-9]{0,9}$/))
@@ -3125,6 +3182,55 @@ const routes = {
 				runtime: +(e.runtimeMinutes ?? 0) || null, upcoming: !!e.upcoming,
 			})),
 		} : null;
+	},
+
+	// Who is on the screen of a TV paused: see faces_reply; or, with no
+	// faces, why (reason): no_play, playing, no_cache (the quality is auto
+	// or the media proxy is off, so no segment is kept), no_segment,
+	// not_matched (with TMDB), off (title-api has no faces service).
+	'GET /faces': p => {
+		let dev = device(p), key = state_key(dev), now = now_get(key);
+		let m = castctl(dev, 'status').media;
+		if (!now?.id || !m || m.url != now.url)
+			return { reason: 'no_play' };
+		if (m.state != 'PAUSED')
+			return { reason: 'playing' };
+		if (!now.c)
+			return { reason: 'no_cache' };
+		let t = +(m.time ?? 0);
+		let seg = sql_rows('SELECT key, start FROM cache WHERE c = ? AND start IS NOT NULL AND start <= ? AND stop > ? ' +
+		                   'ORDER BY t DESC LIMIT 1', now.c, t, t)[0];
+		if (!seg || !cache_get(seg.key))
+			return { reason: 'no_segment' };
+		let init = replace(seg.key, /-[0-9]+-[0-9]+$/, '-i'), files = [];
+		if (cache_get(init))
+			push(files, CACHE + init);
+		push(files, CACHE + seg.key);
+		let r = api_upload(sprintf('/v1/faces?%s&t=%.3f&offset=%.3f', faces_query(now), t, max(t - +seg.start, 0)), files);
+		if (faces_reason(r.status))
+			return { reason: faces_reason(r.status) };
+		let j = r.status == 200 ? json(r.out) : null;
+		if (type(j) != 'object')
+			fail(502, 'title-api request failed' + (r.status ? ` (HTTP ${r.status})` : ''));
+		return faces_reply(j);
+	},
+
+	// A pause /faces told of (id its pause), told anew by the cast's
+	// photos looked at since.
+	'GET /faces/pause': p => {
+		if (!match(p.id ?? '', /^[1-9][0-9]{0,14}$/))
+			fail(400, 'invalid id');
+		let r = api(`/v1/faces/pauses/${p.id}`, [404, 409, 503]);
+		return r ? faces_reply(r) : { reason: 'gone' };
+	},
+
+	// The cast's photos of what a TV plays are looked at ahead of a pause.
+	'POST /faces/prepare': p => {
+		let now = now_get(state_key(device(p)));
+		if (!now?.id)
+			return { preparing: false };
+		let r = api_post('/v1/faces/prepare?' + faces_query(now), {});
+		return { preparing: r.status == 200 && !!json(r.out || '{}')?.preparing };
 	},
 
 	'POST /cmd': p => {

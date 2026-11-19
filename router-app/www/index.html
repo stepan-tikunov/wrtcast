@@ -356,6 +356,34 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 /* Skips the recap or the intro playing now, over the panel's right edge. */
 #skipb{position:absolute;right:16px;bottom:calc(100% + 12px);height:44px;padding:0 18px;box-shadow:0 4px 20px #000a;animation:pop .25s cubic-bezier(.2,.8,.2,1)}
 #pl.pending #skipb{display:none}
+/* Who is on the screen of a pause, over the panel where the skip button
+   stands, which it hides (see showFaces): the paused frame with the faces
+   boxed, those surely someone in the accent, and a card of each face told
+   or large enough to tell, its picture from the frame, TMDB's portrait at
+   its corner, the name and the part; a face not surely someone is outlined
+   dashed. */
+#faces{position:absolute;left:16px;right:16px;bottom:calc(100% + 12px);padding:10px 12px 12px;border-radius:16px;background:var(--s1);box-shadow:0 0 0 1px #ffffff10,0 4px 24px #000c;animation:pop .25s cubic-bezier(.2,.8,.2,1)}
+#faces[hidden],#pl.pending #faces{display:none}
+#pl:has(#faces:not([hidden])) #skipb{display:none}
+#faces h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:var(--mu);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+#faces h3 small{overflow:hidden;font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;white-space:nowrap;text-overflow:ellipsis}
+#faces h3 .ib{flex:none;width:32px;height:32px;margin:-6px -8px -6px auto;color:var(--mu)}
+#faces h3 .ib svg{width:18px;height:18px}
+.fstrip{display:flex;gap:10px;margin:0 -12px;padding:0 12px;overflow-x:auto;scrollbar-width:none}
+.fstrip::-webkit-scrollbar{display:none}
+.fshot{position:relative;flex:none;height:92px;overflow:hidden;border-radius:10px;background:var(--s2)}
+.fshot img{display:block;height:100%}
+.fshot i{position:absolute;border:1.5px dashed #ffffffb0;border-radius:3px;cursor:pointer}
+.fshot i.sure{border:2px solid var(--ac)}
+.fcard{flex:none;width:80px;padding:0;border:0;background:none;color:var(--tx);font-size:12px;line-height:1.25;text-align:center;cursor:pointer}
+.fcard .fc{position:relative;width:64px;height:64px;margin:0 auto 6px}
+.fcard .fc>img{display:block;width:64px;height:64px;border-radius:12px;object-fit:cover;background:var(--s2)}
+.fcard.maybe .fc>img{outline:2px dashed #ffffff60;outline-offset:2px}
+.fcard .fc .nop{position:absolute;right:-6px;bottom:-6px;width:26px;height:26px;border-radius:50%;background:var(--s2);box-shadow:0 0 0 2px var(--s1)}
+.fcard b,.fcard span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.fcard b{font-weight:550}
+.fcard span{margin-top:2px;color:var(--mu)}
+.fcard.hit .fc>img{animation:pop .4s cubic-bezier(.2,.8,.2,1)}
 #bar{position:relative;display:flex;align-items:center;gap:12px;min-height:72px}
 /* The poster grows with a transform so it does not lay the bar out. While
    loading it dims. */
@@ -741,6 +769,7 @@ svg.spring{animation:spring .3s ease-out}
   <div id="prog"><div></div></div>
   <div id="handle"></div>
   <button class="pill ac" id="skipb" hidden></button>
+  <div id="faces" hidden><h3><span>В кадре</span><small id="fnote"></small><button class="ib" id="fx" aria-label="Скрыть"><svg><use href="#i-close"/></svg></button></h3><div class="fstrip" id="fstrip"></div></div>
   <div id="bar">
     <span id="thumb"><img alt=""></span>
     <div class="t"><b id="title"></b><span id="st"></span></div>
@@ -2784,6 +2813,7 @@ function render(s) {
   if (s.now) lastNow = s.now;
   st = s;
   statusAt = Date.now();
+  watchFaces(s);
   // Something is already on after a reload: try the widget right away. iOS
   // usually refuses without a tap, and then the first tap does it.
   if (!autoArmed && ['PLAYING', 'BUFFERING'].includes(s.media?.state)) {
@@ -2901,6 +2931,108 @@ async function poll() {
   }
   busy = false;
 }
+
+// ---- who is on the screen -----------------------------------------------
+//
+// A second into a pause the router is asked who is in the paused frame
+// (see /faces), and again as the pause moves; while the cast's photos are
+// still being looked at, the same pause is asked again a few times. A
+// closed card stays closed until the next pause. Ahead of a pause, the
+// cast's photos of an episode played are looked at (/faces/prepare).
+let facesAt = null;     // where the pause asked of is, in seconds
+let facesKey = null;    // the episode and the pause asked of
+let facesTimer = null;
+let facesPrepared = null;
+
+function watchFaces(s) {
+  const m = s.media, n = s.now;
+  const ep = n ? `${n.id}|${n.season ?? ''}|${n.episode ?? ''}` : null;
+  if (ep && ep != facesPrepared && ['PLAYING', 'PAUSED', 'BUFFERING'].includes(m?.state)) {
+    facesPrepared = ep;
+    api(withDevice('faces/prepare'), {}).catch(() => {});
+  }
+  if (!ep || m?.state != 'PAUSED' || pending) {
+    if (facesKey) {
+      facesKey = facesAt = null;
+      clearTimeout(facesTimer);
+      showFaces(null);
+    }
+    return;
+  }
+  // The icon flips before the TV tells where it stopped: within a second
+  // and a half it is the same pause.
+  if (facesKey?.startsWith(ep + '|') && Math.abs((m.time || 0) - facesAt) < 1.5) return;
+  facesAt = m.time || 0;
+  facesKey = ep + '|' + facesAt;
+  clearTimeout(facesTimer);
+  showFaces(null);
+  const key = facesKey;
+  facesTimer = setTimeout(() => loadFaces(key), 1000);
+}
+
+async function loadFaces(key, pause, tries = 0) {
+  let r;
+  try {
+    r = await api(withDevice(pause ? 'faces/pause?id=' + pause : 'faces'));
+  } catch (e) {
+    return; // no faces is no news
+  }
+  if (key != facesKey) return;
+  showFaces(r.faces?.length ? r : null);
+  if (r.preparing && r.pause && tries < 10)
+    facesTimer = setTimeout(() => loadFaces(key, r.pause, tries + 1), 6000);
+}
+
+function showFaces(r) {
+  const box = $('faces');
+  if (!r) {
+    box.hidden = true;
+    return;
+  }
+  // The faces surely someone first, then those maybe, then the rest large
+  // enough to be worth a card; each lot from left to right.
+  const side = f => Math.min(f.box[2] - f.box[0], f.box[3] - f.box[1]) * 1280 / Math.max(r.width, r.height);
+  const rank = f => f.sure ? 0 : f.person || f.alternatives?.length ? 1 : side(f) >= 64 ? 2 : 3;
+  const faces = [...r.faces].sort((a, b) => rank(a) - rank(b) || a.box[0] - b.box[0]);
+  const cards = faces.map(f => {
+    if (rank(f) == 3) return null;
+    const p = f.person, alt = f.alternatives || [];
+    const name = p ? p.name : alt.length ? alt.map(a => a.name).join(' или ') : 'Не узнан';
+    const part = p ? (f.sure ? p.character : 'похоже') : alt.length ? 'похоже' : null;
+    const card = el('button', { className: 'fcard' + (f.sure ? '' : ' maybe') },
+      el('div', { className: 'fc' }, el('img', { src: f.crop, alt: '' }), ...(p || alt[0] ? [photo((p || alt[0]).photo)] : [])),
+      el('b', {}, name), ...(part ? [el('span', {}, part)] : []));
+    const who = p || (alt.length == 1 ? alt[0] : null);
+    if (who?.id) card.onclick = () => {
+      setPlayer(false);
+      openPerson({ id: who.id, name: who.name, photo: who.photo });
+    };
+    return card;
+  });
+  const shot = el('div', { className: 'fshot' }, el('img', { src: r.frame, alt: '' }));
+  shot.style.width = (92 * r.width / r.height) + 'px';
+  faces.forEach((f, i) => {
+    const [x1, y1, x2, y2] = f.box, mark = el('i', { className: f.sure ? 'sure' : '' });
+    Object.assign(mark.style, {
+      left: x1 / r.width * 100 + '%', top: y1 / r.height * 100 + '%',
+      width: (x2 - x1) / r.width * 100 + '%', height: (y2 - y1) / r.height * 100 + '%',
+    });
+    if (cards[i]) mark.onclick = () => {
+      cards[i].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      cards[i].classList.remove('hit');
+      void cards[i].offsetWidth;
+      cards[i].classList.add('hit');
+    };
+    shot.append(mark);
+  });
+  $('fnote').textContent = r.preparing ? 'смотрю фото актёров…' : '';
+  $('fstrip').replaceChildren(shot, ...cards.filter(Boolean));
+  box.hidden = false;
+}
+$('fx').onclick = () => {
+  clearTimeout(facesTimer);
+  showFaces(null);
+};
 
 // ---- lock screen controls -----------------------------------------------
 
