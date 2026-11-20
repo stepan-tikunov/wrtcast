@@ -366,6 +366,38 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 .fsp svg{width:18px;height:18px}
 #fpill.busy{color:var(--mu)}
 #fpill.busy .fsp::after{content:'';position:absolute;inset:-4px;border:2px solid #ffffff22;border-top-color:var(--ac);border-radius:50%;animation:spin .9s linear infinite}
+/* What plays now (see watchMusic): a pill over the panel's left edge, the
+   track's cover turning while the TV plays, its name and its artist; it
+   leaves room for the skip button or "В кадре" on the right. */
+#mpill{position:absolute;left:16px;bottom:calc(100% + 12px);display:flex;align-items:center;gap:9px;max-width:calc(100% - 32px);height:44px;padding:0 16px 0 6px;border:0;border-radius:22px;background:var(--s2);color:var(--tx);font-size:14px;font-weight:600;text-align:left;box-shadow:0 0 0 1px #ffffff14,0 4px 20px #000a;animation:pop .25s cubic-bezier(.2,.8,.2,1);cursor:pointer}
+#mpill[hidden],#pl.pending #mpill{display:none}
+#pl:has(#skipb:not([hidden])) #mpill,#pl:has(#fpill:not([hidden])) #mpill{max-width:calc(100% - 250px);min-width:0}
+#mpill .mc{flex:none;width:32px;height:32px}
+#mpill.on .mc:has(img){animation:spin 8s linear infinite}
+#mpill>span{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+#mpill b,#mpill small{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#mpill small{color:var(--mu);font-size:12px;font-weight:500}
+.mc{display:grid;place-items:center;border-radius:50%;background:var(--s3);color:var(--ac);overflow:hidden}
+.mc img{width:100%;height:100%;object-fit:cover}
+.mc svg{width:55%;height:55%}
+/* The sheet "Музыка": the tracks told of what plays, in its order, the one
+   playing now marked; each with when it plays, which seeks there, and
+   where to listen to it. */
+#msheet h2 .mc{flex:none;width:22px;height:22px;margin-right:8px;background:none}
+#msheet h2 small{margin-left:12px;color:var(--mu);font-size:13px;font-weight:500;white-space:nowrap}
+#mlist{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.mt{display:flex;align-items:center;gap:12px;padding:10px 2px 4px}
+.mt .mc{flex:none;width:48px;height:48px;border-radius:10px}
+.mt>span{flex:1;min-width:0}
+.mt b,.mt small{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.mt b{font-weight:600}
+.mt small{color:var(--mu);font-size:13px}
+.mt.now b{color:var(--ac)}
+.mt .pill{flex:none;height:32px;padding:0 12px;font-size:13px;font-variant-numeric:tabular-nums}
+.ml{display:flex;flex-wrap:wrap;gap:6px;padding:4px 2px 10px 62px;border-bottom:1px solid var(--s2)}
+@media (max-width:440px){.ml{padding-left:2px}}
+.ml a{padding:5px 10px;border-radius:12px;background:var(--s2);color:var(--tx);font-size:12px;font-weight:600;text-decoration:none}
+#mempty{padding:18px 4px;color:var(--mu);font-size:14px;line-height:1.4}
 .fav{display:flex}
 .fav .nop{width:28px;height:28px;border-radius:50%;background:var(--s3);box-shadow:0 0 0 2px var(--s2)}
 .fav .nop+.nop{margin-left:-9px}
@@ -515,7 +547,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .sheet .handle,.sheet h2{touch-action:none}
 .sheet .handle::before{content:'';position:absolute;inset:-8px -60px -6px}
 .sheet::after{content:'';position:absolute;left:0;right:0;top:100%;height:50vh;background:var(--s1)}
-#optcollapse,#stycollapse,#fcollapse{display:none}
+#optcollapse,#stycollapse,#fcollapse,#mcollapse{display:none}
 .sheet h2{display:flex;align-items:center;margin:0 0 4px;font-size:18px}
 .sheet h2 span{flex:1}
 /* A sheet over the player dims the player too. */
@@ -716,7 +748,7 @@ svg.spring{animation:spring .3s ease-out}
   #pl.open #bar{margin-top:16px} /* where the handle stood */
   .sheet{width:min(480px,calc(100% - 32px));padding-bottom:16px}
   .sheet::after,.sheet .handle{display:none}
-  #optcollapse,#stycollapse,#fcollapse{display:grid}
+  #optcollapse,#stycollapse,#fcollapse,#mcollapse{display:grid}
   #toast{bottom:112px}
 }
 @media (hover:hover){
@@ -761,6 +793,7 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-restart" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></symbol>
   <symbol id="i-spark" viewBox="0 0 24 24"><path d="M10 2l1.9 5.6 5.6 1.9-5.6 1.9L10 17l-1.9-5.6-5.6-1.9 5.6-1.9zm8.5 11 .95 2.55L22 16.5l-2.55.95L18.5 20l-.95-2.55L15 16.5l2.55-.95z"/></symbol>
   <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
@@ -816,6 +849,7 @@ svg.spring{animation:spring .3s ease-out}
   <div id="handle"></div>
   <button class="pill ac" id="skipb" hidden></button>
   <button id="fpill" hidden></button>
+  <button id="mpill" hidden></button>
   <div id="bar">
     <span id="thumb"><img alt=""></span>
     <div class="t"><b id="title"></b><span id="st"></span></div>
@@ -845,6 +879,11 @@ svg.spring{animation:spring .3s ease-out}
   <div id="fshot"><img alt=""><div id="fmarks"></div></div>
   <div id="fcall"></div>
 </section>
+<section id="msheet" class="sheet" hidden>
+  <div class="handle"></div>
+  <h2><span class="mc"><svg><use href="#i-music"/></svg></span><span>Музыка</span><small id="mnote"></small><button class="ib" id="mcollapse" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button></h2>
+  <div id="mlist"></div>
+</section>
 <section id="opts" class="sheet" hidden>
   <div class="handle"></div>
   <h2><span>Настройки</span><button class="ib" id="optcollapse" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button></h2>
@@ -854,7 +893,7 @@ svg.spring{animation:spring .3s ease-out}
     <div class="row" id="drcrow" hidden><label class="sw"><span>Выравнивать громкость<small>Тише музыка и взрывы, громче речь</small></span><input type="checkbox" id="drc"></label></div>
     <div class="row"><label class="sw"><span>Пропускать повтор и заставку<small>Роутер перемотает их сам</small></span><input type="checkbox" id="autoskip"></label></div>
     <div class="row" id="nextrow" hidden><label class="sw"><span>Следующая серия<small>Включится сама, как начнутся титры</small></span><input type="checkbox" id="autonext"></label></div>
-    <div class="row" id="eprow"><button class="pill" id="eplist"><svg><use href="#i-list"/></svg>Серии</button></div>
+    <div class="row" id="eprow"><button class="pill" id="eplist"><svg><use href="#i-list"/></svg>Серии</button><button class="pill" id="mlistb" hidden><svg><use href="#i-music"/></svg>Музыка</button></div>
     <button id="stop" data-c="stop">Остановить</button>
     <button id="devname"><svg><use href="#i-tv"/></svg><span></span></button>
   </div>
@@ -915,7 +954,7 @@ let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF defaul
 let devices = null;     // last /devices answer
 let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null = receiver default
 localStorage.removeItem('subStyle'); // older format with colors
-const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs', mk: 'mk', faces: 'fsheet' }; // layer name -> bottom sheet
+const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs', mk: 'mk', faces: 'fsheet', music: 'msheet' }; // layer name -> bottom sheet
 let recent = [];        // /progress list: recently watched titles, latest first
 let saved = [];         // and the titles saved to watch, latest saved first
 let listShown = null;   // the list on a page of its own (see openList): 'recent', 'saved' or null
@@ -2773,6 +2812,7 @@ function showTime() {
   if (drag != 'pos') showPos(t, m.duration);
   showSections(st.now?.sections || [], m.duration);
   showSkip(t);
+  showMusic(t);
 }
 
 // The recap or the intro playing now gets a button that skips it, unless
@@ -2814,6 +2854,7 @@ function renderBar() {
   if (pending) {
     // The controls of what starts, not of what was on.
     $('skipb').hidden = true;
+    $('mpill').hidden = true;
     $('st').textContent = epLine(pending);
     $('prog').firstChild.style.width = 0;
     showPos(0, 0);
@@ -2871,6 +2912,7 @@ function render(s) {
   st = s;
   statusAt = Date.now();
   watchFaces(s);
+  watchMusic(s);
   // Something is already on after a reload: try the widget right away. iOS
   // usually refuses without a tap, and then the first tap does it.
   if (!autoArmed && ['PLAYING', 'BUFFERING'].includes(s.media?.state)) {
@@ -2883,7 +2925,8 @@ function render(s) {
   const m = s.media;
   if (!m) return;
   const series = s.now?.season != null;
-  $('eprow').hidden = !series;
+  $('eplist').hidden = !series;
+  $('eprow').hidden = !series && $('mlistb').hidden;
   $('nextrow').hidden = !series;
   $('autonext').checked = !!(s.now?.autonext ?? s.settings?.autonext);
   $('autoskip').checked = !!(s.now?.autoskip ?? s.settings?.autoskip);
@@ -2987,6 +3030,121 @@ async function poll() {
     pollError = e.message;
   }
   busy = false;
+}
+
+// ---- music ----------------------------------------------------------------
+//
+// What plays in the video on the TV, told by title-api as the router sends
+// it the audio (/music): asked as the video starts and every 15 s while
+// the TV plays it, every 5 s while the sheet is open. A pill over the
+// player names the track playing now; it, and the button "Музыка" in the
+// settings, open the sheet of all the tracks told so far.
+let musicKey = null;    // the video asked of: title, episode, source
+let mz = null;          // the router's last answer of it
+let musicAt = 0;        // when it was asked
+let musicBusy = false;
+
+const MUSIC_WHY = {
+  no_cache: 'Звук берётся из кэша роутера: нужен прокси и качество не «Авто»',
+  not_fmp4: 'У этого источника музыка пока не распознаётся',
+  off: 'Распознавание музыки не настроено',
+  error: 'Не получилось спросить роутер',
+};
+
+function watchMusic(s) {
+  const n = s.now, m = s.media;
+  const key = n && m ? `${n.id}|${n.season ?? ''}|${n.episode ?? ''}|${n.source ?? ''}` : null;
+  if (key != musicKey) {
+    musicKey = key;
+    mz = null;
+    musicAt = 0;
+    renderMusic();
+  }
+  if (!key || musicBusy || !['PLAYING', 'PAUSED', 'BUFFERING'].includes(m.state)) return;
+  const every = layers.at(-1) == 'music' ? 5000 : m.state == 'PAUSED' && mz ? 60000 : 15000;
+  if (Date.now() - musicAt < every) return;
+  musicAt = Date.now();
+  musicBusy = true;
+  api(withDevice('music')).then(r => {
+    if (key == musicKey) mz = r;
+  }, () => {
+    if (key == musicKey && !mz) mz = { reason: 'error' };
+  }).finally(() => {
+    musicBusy = false;
+    renderMusic();
+  });
+}
+
+// The track playing at t seconds of the video, if one was told.
+const musicNow = t => (mz?.tracks || []).find(x => t >= x.start && t < x.stop);
+
+const musicQuery = x => `${x.artist} ${x.title}`;
+
+function musicCover(x) {
+  const e = el('span', { className: 'mc' }, svgIcon('music'));
+  if (x?.cover) {
+    const img = el('img', { src: x.cover, alt: '' });
+    img.onload = () => e.replaceChildren(img);
+  }
+  return e;
+}
+
+function showMusic(t) {
+  const b = $('mpill'), x = pending ? null : musicNow(t);
+  b.hidden = !x;
+  if (!x) return;
+  b.classList.toggle('on', st?.media?.state == 'PLAYING');
+  if (b.dataset.key == x.key + '|' + x.start) return;
+  b.dataset.key = x.key + '|' + x.start;
+  b.replaceChildren(musicCover(x), el('span', {}, el('b', {}, x.title), el('small', {}, x.artist)));
+  if (layers.at(-1) == 'music') renderMusic();
+}
+
+$('mpill').onclick = () => openMusic();
+$('mlistb').onclick = () => openMusic();
+$('mcollapse').onclick = () => closeTop();
+
+function openMusic() {
+  openLayer('music');
+  musicAt = 0;
+  renderMusic();
+  if (st) watchMusic(st);
+}
+
+function renderMusic() {
+  const tracks = mz?.tracks || [];
+  $('mlistb').hidden = !tracks.length;
+  $('eprow').hidden = $('eplist').hidden && $('mlistb').hidden;
+  const sheet = $('msheet');
+  if (sheet.hidden || sheet.classList.contains('out')) return;
+  const m = st?.media, now = m ? musicNow(position(m)) : null;
+  // Drawn anew only when something changed: the covers would blink.
+  const sig = JSON.stringify([mz, now?.start]);
+  if (sheet.dataset.sig == sig) return;
+  sheet.dataset.sig = sig;
+  $('mnote').textContent = mz?.pending ? 'узнаю…' : tracks.length ? `узнано ${tracks.length}` : '';
+  if (!tracks.length) {
+    const why = mz?.reason ? MUSIC_WHY[mz.reason] || '' : !mz ? 'Спрашиваю роутер…'
+      : mz.received ? 'Слушаю. Как заиграет музыка, она появится здесь'
+      : 'Звук этого видео ещё не дошёл до сервера';
+    $('mlist').replaceChildren(el('p', { id: 'mempty' }, why));
+    return;
+  }
+  const link = (text, href) => href ? el('a', { href, target: '_blank', rel: 'noopener' }, text) : '';
+  $('mlist').replaceChildren(...tracks.flatMap(x => {
+    const q = encodeURIComponent(musicQuery(x));
+    const at = el('button', { className: 'pill', ariaLabel: 'Перемотать сюда' }, fmt(x.start));
+    at.onclick = () => cmd('seek', x.start.toFixed(1));
+    return [
+      el('div', { className: 'mt' + (x == now ? ' now' : '') }, musicCover(x),
+        el('span', {}, el('b', {}, x.title), el('small', {}, x.artist + (x == now ? ' · играет' : ''))), at),
+      el('div', { className: 'ml' },
+        link('Apple Music', x.apple_url || `https://music.apple.com/search?term=${q}`),
+        link('Spotify', `https://open.spotify.com/search/${q}`),
+        link('YouTube', `https://www.youtube.com/results?search_query=${q}`),
+        link('Shazam', x.url)),
+    ];
+  }));
 }
 
 // ---- who is on the screen -----------------------------------------------
