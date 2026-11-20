@@ -375,7 +375,8 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
    one picked in the accent, each hit well around it, a small face over a
    large one; under each the name of whom it was taken for, always on a
    phone, hovered on a desktop; under the frame, the callout of the face
-   picked, its tip at it. */
+   picked, its tip at it. The frame shimmers till it has loaded, the
+   light sweeps it only once it shows. */
 #fsheet{padding-bottom:max(20px,env(safe-area-inset-bottom))}
 #fsheet h2 .fsp{flex:none;margin-right:8px}
 #fsheet h2 small{margin-left:12px;overflow:hidden;color:var(--mu);font-size:13px;font-weight:500;white-space:nowrap;text-overflow:ellipsis}
@@ -383,7 +384,7 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 #fshot.sk{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%}
 #fshot>img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .25s}
 #fshot>img.ld{opacity:1}
-#fshot.finding::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,#ffb02028 50%,transparent 60%) 0 0/100% 300%;animation:scan 1.6s linear infinite;pointer-events:none}
+#fshot.finding:has(>img.ld)::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,#ffb02028 50%,transparent 60%) 0 0/100% 300%;animation:scan 1.6s linear infinite;pointer-events:none}
 @keyframes scan{from{background-position:0 100%}to{background-position:0 0}}
 #fmarks{position:absolute;inset:0}
 .fbox{position:absolute;padding:0;border:1.5px solid #ffffffc0;border-radius:4px;background:none;cursor:pointer}
@@ -3126,13 +3127,16 @@ function renderFaces() {
   $('fnote').textContent = r.reason || !faces.length && !r.finding ? '' : r.finding ? 'ищу лица…'
     : r.preparing ? 'смотрю фото актёров…' : faces.length == 1 ? (known ? 'узнан' : 'не узнан') : `узнано ${known} из ${faces.length}`;
   shot.hidden = !r.frame && !!r.reason;
-  shot.classList.toggle('sk', !r.frame);
+  shot.classList.toggle('sk', !img.classList.contains('ld') || img.getAttribute('src') != r.frame);
   shot.classList.toggle('finding', !!r.frame && !!r.finding);
   if (r.frame) {
     shot.style.aspectRatio = r.width + '/' + r.height;
     if (img.getAttribute('src') != r.frame) {
       img.classList.remove('ld');
-      img.onload = () => img.classList.add('ld');
+      img.onload = () => {
+        img.classList.add('ld');
+        shot.classList.remove('sk');
+      };
       img.src = r.frame;
     }
   } else {
