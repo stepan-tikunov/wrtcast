@@ -2866,8 +2866,9 @@ const faces_query = now => sprintf('title_id=%s&season=%d&episode=%d', urlenc(no
 
 // Who title-api told is in a pause, its pictures as URLs: the frame and
 // its size, each face's box in it, a picture of the face, and whom it
-// was taken for, surely or not, or the two most alike; preparing while the
-// cast's photos are still being looked at, to be asked again (see
+// was taken for, surely or not, or the two most alike; finding while the
+// faces are still being found (none yet), preparing while the cast's
+// photos are still being looked at: either is asked again (see
 // /faces/pause).
 function faces_reply(r) {
 	let person = x => x?.id ? {
@@ -2876,7 +2877,7 @@ function faces_reply(r) {
 	} : null;
 	return {
 		pause: +r.pause, frame: face_img(r.frame), width: +r.width, height: +r.height,
-		preparing: !!r.preparing,
+		preparing: !!r.preparing, finding: !!r.finding,
 		faces: map(r.faces ?? [], f => ({
 			box: f.box, crop: face_img(f.crop), person: person(f.person),
 			score: f.score ?? null, sure: !!f.sure,
@@ -3219,8 +3220,9 @@ const routes = {
 		return faces_reply(j);
 	},
 
-	// A pause /faces told of (id its pause), told anew by the cast's
-	// photos looked at since.
+	// A pause /faces told of (id its pause): its faces, told by the cast's
+	// photos looked at by now; while they are being found, title-api waits
+	// for them up to 15 s.
 	'GET /faces/pause': p => {
 		if (!match(p.id ?? '', /^[1-9][0-9]{0,14}$/))
 			fail(400, 'invalid id');

@@ -356,34 +356,78 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 /* Skips the recap or the intro playing now, over the panel's right edge. */
 #skipb{position:absolute;right:16px;bottom:calc(100% + 12px);height:44px;padding:0 18px;box-shadow:0 4px 20px #000a;animation:pop .25s cubic-bezier(.2,.8,.2,1)}
 #pl.pending #skipb{display:none}
-/* Who is on the screen of a pause, over the panel where the skip button
-   stands, which it hides (see showFaces): the paused frame with the faces
-   boxed, those surely someone in the accent, and a card of each face told
-   or large enough to tell, its picture from the frame, TMDB's portrait at
-   its corner, the name and the part; a face not surely someone is outlined
-   dashed. */
-#faces{position:absolute;left:16px;right:16px;bottom:calc(100% + 12px);padding:10px 12px 12px;border-radius:16px;background:var(--s1);box-shadow:0 0 0 1px #ffffff10,0 4px 24px #000c;animation:pop .25s cubic-bezier(.2,.8,.2,1)}
-#faces[hidden],#pl.pending #faces{display:none}
-#pl:has(#faces:not([hidden])) #skipb{display:none}
-#faces h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:var(--mu);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-#faces h3 small{overflow:hidden;font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;white-space:nowrap;text-overflow:ellipsis}
-#faces h3 .ib{flex:none;width:32px;height:32px;margin:-6px -8px -6px auto;color:var(--mu)}
-#faces h3 .ib svg{width:18px;height:18px}
-.fstrip{display:flex;gap:10px;margin:0 -12px;padding:0 12px;overflow-x:auto;scrollbar-width:none}
-.fstrip::-webkit-scrollbar{display:none}
-.fshot{position:relative;flex:none;height:92px;overflow:hidden;border-radius:10px;background:var(--s2)}
-.fshot img{display:block;height:100%}
-.fshot i{position:absolute;border:1.5px dashed #ffffffb0;border-radius:3px;cursor:pointer}
-.fshot i.sure{border:2px solid var(--ac)}
-.fcard{flex:none;width:80px;padding:0;border:0;background:none;color:var(--tx);font-size:12px;line-height:1.25;text-align:center;cursor:pointer}
-.fcard .fc{position:relative;width:64px;height:64px;margin:0 auto 6px}
-.fcard .fc>img{display:block;width:64px;height:64px;border-radius:12px;object-fit:cover;background:var(--s2)}
-.fcard.maybe .fc>img{outline:2px dashed #ffffff60;outline-offset:2px}
-.fcard .fc .nop{position:absolute;right:-6px;bottom:-6px;width:26px;height:26px;border-radius:50%;background:var(--s2);box-shadow:0 0 0 2px var(--s1)}
-.fcard b,.fcard span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
-.fcard b{font-weight:550}
-.fcard span{margin-top:2px;color:var(--mu)}
-.fcard.hit .fc>img{animation:pop .4s cubic-bezier(.2,.8,.2,1)}
+/* Who is on the screen of a pause (see watchFaces): a pill where the skip
+   button stands, which it hides; spinning while the faces are being
+   found, then the faces of those told, up to three. */
+#fpill{position:absolute;right:16px;bottom:calc(100% + 12px);display:flex;align-items:center;gap:8px;height:44px;padding:0 16px 0 11px;border:0;border-radius:22px;background:var(--s2);color:var(--tx);font-size:15px;font-weight:600;box-shadow:0 0 0 1px #ffffff14,0 4px 20px #000a;animation:pop .25s cubic-bezier(.2,.8,.2,1);cursor:pointer}
+#fpill[hidden],#pl.pending #fpill{display:none}
+#pl:has(#fpill:not([hidden])) #skipb{display:none}
+.fsp{position:relative;display:grid;place-items:center;width:22px;height:22px;color:var(--ac)}
+.fsp svg{width:18px;height:18px}
+#fpill.busy{color:var(--mu)}
+#fpill.busy .fsp::after{content:'';position:absolute;inset:-4px;border:2px solid #ffffff22;border-top-color:var(--ac);border-radius:50%;animation:spin .9s linear infinite}
+.fav{display:flex}
+.fav .nop{width:28px;height:28px;border-radius:50%;background:var(--s3);box-shadow:0 0 0 2px var(--s2)}
+.fav .nop+.nop{margin-left:-9px}
+/* The sheet "Актёры в кадре": the paused frame across, shimmering till it
+   comes and swept by a light while its faces are being found; the faces
+   boxed, those surely someone solid, maybe dashed, not told dotted, the
+   one picked in the accent, each hit well around it, a small face over a
+   large one; under each the name of whom it was taken for, always on a
+   phone, hovered on a desktop; under the frame, the callout of the face
+   picked, its tip at it. */
+#fsheet{padding-bottom:max(20px,env(safe-area-inset-bottom))}
+#fsheet h2 .fsp{flex:none;margin-right:8px}
+#fsheet h2 small{margin-left:12px;overflow:hidden;color:var(--mu);font-size:13px;font-weight:500;white-space:nowrap;text-overflow:ellipsis}
+#fshot{position:relative;flex:none;margin:8px -16px 0;aspect-ratio:16/9;background:#000}
+#fshot.sk{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%}
+#fshot>img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .25s}
+#fshot>img.ld{opacity:1}
+#fshot.finding::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,#ffb02028 50%,transparent 60%) 0 0/100% 300%;animation:scan 1.6s linear infinite;pointer-events:none}
+@keyframes scan{from{background-position:0 100%}to{background-position:0 0}}
+#fmarks{position:absolute;inset:0}
+.fbox{position:absolute;padding:0;border:1.5px solid #ffffffc0;border-radius:4px;background:none;cursor:pointer}
+.fbox.in{animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards}
+.fbox::before{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+.fbox.maybe{border-style:dashed}
+.fbox.none{border:1.5px dotted #ffffff70}
+.fbox.sel{border-width:2.5px;border-color:var(--ac);box-shadow:0 0 0 3px #ffb02040}
+.ftip{position:absolute;left:50%;top:calc(100% + 7px);z-index:1;display:flex;align-items:center;gap:4px;max-width:136px;height:22px;padding:0 8px 0 3px;border-radius:11px;background:#000000b8;color:#fff;font-size:11px;font-weight:600;line-height:1;white-space:nowrap;transform:translateX(calc(-50% + var(--dx,0px)));-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.ftip.up{top:auto;bottom:calc(100% + 7px)}
+/* Its tip at the face's middle, wherever the name was moved to. */
+.ftip::before{content:'';position:absolute;left:clamp(9px,calc(50% - var(--dx,0px)),calc(100% - 9px));bottom:100%;border:5px solid transparent;border-top:0;border-bottom-color:#000000b8;transform:translateX(-50%)}
+.ftip.up::before{top:100%;bottom:auto;border:5px solid transparent;border-bottom:0;border-top-color:#000000b8}
+.fbox.sel .ftip::before{border-bottom-color:var(--ac)}
+.fbox.sel .ftip.up::before{border-bottom-color:transparent;border-top-color:var(--ac)}
+/* Where the names crowd, the photo alone. */
+.ftip.tiny{padding:0 3px}
+.ftip.tiny>span{display:none}
+.ftip .nop{flex:none;width:16px;height:16px;border-radius:50%;background:var(--s3)}
+.ftip>span{overflow:hidden;line-height:22px;text-overflow:ellipsis}
+.fbox.sel .ftip{z-index:2;background:var(--ac);color:#111}
+@media (hover:hover){
+  .ftip{opacity:0;pointer-events:none;transition:opacity .15s}
+  .fbox:hover .ftip{opacity:1}
+}
+#fcall{margin-top:14px}
+.fc{position:relative;padding:4px 12px;border-radius:16px;background:var(--s2)}
+.fc.in{animation:pop .25s cubic-bezier(.2,.8,.2,1)}
+.fc::before{content:'';position:absolute;top:-6px;left:var(--x,50%);width:14px;height:14px;border-radius:2px;background:var(--s2);transform:translateX(-50%) rotate(45deg)}
+.fc.free::before{display:none}
+.fc small{display:block;padding:8px 0 0;color:var(--mu);font-size:12px}
+.fr{display:flex;align-items:center;gap:12px;width:100%;padding:8px 0;border:0;background:none;color:var(--tx);font:inherit;text-align:left}
+button.fr{cursor:pointer}
+.fr+.fr{border-top:1px solid #ffffff10}
+.fr .nop{flex:none;width:44px;height:44px;border-radius:50%;background:var(--s3)}
+.fr:only-of-type .nop{width:56px;height:56px}
+.fr .w{flex:1;min-width:0}
+.fr b,.fr .w span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.fr b{font-size:16px;font-weight:600}
+.fr .w span{margin-top:2px;color:var(--mu);font-size:13px}
+.fr>svg{color:var(--mu)}
+.fr .skl{display:block;width:55%;height:12px;margin:4px 0;border-radius:6px}
+.fr .skl+.skl{width:35%}
+.fmsg{margin:0;padding:22px 8px;color:var(--mu);font-size:14px;line-height:1.4;text-align:center}
 #bar{position:relative;display:flex;align-items:center;gap:12px;min-height:72px}
 /* The poster grows with a transform so it does not lay the bar out. While
    loading it dims. */
@@ -470,7 +514,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .sheet .handle,.sheet h2{touch-action:none}
 .sheet .handle::before{content:'';position:absolute;inset:-8px -60px -6px}
 .sheet::after{content:'';position:absolute;left:0;right:0;top:100%;height:50vh;background:var(--s1)}
-#optcollapse,#stycollapse{display:none}
+#optcollapse,#stycollapse,#fcollapse{display:none}
 .sheet h2{display:flex;align-items:center;margin:0 0 4px;font-size:18px}
 .sheet h2 span{flex:1}
 /* A sheet over the player dims the player too. */
@@ -519,7 +563,7 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .card img{opacity:0;transition:opacity .35s}
 .card img.ld{opacity:1}
 .sk{display:block;aspect-ratio:2/3;border-radius:12px}
-.sk,.skl,.nop.ph,.pf.ph,.st.ph,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
+.sk,.skl,.nop.ph,#fshot.sk,.pf.ph,.st.ph,#dposter.loading,#det.loading #dplay{background:linear-gradient(100deg,var(--s2) 40%,var(--s3) 50%,var(--s2) 60%) 0 0/200% 100%;animation:shim 1.2s linear infinite}
 .skl{display:block;height:12px;margin-top:9px;border-radius:6px}
 .skl+.skl{width:40%}
 .badge.on{animation:bounce .35s ease-out}
@@ -671,7 +715,7 @@ svg.spring{animation:spring .3s ease-out}
   #pl.open #bar{margin-top:16px} /* where the handle stood */
   .sheet{width:min(480px,calc(100% - 32px));padding-bottom:16px}
   .sheet::after,.sheet .handle{display:none}
-  #optcollapse,#stycollapse{display:grid}
+  #optcollapse,#stycollapse,#fcollapse{display:grid}
   #toast{bottom:112px}
 }
 @media (hover:hover){
@@ -716,6 +760,7 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-restart" viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></symbol>
   <symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M10 2l1.9 5.6 5.6 1.9-5.6 1.9L10 17l-1.9-5.6-5.6-1.9 5.6-1.9zm8.5 11 .95 2.55L22 16.5l-2.55.95L18.5 20l-.95-2.55L15 16.5l2.55-.95z"/></symbol>
   <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
@@ -769,7 +814,7 @@ svg.spring{animation:spring .3s ease-out}
   <div id="prog"><div></div></div>
   <div id="handle"></div>
   <button class="pill ac" id="skipb" hidden></button>
-  <div id="faces" hidden><h3><span>В кадре</span><small id="fnote"></small><button class="ib" id="fx" aria-label="Скрыть"><svg><use href="#i-close"/></svg></button></h3><div class="fstrip" id="fstrip"></div></div>
+  <button id="fpill" hidden></button>
   <div id="bar">
     <span id="thumb"><img alt=""></span>
     <div class="t"><b id="title"></b><span id="st"></span></div>
@@ -792,6 +837,12 @@ svg.spring{animation:spring .3s ease-out}
     <div class="row"><button class="ib" data-c="mute" id="mu" aria-label="Звук"><svg><use href="#i-vol"/></svg></button><div class="sl" id="vol" role="slider" aria-label="Громкость"><i><b></b></i></div></div>
     </div>
   </div></div>
+</section>
+<section id="fsheet" class="sheet" hidden>
+  <div class="handle"></div>
+  <h2><span class="fsp"><svg><use href="#i-spark"/></svg></span><span>Актёры в кадре</span><small id="fnote"></small><button class="ib" id="fcollapse" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button></h2>
+  <div id="fshot"><img alt=""><div id="fmarks"></div></div>
+  <div id="fcall"></div>
 </section>
 <section id="opts" class="sheet" hidden>
   <div class="handle"></div>
@@ -863,7 +914,7 @@ let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF defaul
 let devices = null;     // last /devices answer
 let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null = receiver default
 localStorage.removeItem('subStyle'); // older format with colors
-const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs', mk: 'mk' }; // layer name -> bottom sheet
+const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs', mk: 'mk', faces: 'fsheet' }; // layer name -> bottom sheet
 let recent = [];        // /progress list: recently watched titles, latest first
 let saved = [];         // and the titles saved to watch, latest saved first
 let listShown = null;   // the list on a page of its own (see openList): 'recent', 'saved' or null
@@ -1243,7 +1294,12 @@ function closeLayer() {
   }
   if (name == 'list') listShown = null;
   if (name == 'cast') castShown = null;
-  if (name == 'person') personShown = null;
+  if (name == 'person') {
+    personShown = null;
+    const back = facesBack;
+    facesBack = null;
+    if (back && back == facesKey && fz && !fz.reason) setTimeout(openFaces);
+  }
 }
 
 // ---- addresses ----------------------------------------------------------
@@ -2390,7 +2446,7 @@ function personButton(e, c) {
 // Someone of a title's page or of its cast, over it.
 function openPerson(c) {
   showPerson(c.id, c);
-  openLayer('person', basePath() + '/person/' + c.id);
+  openLayer('person', basePath().replace(/\/$/, '') + '/person/' + c.id);
 }
 
 // known: what the page they were opened from has of them (name, photo),
@@ -2934,15 +2990,31 @@ async function poll() {
 
 // ---- who is on the screen -----------------------------------------------
 //
-// A second into a pause the router is asked who is in the paused frame
-// (see /faces), and again as the pause moves; while the cast's photos are
-// still being looked at, the same pause is asked again a few times. A
-// closed card stays closed until the next pause. Ahead of a pause, the
-// cast's photos of an episode played are looked at (/faces/prepare).
+// On a pause the pill "В кадре" shows over the player at once, spinning,
+// and a second in the router is asked who is in the paused frame (/faces):
+// it answers the frame as soon as title-api has cut it out, then the
+// faces are asked for (/faces/pause), which waits for them to be found;
+// while the cast's photos are still being looked at, they are asked again
+// a few times. The pill then shows the faces of those told, or goes if
+// there are no faces. Any time, it opens the sheet "Актёры в кадре" (see
+// renderFaces), which fills in as the answers come. Someone's page opened
+// from it goes back to it. Playing on closes it; seeking on a pause is a
+// new pause. Ahead of a pause, the cast's photos of an episode played are
+// looked at (/faces/prepare).
 let facesAt = null;     // where the pause asked of is, in seconds
 let facesKey = null;    // the episode and the pause asked of
 let facesTimer = null;
 let facesPrepared = null;
+let fz = null;          // the router's last answer of the pause: { finding } before the first
+let fsel = -1;          // the face picked, its place in fz.faces
+let facesBack = null;   // the pause whose sheet someone's page was opened from
+
+const FACES_WHY = {
+  no_cache: 'Кадр берётся из кэша роутера: нужен прокси и качество не «Авто»',
+  no_segment: 'Этого кадра нет в кэше роутера',
+  not_matched: 'Тайтл не сопоставлен с TMDB, актёры неизвестны',
+  off: 'Распознавание лиц не настроено',
+};
 
 function watchFaces(s) {
   const m = s.media, n = s.now;
@@ -2955,7 +3027,8 @@ function watchFaces(s) {
     if (facesKey) {
       facesKey = facesAt = null;
       clearTimeout(facesTimer);
-      showFaces(null);
+      setFaces(null);
+      if (layers.at(-1) == 'faces') closeTop();
     }
     return;
   }
@@ -2965,74 +3038,212 @@ function watchFaces(s) {
   facesAt = m.time || 0;
   facesKey = ep + '|' + facesAt;
   clearTimeout(facesTimer);
-  showFaces(null);
+  setFaces({ finding: true });
   const key = facesKey;
   facesTimer = setTimeout(() => loadFaces(key), 1000);
 }
 
-async function loadFaces(key, pause, tries = 0) {
-  let r;
-  try {
-    r = await api(withDevice(pause ? 'faces/pause?id=' + pause : 'faces'));
-  } catch (e) {
-    return; // no faces is no news
+async function loadFaces(key) {
+  let path = withDevice('faces'), waits = 0, again = 0;
+  for (;;) {
+    let r;
+    try {
+      r = await api(path);
+    } catch (e) {
+      r = { reason: 'error' };
+    }
+    if (key != facesKey) return;
+    // Faces told stay should asking again fail.
+    if (r.reason && fz?.faces?.length) return;
+    setFaces(r);
+    if (r.reason || !r.pause) return;
+    // Being found, the router waits for them; past a couple of minutes
+    // they won't be.
+    if (r.finding) {
+      if (++waits > 8) return setFaces({ reason: 'error' });
+    } else if (r.preparing && again++ < 10) {
+      await new Promise(ok => facesTimer = setTimeout(ok, 6000));
+      if (key != facesKey) return;
+    } else return;
+    path = 'faces/pause?id=' + r.pause;
   }
-  if (key != facesKey) return;
-  showFaces(r.faces?.length ? r : null);
-  if (r.preparing && r.pause && tries < 10)
-    facesTimer = setTimeout(() => loadFaces(key, r.pause, tries + 1), 6000);
 }
 
-function showFaces(r) {
-  const box = $('faces');
-  if (!r) {
-    box.hidden = true;
-    return;
-  }
-  // The faces surely someone first, then those maybe, then the rest large
-  // enough to be worth a card; each lot from left to right.
-  const side = f => Math.min(f.box[2] - f.box[0], f.box[3] - f.box[1]) * 1280 / Math.max(r.width, r.height);
-  const rank = f => f.sure ? 0 : f.person || f.alternatives?.length ? 1 : side(f) >= 64 ? 2 : 3;
-  const faces = [...r.faces].sort((a, b) => rank(a) - rank(b) || a.box[0] - b.box[0]);
-  const cards = faces.map(f => {
-    if (rank(f) == 3) return null;
-    const p = f.person, alt = f.alternatives || [];
-    const name = p ? p.name : alt.length ? alt.map(a => a.name).join(' или ') : 'Не узнан';
-    const part = p ? (f.sure ? p.character : 'похоже') : alt.length ? 'похоже' : null;
-    const card = el('button', { className: 'fcard' + (f.sure ? '' : ' maybe') },
-      el('div', { className: 'fc' }, el('img', { src: f.crop, alt: '' }), ...(p || alt[0] ? [photo((p || alt[0]).photo)] : [])),
-      el('b', {}, name), ...(part ? [el('span', {}, part)] : []));
-    const who = p || (alt.length == 1 ? alt[0] : null);
-    if (who?.id) card.onclick = () => {
-      setPlayer(false);
-      openPerson({ id: who.id, name: who.name, photo: who.photo });
-    };
-    return card;
-  });
-  const shot = el('div', { className: 'fshot' }, el('img', { src: r.frame, alt: '' }));
-  shot.style.width = (92 * r.width / r.height) + 'px';
-  faces.forEach((f, i) => {
-    const [x1, y1, x2, y2] = f.box, mark = el('i', { className: f.sure ? 'sure' : '' });
-    Object.assign(mark.style, {
-      left: x1 / r.width * 100 + '%', top: y1 / r.height * 100 + '%',
-      width: (x2 - x1) / r.width * 100 + '%', height: (y2 - y1) / r.height * 100 + '%',
-    });
-    if (cards[i]) mark.onclick = () => {
-      cards[i].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      cards[i].classList.remove('hit');
-      void cards[i].offsetWidth;
-      cards[i].classList.add('hit');
-    };
-    shot.append(mark);
-  });
-  $('fnote').textContent = r.preparing ? 'смотрю фото актёров…' : '';
-  $('fstrip').replaceChildren(shot, ...cards.filter(Boolean));
-  box.hidden = false;
+// A photo of someone or of a face, at once: they are small and few, and
+// drawn anew as the answers come.
+function facePhoto(src) {
+  const e = photo(src), img = e.querySelector('img');
+  if (img) img.loading = 'eager';
+  return e;
 }
-$('fx').onclick = () => {
-  clearTimeout(facesTimer);
-  showFaces(null);
-};
+
+// Told, surely or maybe, or the two most alike.
+const faceWho = f => f.person || f.alternatives?.[0] || null;
+const faceArea = f => (f.box[2] - f.box[0]) * (f.box[3] - f.box[1]);
+
+function setFaces(r) {
+  if (!(r?.pause && r.pause == fz?.pause)) fsel = -1;
+  fz = r;
+  const faces = r?.faces || [];
+  // Picked at first: the largest face surely someone, else maybe, else any.
+  if (fsel < 0 && faces.length) {
+    const rank = f => f.sure ? 0 : faceWho(f) ? 1 : 2;
+    fsel = faces.reduce((b, f, i) => rank(f) < rank(faces[b]) || rank(f) == rank(faces[b]) && faceArea(f) > faceArea(faces[b]) ? i : b, 0);
+  }
+  renderPill();
+  renderFaces();
+}
+
+function renderPill() {
+  const b = $('fpill'), r = fz;
+  b.hidden = !r || !!r.reason || !r.finding && !r.faces?.length;
+  if (b.hidden) return;
+  b.classList.toggle('busy', !!r.finding);
+  const who = (r.faces || []).filter(faceWho).sort((x, y) => !x.sure - !y.sure || faceArea(y) - faceArea(x)).slice(0, 3);
+  const sig = who.map(f => faceWho(f).id).join() || '-';
+  if (b.dataset.sig == sig) return;
+  b.dataset.sig = sig;
+  b.replaceChildren(who.length ? el('span', { className: 'fav' }, ...who.map(f => facePhoto(faceWho(f).photo || f.crop)))
+    : el('span', { className: 'fsp' }, svgIcon('spark')), 'В кадре');
+}
+
+function openFaces() {
+  openLayer('faces');
+  requestAnimationFrame(renderFaces);
+}
+$('fpill').onclick = openFaces;
+$('fcollapse').onclick = () => closeTop();
+addEventListener('resize', () => renderFaces());
+
+// The sheet: the frame, its faces boxed and named, the callout of the one
+// picked; drawn only while it is open.
+function renderFaces() {
+  const sheet = $('fsheet');
+  if (sheet.hidden || sheet.classList.contains('out')) return;
+  const r = fz || { reason: 'error' }, faces = r.faces || [];
+  const shot = $('fshot'), img = shot.querySelector('img');
+  const known = faces.filter(faceWho).length;
+  $('fnote').textContent = r.reason || !faces.length && !r.finding ? '' : r.finding ? 'ищу лица…'
+    : r.preparing ? 'смотрю фото актёров…' : faces.length == 1 ? (known ? 'узнан' : 'не узнан') : `узнано ${known} из ${faces.length}`;
+  shot.hidden = !r.frame && !!r.reason;
+  shot.classList.toggle('sk', !r.frame);
+  shot.classList.toggle('finding', !!r.frame && !!r.finding);
+  if (r.frame) {
+    shot.style.aspectRatio = r.width + '/' + r.height;
+    if (img.getAttribute('src') != r.frame) {
+      img.classList.remove('ld');
+      img.onload = () => img.classList.add('ld');
+      img.src = r.frame;
+    }
+  } else {
+    shot.style.aspectRatio = '';
+    img.removeAttribute('src');
+    img.classList.remove('ld');
+  }
+  // The largest first, so that a small face is over a large one. Drawn
+  // anew only as the faces or whom they were taken for change.
+  const marks = $('fmarks'), order = faces.map((f, i) => i).sort((a, b) => faceArea(faces[b]) - faceArea(faces[a]));
+  const sig = r.pause + JSON.stringify(faces.map(f => [f.box, faceWho(f)?.id, f.sure]));
+  if (marks.dataset.sig != sig) {
+    // Popping in as the pause's faces first come.
+    const first = !(marks.dataset.sig || '').startsWith(r.pause + '[[');
+    marks.dataset.sig = sig;
+    marks.replaceChildren(...order.map(i => {
+      const f = faces[i], who = faceWho(f), [x1, y1, x2, y2] = f.box;
+      const b = el('button', {
+        className: 'fbox ' + (f.sure ? 'sure' : who ? 'maybe' : 'none') + (first ? ' in' : ''),
+        ariaLabel: who ? who.name : 'Не узнан',
+      }, ...who ? [el('span', { className: 'ftip' }, facePhoto(who.photo || f.crop), el('span', {}, who.name + (f.sure ? '' : '?')))] : []);
+      Object.assign(b.style, {
+        left: x1 / r.width * 100 + '%', top: y1 / r.height * 100 + '%',
+        width: (x2 - x1) / r.width * 100 + '%', height: (y2 - y1) / r.height * 100 + '%',
+      });
+      b.onclick = () => {
+        if (fsel == i) return;
+        fsel = i;
+        renderFaces();
+      };
+      return b;
+    }));
+  }
+  order.forEach((i, k) => marks.children[k].classList.toggle('sel', i == fsel));
+  placeTips();
+  const call = $('fcall'), f = faces[fsel], was = call.dataset.k, k = `${r.pause}:${fsel}`;
+  let c;
+  if (r.reason) c = el('p', { className: 'fmsg' }, FACES_WHY[r.reason] || 'Не получилось узнать, кто в кадре');
+  else if (r.finding) c = el('div', { className: 'fc free' }, el('div', { className: 'fr' },
+    el('i', { className: 'nop ph' }), el('span', { className: 'w' }, el('i', { className: 'skl' }), el('i', { className: 'skl' }))));
+  else if (!f) c = el('p', { className: 'fmsg' }, 'Лиц в кадре не нашлось');
+  else {
+    c = faceCallout(f);
+    // Its tip at the face: the frame is as wide as the sheet, the callout
+    // inside its margins.
+    const box = marks.children[order.indexOf(fsel)], sx = call.getBoundingClientRect().left - shot.getBoundingClientRect().left;
+    const x = box.offsetLeft + box.offsetWidth / 2 - sx;
+    c.style.setProperty('--x', Math.min(Math.max(x, 22), call.clientWidth - 22) + 'px');
+    if (was != k) c.classList.add('in');
+  }
+  call.dataset.k = f && !r.finding ? k : '';
+  call.replaceChildren(c);
+}
+
+// The callout of a face: whom it surely is; who it may be, one or two;
+// or none.
+function faceCallout(f) {
+  const row = (who, part) => {
+    const b = el('button', { className: 'fr' }, facePhoto(who.photo || f.crop),
+      el('span', { className: 'w' }, el('b', {}, who.name), ...part ? [el('span', {}, part)] : []), svgIcon('more'));
+    b.onclick = () => facesPerson(who);
+    return b;
+  };
+  if (f.sure && f.person) return el('div', { className: 'fc' }, row(f.person, f.person.character));
+  const rows = [f.person, ...f.alternatives || []].filter((x, i, a) => x && a.findIndex(y => y?.id == x.id) == i).slice(0, 2);
+  if (!rows.length) return el('div', { className: 'fc' }, el('div', { className: 'fr' }, facePhoto(f.crop),
+    el('span', { className: 'w' }, el('b', {}, 'Не узнали'), el('span', {}, 'Не похож ни на кого из актёров серии'))));
+  return el('div', { className: 'fc' }, el('small', {}, rows.length > 1 ? 'Похоже на одного из них' : 'Похоже на'),
+    ...rows.map(x => row(x, x.character)));
+}
+
+// The names under the boxes, the picked one's first, then the largest
+// faces': under the box or over it, moved in from the frame's sides; where
+// it would leave the frame, cover another's name or another face, wherever
+// covers least, the photo alone if the name would cover more. Shown one
+// at a time, as hovered, they need not keep off each other.
+function placeTips() {
+  const marks = $('fmarks'), W = marks.clientWidth, H = marks.clientHeight, placed = [];
+  const alone = matchMedia('(hover:hover)').matches;
+  if (!W) return;
+  const boxes = [...marks.children].map(e => ({ x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight, e }));
+  const over = (p, list) => list.reduce((sum, q) =>
+    sum + Math.max(0, Math.min(p.x + p.w, q.x + q.w) - Math.max(p.x, q.x)) * Math.max(0, Math.min(p.y + p.h, q.y + q.h) - Math.max(p.y, q.y)), 0);
+  const tips = [...marks.querySelectorAll('.ftip')];
+  tips.sort((a, b) => b.parentNode.classList.contains('sel') - a.parentNode.classList.contains('sel'));
+  for (const tip of tips) {
+    const box = tip.parentNode, c = box.offsetLeft + box.offsetWidth / 2;
+    tip.classList.remove('tiny');
+    const full = tip.offsetWidth, h = tip.offsetHeight, others = boxes.filter(q => q.e != box);
+    const spots = (alone ? [false] : [false, true]).flatMap(tiny => [false, true].map(up => {
+      const w = tiny ? h : full, x = Math.min(Math.max(c - w / 2, 4), W - 4 - w);
+      const p = { x, y: up ? box.offsetTop - 7 - h : box.offsetTop + box.offsetHeight + 7, w, h, up, tiny, dx: x - (c - w / 2) };
+      // Off the frame never; over another name worse than over a face,
+      // over a face worse than the photo alone.
+      p.cost = (p.y < 2 || p.y + h > H - 2 ? 1e9 : 0) + 4 * over(p, placed) + 3 * over(p, others) + (tiny ? full * h * .3 : 0);
+      return p;
+    }));
+    const p = spots.reduce((a, b) => b.cost < a.cost ? b : a);
+    tip.classList.toggle('up', p.up);
+    tip.classList.toggle('tiny', p.tiny);
+    tip.style.setProperty('--dx', p.dx + 'px');
+    if (!alone) placed.push(p);
+  }
+}
+
+async function facesPerson(who) {
+  facesBack = facesKey;
+  await closeTop();
+  setPlayer(false);
+  openPerson({ id: who.id, name: who.name, photo: who.photo });
+}
 
 // ---- lock screen controls -----------------------------------------------
 
