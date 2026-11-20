@@ -80,8 +80,9 @@ func facesDisabled(response http.ResponseWriter, service *faces.Service) bool {
 // /v1/faces?title_id=<id>&season=<n>&episode=<n>&t=<seconds>&offset=<seconds>,
 // the body the segment the TV is paused in as it was served (an fMP4
 // one's init segment first), offset the seconds into it of the pause, t
-// where that is on the video: who is in the paused frame (see
-// faces.Result).
+// where that is on the video: the paused frame, as soon as it is cut out,
+// its faces being found (see faces.Result), which
+// GET /v1/faces/pauses/{id} answers.
 func facesHandler(service *faces.Service) runtime.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request, _ map[string]string) {
 		if facesDisabled(response, service) {
@@ -122,7 +123,8 @@ func facesHandler(service *faces.Service) runtime.HandlerFunc {
 }
 
 // facesAgainHandler serves GET /v1/faces/pauses/{id}: who is in a pause
-// told by POST /v1/faces, told anew by the references made since.
+// kept by POST /v1/faces, told by the references made by now; while its
+// faces are being found, it waits for them a while.
 func facesAgainHandler(service *faces.Service) runtime.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
 		if facesDisabled(response, service) {

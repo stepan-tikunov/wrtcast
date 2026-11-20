@@ -192,6 +192,29 @@ func (s *store) addPause(ctx context.Context, p pause, sightings []sighting) (in
 	if err != nil {
 		return 0, nil, err
 	}
+	p.id = id
+	ids, err := insertSightings(ctx, tx, p, sightings)
+	if err != nil {
+		return 0, nil, err
+	}
+	return id, ids, tx.Commit()
+}
+
+// addSightings keeps the faces found in a pause kept before they were.
+func (s *store) addSightings(ctx context.Context, p pause, sightings []sighting) ([]int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	ids, err := insertSightings(ctx, tx, p, sightings)
+	if err != nil {
+		return nil, err
+	}
+	return ids, tx.Commit()
+}
+
+func insertSightings(ctx context.Context, tx *sql.Tx, p pause, sightings []sighting) ([]int64, error) {
 	ids := make([]int64, len(sightings))
 	for i, f := range sightings {
 		box, _ := json.Marshal(f.box)
@@ -202,16 +225,16 @@ func (s *store) addPause(ctx context.Context, p pause, sightings []sighting) (in
 		result, err := tx.ExecContext(ctx, `
 			INSERT INTO face_sightings (pause, scope, box, embedding, quality, det, yaw, blur, model, person, score, sure, at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			id, p.scope, string(box), raw, f.quality, f.det, f.yaw, f.blur, p.model,
+			p.id, p.scope, string(box), raw, f.quality, f.det, f.yaw, f.blur, p.model,
 			nullable(f.person), nullable(f.score), f.sure, p.at.Unix())
 		if err != nil {
-			return 0, nil, err
+			return nil, err
 		}
 		if ids[i], err = result.LastInsertId(); err != nil {
-			return 0, nil, err
+			return nil, err
 		}
 	}
-	return id, ids, tx.Commit()
+	return ids, nil
 }
 
 var errNoPause = errors.New("no such pause")

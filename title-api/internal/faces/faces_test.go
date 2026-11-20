@@ -291,11 +291,19 @@ func TestRecognize(t *testing.T) {
 		t.Fatalf("unmatched title: %v", err)
 	}
 	r := Request{Title: "dexter", Season: 1, Episode: 2, Time: 125.3, Offset: 0.5, Segment: data}
-	first, err := s.Recognize(ctx, r)
+	paused, err := s.Recognize(ctx, r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !first.Preparing || len(first.Faces) != 2 || first.Faces[0].Person != nil {
+	// The frame at once, the faces yet to be found.
+	if !paused.Finding || len(paused.Faces) != 0 || paused.Frame == "" || paused.Width != 320 {
+		t.Fatalf("paused: %+v", paused)
+	}
+	first, err := s.Again(ctx, paused.Pause)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Finding || !first.Preparing || len(first.Faces) != 2 || first.Faces[0].Person != nil {
 		t.Fatalf("before the references: %+v", first)
 	}
 	if first.Width != 320 || first.Height != 180 || first.Faces[0].Box != [4]float64{100, 50, 200, 170} {

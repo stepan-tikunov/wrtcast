@@ -531,7 +531,8 @@ HLS-сегментов. Для другой прошивки ресивера е
 На паузе роутер присылает сегмент, на котором стоит ТВ, и сервис говорит,
 кто из актёров в кадре (`internal/faces`):
 
-1. ffmpeg вырезает из сегмента кадр паузы в полном размере.
+1. ffmpeg вырезает из сегмента кадр паузы в полном размере; кадр
+   сохраняется и отдаётся сразу, остальное идёт в фоне.
 2. Сервис лиц (`faces/`, InsightFace: SCRFD-2.5G и ArcFace R50 на CPU)
    находит лица и считает вектор каждого из пяти самых крупных от 40 px.
 3. Каждое лицо сравнивается с эталонами людей серии: первые 20 по титрам
@@ -560,22 +561,27 @@ HLS-сегментов. Для другой прошивки ресивера е
 ```sh
 curl --data-binary @segment 'http://localhost:8080/v1/faces?title_id=<id>&season=1&episode=3&t=182&offset=2'
 # {"pause":1,"frame":"/v1/faces/frames/1.jpg","width":1280,"height":720,
+#  "faces":[],"preparing":true,"finding":true}
+curl http://localhost:8080/v1/faces/pauses/1
+# {"pause":1,"frame":"/v1/faces/frames/1.jpg","width":1280,"height":720,
 #  "faces":[{"box":[546,57.3,855.8,443.1],"crop":"/v1/faces/crops/1.jpg",
 #    "person":{"id":3787911,"name":"Brayden Gleave","character":"Jimmy Powell",
 #      "profile":"j6ro….jpg","portrait":"/v1/faces/crops/1.jpg"},
-#    "score":0.569,"sure":true}],"preparing":false}
+#    "score":0.569,"sure":true}],"preparing":false,"finding":false}
 ```
 
 - `POST /v1/faces?title_id=&season=&episode=&t=&offset=` — тело: сегмент,
   как его отдал CDN (у fMP4 сперва init-сегмент); `offset` — секунды паузы
-  от начала сегмента, `t` — от начала видео. `box` — в пикселях `frame`
+  от начала сегмента, `t` — от начала видео. Отвечает, как только кадр
+  вырезан: `faces` пустые, `finding` — лица ещё ищутся, их отдаёт
+  `GET /v1/faces/pauses/{id}`. `box` — в пикселях `frame`
   (длинная сторона до 1280), `crop` — лицо из кадра 256×256, `portrait` —
   лучшее лицо этого человека из пауз этого тайтла, которое было «точно».
   `preparing` — эталоны части людей ещё готовятся: позже паузу стоит
   спросить снова. `409` — тайтл не сопоставлен с TMDB, `422` — в сегменте
   нет такого кадра.
-- `GET /v1/faces/pauses/{id}` — та же пауза заново, по эталонам,
-  появившимся с тех пор.
+- `GET /v1/faces/pauses/{id}` — лица паузы, по эталонам на сейчас. Пока
+  они ищутся, ждёт их до 15 с; не дождался — `finding`, без лиц.
 - `POST /v1/faces/prepare?title_id=&season=&episode=` — готовит эталоны
   людей серии заранее: `{"preparing":true}`, если кого-то ещё нет.
 - `GET /v1/faces/frames/{id}.jpg`, `/v1/faces/crops/{id}.jpg` — кадр паузы и

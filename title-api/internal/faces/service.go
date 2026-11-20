@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"image"
 	"log"
 	"math"
 	"os"
@@ -64,7 +65,16 @@ type Service struct {
 	wake    chan struct{}
 	// Pauses waiting for the faces service, which the references wait for.
 	urgent atomic.Int32
+	// The pauses whose faces are being found, by their IDs.
+	finding map[int64]chan struct{}
 }
+
+// How long the faces of a pause are found at most, and how long a request
+// waits for them before it is answered they are still being found.
+const (
+	findLimit = 2 * time.Minute
+	findWait  = 15 * time.Second
+)
 
 // New is a Service asking the faces service at url, keeping the pictures
 // of the pauses in dir.
@@ -79,7 +89,7 @@ func New(ctx context.Context, db *sql.DB, url, dir string, tmdb TMDB, images Ima
 	}
 	return &Service{
 		store: store, detector: newDetector(url), tmdb: tmdb, images: images, pictures: pictures,
-		wake: make(chan struct{}, 1),
+		wake: make(chan struct{}, 1), finding: map[int64]chan struct{}{},
 	}, nil
 }
 
@@ -103,6 +113,8 @@ type Result struct {
 	// References of some of the people are yet to be made; asked again
 	// later (Again), the faces may be told better.
 	Preparing bool `json:"preparing"`
+	// The faces are still being found: Again waits for them.
+	Finding bool `json:"finding"`
 }
 
 // Face is a face of the frame, its box in the frame's pixels, a picture
@@ -293,8 +305,9 @@ func (s *Service) detect(ctx context.Context, picture []byte, l look, urgent boo
 	return result, err
 }
 
-// Recognize tells who is in the paused frame, keeping it, its faces and
-// what they were taken for.
+// Recognize keeps the paused frame and starts finding its faces and
+// telling who they are, in the background: the frame at once, the faces
+// none yet (Finding), which Again waits for.
 func (s *Service) Recognize(ctx context.Context, r Request) (Result, error) {
 	started := time.Now()
 	m, ok := s.tmdb.Match(ctx, r.Title)
@@ -314,17 +327,55 @@ func (s *Service) Recognize(ctx context.Context, r Request) (Result, error) {
 		log.Printf("faces %s s%de%d at %.1f: %v", r.Title, r.Season, r.Episode, r.Time, err)
 		return Result{}, err
 	}
-	decoded := time.Now()
-	found, err := s.detect(ctx, jpeg, pauseLook, true)
-	if err != nil {
-		return Result{}, err
-	}
-	detected := time.Now()
 	picture, err := decodeJPEG(jpeg)
 	if err != nil {
 		return Result{}, fmt.Errorf("paused frame: %w", err)
 	}
 	frame, scale := scaled(picture)
+	p := pause{
+		title: r.Title, scope: scopeOf(m), season: r.Season, episode: r.Episode, t: r.Time,
+		width: frame.Bounds().Dx(), height: frame.Bounds().Dy(), model: model, at: time.Now(),
+	}
+	if p.id, _, err = s.store.addPause(ctx, p, nil); err != nil {
+		return Result{}, err
+	}
+	if err := s.pictures.put(framePath, p.id, encodeJPEG(frame, 82)); err != nil {
+		return Result{}, err
+	}
+	done := make(chan struct{})
+	s.mu.Lock()
+	s.finding[p.id] = done
+	s.mu.Unlock()
+	go func() {
+		defer func() {
+			s.mu.Lock()
+			delete(s.finding, p.id)
+			s.mu.Unlock()
+			close(done)
+		}()
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), findLimit)
+		defer cancel()
+		if err := s.find(ctx, p, people, jpeg, picture, scale, started); err != nil {
+			log.Printf("faces %s %s s%de%d at %.1f: %v", r.Title, p.scope, r.Season, r.Episode, r.Time, err)
+		}
+	}()
+	result := Result{
+		Pause: p.id, Frame: frameURL(p.id), Width: p.width, Height: p.height, Faces: []Face{},
+		Preparing: preparing, Finding: true,
+	}
+	return result, nil
+}
+
+// find finds the faces of a pause kept, tells who they are, and keeps
+// them and their pictures.
+func (s *Service) find(ctx context.Context, p pause, people []tmdb.Person, jpeg []byte, picture *image.RGBA,
+	scale float64, started time.Time) error {
+	framed := time.Now()
+	found, err := s.detect(ctx, jpeg, pauseLook, true)
+	if err != nil {
+		return err
+	}
+	detected := time.Now()
 	var sightings []sighting
 	// The faces' boxes in the segment's pixels, the crops cut by.
 	var boxes [][4]float64
@@ -341,30 +392,18 @@ func (s *Service) Recognize(ctx context.Context, r Request) (Result, error) {
 			box: box, vector: f.Embedding, quality: f.side(), det: f.Det, yaw: f.Yaw, blur: f.Blur,
 		})
 	}
-	scope := scopeOf(m)
-	if err := s.guess(ctx, scope, people, sightings); err != nil {
-		return Result{}, err
+	if err := s.guess(ctx, p.scope, people, sightings); err != nil {
+		return err
 	}
-	p := pause{
-		title: r.Title, scope: scope, season: r.Season, episode: r.Episode, t: r.Time,
-		width: frame.Bounds().Dx(), height: frame.Bounds().Dy(), model: model, at: time.Now(),
-	}
-	id, sightingIDs, err := s.store.addPause(ctx, p, sightings)
+	sightingIDs, err := s.store.addSightings(ctx, p, sightings)
 	if err != nil {
-		return Result{}, err
-	}
-	if err := s.pictures.put(framePath, id, encodeJPEG(frame, 82)); err != nil {
-		return Result{}, err
+		return err
 	}
 	for i, box := range boxes {
-		sightings[i].id = sightingIDs[i]
 		if err := s.pictures.put(cropPath, sightingIDs[i], encodeJPEG(crop(picture, box), 88)); err != nil {
-			return Result{}, err
+			return err
 		}
 	}
-	p.id = id
-	result, err := s.result(ctx, p, people, sightings)
-	result.Preparing = preparing
 	sure := 0
 	for _, f := range sightings {
 		if f.sure {
@@ -372,14 +411,32 @@ func (s *Service) Recognize(ctx context.Context, r Request) (Result, error) {
 		}
 	}
 	log.Printf("faces %s %s s%de%d at %.1f: %d faces, %d sure, of %d people (frame %s, faces %s, all %s)",
-		r.Title, scope, r.Season, r.Episode, r.Time, len(sightings), sure, len(people),
-		decoded.Sub(started).Round(time.Millisecond), detected.Sub(decoded).Round(time.Millisecond),
+		p.title, p.scope, p.season, p.episode, p.t, len(sightings), sure, len(people),
+		framed.Sub(started).Round(time.Millisecond), detected.Sub(framed).Round(time.Millisecond),
 		time.Since(started).Round(time.Millisecond))
-	return result, err
+	return nil
 }
 
-// Again tells anew who is in a pause kept, by the references made since.
+// Again tells anew who is in a pause kept, by the references made since;
+// while its faces are being found, it waits for them a while (else
+// Finding, with none).
 func (s *Service) Again(ctx context.Context, id int64) (Result, error) {
+	s.mu.Lock()
+	done := s.finding[id]
+	s.mu.Unlock()
+	finding := false
+	if done != nil {
+		wait := time.NewTimer(findWait)
+		select {
+		case <-done:
+		case <-wait.C:
+			finding = true
+		case <-ctx.Done():
+			wait.Stop()
+			return Result{}, ctx.Err()
+		}
+		wait.Stop()
+	}
 	p, sightings, err := s.store.pause(ctx, id)
 	if err != nil {
 		return Result{}, err
@@ -395,6 +452,12 @@ func (s *Service) Again(ctx context.Context, id int64) (Result, error) {
 	preparing, err := s.enqueue(ctx, ids(people))
 	if err != nil {
 		return Result{}, err
+	}
+	if finding {
+		return Result{
+			Pause: p.id, Frame: frameURL(p.id), Width: p.width, Height: p.height, Faces: []Face{},
+			Preparing: preparing, Finding: true,
+		}, nil
 	}
 	if err := s.guess(ctx, p.scope, people, sightings); err != nil {
 		return Result{}, err
