@@ -1,0 +1,6 @@
+ai-edge-litert==2.4.0
+aiohttp==3.14.5
+aiohttp-retry==2.9.1
+numpy==2.5.5
+shazamio==0.9.0
+shazamio_core==2.0.0

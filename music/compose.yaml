@@ -1,0 +1,18 @@
+# Next to title-api on the same host; title-api reaches it on loopback
+# (MUSIC_URL=http://127.0.0.1:50061). It must not get title-api's
+# HTTPS_PROXY: Shazam is asked from the server's address, never from home.
+#
+#   docker build -t wrtcast/music:latest . && docker compose up -d
+services:
+  music:
+    image: wrtcast/music:latest
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      MUSIC_ADDR: 127.0.0.1:50061
+      MUSIC_SHAZAM: "on"
+      MUSIC_SHAZAM_MAX: "8"
+      MUSIC_SHAZAM_WINDOW: "300"
+      MUSIC_SHAZAM_COOLDOWN: "3600"
+    cpus: 1
+    mem_limit: 512m
