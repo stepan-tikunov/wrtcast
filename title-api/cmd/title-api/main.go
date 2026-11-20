@@ -20,6 +20,7 @@ import (
 	"title-api/internal/faces"
 	"title-api/internal/grpcserver"
 	"title-api/internal/marking"
+	"title-api/internal/music"
 	"title-api/internal/provider"
 	"title-api/internal/tmdb"
 
@@ -108,6 +109,18 @@ func run() error {
 		}
 		go faceService.Run(ctx)
 	}
+	// What music plays in the videos played, with the music service
+	// (music/ in the repository) at MUSIC_URL; without it, the music
+	// requests answer 503.
+	var musicService *music.Service
+	if musicURL := os.Getenv("MUSIC_URL"); musicURL != "" {
+		musicService, err = music.New(ctx, urlStore.DB(), musicURL,
+			envOrDefault("TITLE_API_MUSIC", filepath.Join(filepath.Dir(stateDBPath), "music")))
+		if err != nil {
+			return err
+		}
+		go musicService.Run(ctx)
+	}
 
 	grpcListener, err := net.Listen("tcp", grpcAddress)
 	if err != nil {
@@ -153,6 +166,8 @@ func run() error {
 		{http.MethodGet, "/v1/faces/frames/{file}", facesPictureHandler(faceService, "frames")},
 		{http.MethodGet, "/v1/faces/crops/{file}", facesPictureHandler(faceService, "crops")},
 		{http.MethodGet, "/v1/faces/portraits/{scope}/{person}", facesPortraitHandler(faceService)},
+		{http.MethodPost, "/v1/music/audio", musicAudioHandler(musicService)},
+		{http.MethodGet, "/v1/music", musicHandler(musicService)},
 	} {
 		if err := gateway.HandlePath(route.method, route.path, route.handler); err != nil {
 			_ = grpcListener.Close()
