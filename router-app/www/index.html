@@ -311,6 +311,9 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 #dsave svg{width:24px;height:24px}
 #dsave.on{color:#c8c8cc}
 #dsave.on svg{color:var(--ac)}
+#dseen svg{width:24px;height:24px}
+#dseen.on svg{color:var(--ac)}
+#dseen:disabled{opacity:.5}
 #seasons{display:flex;gap:8px;overflow-x:auto;padding:16px 16px 8px;scrollbar-width:none}
 #seasons::-webkit-scrollbar{display:none}
 .chip{flex:none;height:36px;padding:0 16px;border:0;border-radius:18px;background:var(--s2);font-size:15px}
@@ -536,6 +539,13 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .sw input::before{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--tx);transition:transform .2s}
 .sw input:checked{background:var(--ac)}
 .sw input:checked::before{transform:translateX(18px)}
+/* The seasons of the "watched up to" sheet, as the page's, and its
+   episodes as the sources are listed. */
+#wseasons{display:flex;flex:none;gap:8px;overflow-x:auto;margin:4px -16px 4px;padding:4px 16px 8px;scrollbar-width:none}
+#wseasons::-webkit-scrollbar{display:none}
+#wlist .dev.done b{color:var(--mu)}
+#wlist .dev.on b{color:var(--ac)}
+#wclear{display:block;flex:none;margin:8px auto 0;padding:10px 16px;border:0;background:none;color:var(--err);font-size:15px}
 #stop,#mkdel,#tmdel{display:block;margin:4px auto 0;padding:10px 16px;border:0;background:none;color:var(--err);font-size:15px}
 .sw input:disabled{opacity:.4}
 .hint{margin:0 2px 4px;color:var(--mu);font-size:13px;line-height:1.4}
@@ -555,14 +565,14 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .sheet .handle,.sheet h2{touch-action:none}
 .sheet .handle::before{content:'';position:absolute;inset:-8px -60px -6px}
 .sheet::after{content:'';position:absolute;left:0;right:0;top:100%;height:50vh;background:var(--s1)}
-#optcollapse,#stycollapse,#fcollapse,#mcollapse{display:none}
+#optcollapse,#stycollapse,#fcollapse,#mcollapse,#wcollapse{display:none}
 .sheet h2{display:flex;align-items:center;margin:0 0 4px;font-size:18px}
 .sheet h2 span{flex:1}
 /* A sheet over the player dims the player too. */
 #shade.top{z-index:7}
 /* Long lists scroll inside the sheet instead of pushing it off screen. */
-#optbody,#devlist,#srclist,#mkbody{min-height:0;overflow-y:auto;overscroll-behavior:contain}
-#devlist .dev,#srclist .dev{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;padding:8px 4px;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
+#optbody,#devlist,#srclist,#mkbody,#wlist{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+#devlist .dev,#srclist .dev,#wlist .dev{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;padding:8px 4px;border:0;border-bottom:1px solid var(--s2);background:none;text-align:left}
 .dev span{flex:1;min-width:0}
 .dev b{display:block;font-weight:550}
 .dev small{color:var(--mu)}
@@ -756,7 +766,7 @@ svg.spring{animation:spring .3s ease-out}
   #pl.open #bar{margin-top:16px} /* where the handle stood */
   .sheet{width:min(480px,calc(100% - 32px));padding-bottom:16px}
   .sheet::after,.sheet .handle{display:none}
-  #optcollapse,#stycollapse,#fcollapse,#mcollapse{display:grid}
+  #optcollapse,#stycollapse,#fcollapse,#mcollapse,#wcollapse{display:grid}
   #toast{bottom:112px}
 }
 @media (hover:hover){
@@ -823,7 +833,7 @@ svg.spring{animation:spring .3s ease-out}
     <div class="nav"><button class="ib" id="dback" aria-label="Назад"><svg><use href="#i-back"/></svg></button></div>
     <div class="hero"><img id="dposter" alt=""><div><img id="dlogo" alt="" hidden><h1 id="dtitle"></h1><div id="dmeta"></div></div></div>
     <div class="acts"><button class="pill ac" id="dplay"><svg><use href="#i-play"/></svg><span id="dplab">Смотреть на ТВ</span></button>
-      <div id="dacts"><button class="sv act" id="dsave"><svg><use href="#i-mark"/></svg><span>Сохранить</span></button><a class="act" id="dtrailer" target="_blank" rel="noopener" hidden><svg><use href="#i-film"/></svg><span>Трейлер</span></a><button class="act" id="dfrom0" hidden><svg><use href="#i-restart"/></svg><span>С начала</span></button></div></div>
+      <div id="dacts"><button class="sv act" id="dsave"><svg><use href="#i-mark"/></svg><span>Сохранить</span></button><button class="act" id="dseen" hidden><svg><use href="#i-check"/></svg><span>Просмотрено</span></button><a class="act" id="dtrailer" target="_blank" rel="noopener" hidden><svg><use href="#i-film"/></svg><span>Трейлер</span></a><button class="act" id="dfrom0" hidden><svg><use href="#i-restart"/></svg><span>С начала</span></button></div></div>
   </div>
   <div id="dinfo"></div>
   <div id="dmore"></div>
@@ -916,6 +926,13 @@ svg.spring{animation:spring .3s ease-out}
   <h2><span id="srchead">Источник недоступен</span></h2>
   <div id="srclist"></div>
 </section>
+<section id="wsheet" class="sheet" hidden>
+  <div class="handle"></div>
+  <h2><span>Смотрели до серии</span><button class="ib" id="wcollapse" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button></h2>
+  <div id="wseasons"></div>
+  <div id="wlist"></div>
+  <button id="wclear" hidden>Не смотрели</button>
+</section>
 <section id="sty" class="sheet" hidden>
   <div class="handle"></div>
   <h2><span>Вид субтитров</span><button class="ib" id="stycollapse" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button></h2>
@@ -963,7 +980,7 @@ let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF defaul
 let devices = null;     // last /devices answer
 let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null = receiver default
 localStorage.removeItem('subStyle'); // older format with colors
-const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs', mk: 'mk', faces: 'fsheet', music: 'msheet' }; // layer name -> bottom sheet
+const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs', mk: 'mk', faces: 'fsheet', music: 'msheet', seen: 'wsheet' }; // layer name -> bottom sheet
 let recent = [];        // /progress list: recently watched titles, latest first
 let saved = [];         // and the titles saved to watch, latest saved first
 let listShown = null;   // the list on a page of its own (see openList): 'recent', 'saved' or null
@@ -1573,6 +1590,11 @@ async function loadRecent() {
   } catch {
     return; // the list is a convenience; search still works
   }
+  gotLists(r);
+}
+
+// The lists as /progress (or /watched) tells them.
+function gotLists(r) {
   recent = r.recent;
   saved = r.saved || [];
   listsLoaded = true;
@@ -2067,7 +2089,7 @@ function skeleton(m) {
   $('dsave').dataset.id = m.id;
   $('dsave').hidden = true; // until the title is known; never one of TMDB's alone
   showSaved($('dsave'));
-  $('dfrom0').hidden = true;
+  $('dfrom0').hidden = $('dseen').hidden = true;
   $('seasons').replaceChildren();
   $('eps').replaceChildren();
   $('dmore').replaceChildren();
@@ -2251,9 +2273,10 @@ function renderDetails() {
     $('dplay').disabled = true;
     $('dplay').classList.remove('ac');
     $('dplab').textContent = item.lookup == 'pending' ? 'Ищем у провайдера…' : 'Нет у провайдера';
-      $('dfrom0').hidden = true;
+      $('dfrom0').hidden = $('dseen').hidden = true;
     return;
   }
+  showSeen();
   const on = st?.media && st.now?.id == item.id;
   const starting = pending?.id == item.id || asking?.id == item.id;
   const t = playTarget(item);
@@ -2445,6 +2468,107 @@ $('dfrom0').onclick = () => start({ ...playTarget(item), start: 0 });
 // Back to the title this one was opened from, else off the page.
 $('dback').onclick = () => history.state?.hop ? history.back() : closeTop();
 $('dsave').onclick = () => item && toggleSave(item);
+
+// ---- marked watched -------------------------------------------------------
+//
+// A movie is marked watched, or no longer, by a tap; of a series the
+// episode it was watched up to is picked in a sheet, the router taking
+// those before it as watched too (see /watched).
+
+let seenBusy = null; // the title a /watched is under way of
+
+// The latest episode of a series watched to the end, in the provider's
+// order; null if none is.
+function seenMark(m) {
+  const eps = m.progress?.eps;
+  if (!eps || !m.seasons) return null;
+  let mk = null;
+  for (const s of m.seasons)
+    for (const e of s.episodes)
+      if (eps[epKey({ season: s.season, episode: e.episode })]?.done) mk = { season: s.season, episode: e.episode };
+  return mk;
+}
+
+function showSeen() {
+  const b = $('dseen'), m = item, series = m.type == 'series';
+  b.hidden = series && !m.seasons?.some(s => s.episodes.length);
+  // A series shows the episode it was watched up to, lit once that is
+  // its last.
+  const mk = series ? seenMark(m) : null, last = m.seasons?.findLast(s => s.episodes.length);
+  const on = series ? !!mk && mk.season == last.season && mk.episode == last.episodes.at(-1).episode : !!m.progress?.done;
+  b.classList.toggle('on', on);
+  b.disabled = seenBusy == m;
+  b.querySelector('span').textContent = on ? 'Просмотрен' : mk ? 'До ' + epShort(mk) : 'Просмотрено';
+  b.setAttribute('aria-label', series ? 'Отметить, до какой серии смотрели' : on ? 'Отметить непросмотренным' : 'Отметить просмотренным');
+}
+
+$('dseen').onclick = () => {
+  const m = item;
+  if (!m?.type || seenBusy) return;
+  if (m.type != 'series') return markSeen(m, !m.progress?.done);
+  const mk = seenMark(m);
+  showSeenSeason(m.seasons.find(s => s.season == (mk?.season ?? season?.season)) || m.seasons[0]);
+  openLayer('seen');
+  const on = $('wlist').querySelector('.on');
+  if (on) on.scrollIntoView({ block: 'center' });
+  else $('wlist').scrollTop = 0;
+};
+$('wcollapse').onclick = closeTop;
+$('wclear').onclick = async () => {
+  await closeTop();
+  if (item) markSeen(item, false);
+};
+
+// The episodes of season s to pick the one watched up to.
+function showSeenSeason(s) {
+  const m = item, mk = seenMark(m);
+  $('wseasons').replaceChildren(...m.seasons.filter(x => x.episodes.length).map(x => {
+    const c = el('button', { className: 'chip' + (x == s ? ' on' : '') }, `${x.season} сезон`);
+    c.onclick = () => {
+      showSeenSeason(x);
+      $('wlist').scrollTop = 0;
+    };
+    return c;
+  }));
+  $('wlist').replaceChildren(...s.episodes.map((e, i) => {
+    const ep = { season: s.season, episode: e.episode };
+    const p = m.progress?.eps?.[epKey(ep)], here = mk?.season == s.season && mk.episode == e.episode;
+    const name = epTitle(s.tm?.eps?.[i]?.title, e.title);
+    const b = el('button', { className: 'dev' + (here ? ' on' : p?.done ? ' done' : '') },
+      el('span', {}, el('b', {}, name ? `${e.episode}. ${name}` : `${e.episode} серия`),
+        here ? el('small', {}, 'смотрели до неё') : p?.done ? el('small', {}, 'просмотрена') : ''), el('i'));
+    b.style.setProperty('--i', Math.min(i, 12));
+    b.onclick = async () => {
+      await closeTop();
+      markSeen(m, ep);
+    };
+    return b;
+  }));
+  $('wclear').hidden = !m.progress;
+}
+
+// Marks m watched (on: true, or a series' episode) or no longer (false).
+async function markSeen(m, on) {
+  const req = { id: m.id, on: on ? '1' : '0' };
+  if (on && on !== true) Object.assign(req, { season: String(on.season), episode: String(on.episode) });
+  seenBusy = m;
+  if (item == m) showSeen();
+  try {
+    const r = await api('watched', req);
+    m.progress = r.progress;
+    m.prefs = r.prefs;
+    gotLists(r);
+  } catch (e) {
+    toast(e);
+  }
+  seenBusy = null;
+  if (item != m) return;
+  renderDetails();
+  // The page goes to the season it goes on with.
+  const c = m.type == 'series' && continueAt(m), s = c && m.seasons.find(x => x.season == c.season);
+  if (s && s != season) showSeason(s);
+  else renderEpisodes();
+}
 
 // ---- cast ---------------------------------------------------------------
 

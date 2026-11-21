@@ -3051,6 +3051,86 @@ function recent_rows() {
 		WHERE t.title IS NOT NULL ORDER BY t.t DESC`), with_next(kept_updates()));
 }
 
+// Where a title was left off, as /progress tells it of one.
+function title_progress(id) {
+	let e = title_row(id), progress = null;
+	if (e?.season != null) {
+		let eps = {};
+		for (let x in sql_rows("SELECT ep, pos, dur, done, t FROM progress WHERE id = ? AND ep != ''", id))
+			eps[x.ep] = { pos: x.pos, dur: x.dur, done: !!x.done, t: x.t };
+		progress = { last: { season: e.season, episode: e.episode }, eps };
+	} else if (e) {
+		let x = progress_row(id, '');
+		progress = x ? { pos: x.pos, dur: x.dur, done: x.done } : null;
+	}
+	return { progress, prefs: e?.prefs ?? null };
+}
+
+// ---- marked watched ----------------------------------------------------------
+//
+// A title marked watched from its page (see /watched), as if it had been
+// watched to the end here: a movie, or a series up to an episode, that one
+// its last and those up to it watched (the MAX_EPISODES latest of them,
+// as play keeps); those after it watched are no longer, those begun keep
+// where they were left. Unmarked, a movie forgets where it was left and a
+// series all of it, what it was watched with too.
+function mark_watched(id, on, season, episode) {
+	let r = api(`/v1/titles/${id}`);
+	let series = r.mediaType == 'MEDIA_TYPE_SERIES', t = time();
+	let all = [], upto = -1;
+	if (series && on) {
+		if (season == null)
+			fail(400, 'season and episode required');
+		for (let s in r.seasons ?? [])
+			for (let e in s.episodes ?? [])
+				push(all, { season: +s.seasonNumber, episode: `${e.episodeNumber}`,
+				            dur: +(e.durationSeconds ?? 0) });
+		for (let i, e in all)
+			if (e.season == season && e.episode == episode)
+				upto = i;
+		if (upto < 0)
+			fail(404, 'no such episode');
+	}
+	sql_exec('BEGIN IMMEDIATE');
+	if (!on) {
+		sql_do(series ? 'DELETE FROM progress WHERE id = ?' :
+		       "DELETE FROM progress WHERE id = ? AND ep = ''", id);
+		if (series)
+			sql_do('DELETE FROM titles WHERE id = ?', id);
+	} else {
+		let last = series ? all[upto] : null;
+		sql_do(`INSERT INTO titles (${TITLE_COLS}) VALUES (?, ?, ?, ?, ?, NULL, ?)
+			ON CONFLICT (id) DO UPDATE SET title = coalesce(excluded.title, title),
+			poster = coalesce(excluded.poster, poster), season = excluded.season,
+			episode = excluded.episode, t = excluded.t`,
+			id, r.title || null, poster(r.posterLink), last?.season, last?.episode, t);
+		let put = (ep, dur, at) => sql_do(`INSERT INTO progress (${PROGRESS_COLS})
+			VALUES (?, ?, ?, ?, 1, ?) ON CONFLICT (id, ep) DO UPDATE SET
+			dur = CASE WHEN excluded.dur > 0 THEN excluded.dur ELSE dur END,
+			pos = CASE WHEN excluded.dur > 0 THEN excluded.dur ELSE dur END,
+			done = 1, t = excluded.t`, id, ep, dur, dur, at);
+		if (!series)
+			put('', +(r.durationSeconds ?? 0), t);
+		else {
+			// The latest first, so that those beyond MAX_EPISODES are the
+			// earliest.
+			for (let i = upto; i >= 0 && i > upto - MAX_EPISODES; i--)
+				put(ep_key(all[i].season, all[i].episode), all[i].dur, t - (upto - i));
+			for (let i = upto + 1; i < length(all); i++)
+				sql_do('DELETE FROM progress WHERE id = ? AND ep = ? AND done = 1',
+				       id, ep_key(all[i].season, all[i].episode));
+			sql_do('DELETE FROM progress WHERE id = ? AND ep NOT IN ' +
+			       '(SELECT ep FROM progress WHERE id = ? ORDER BY t DESC LIMIT ?)',
+			       id, id, MAX_EPISODES);
+		}
+		if (sql_do('DELETE FROM titles WHERE id NOT IN ' +
+		           '(SELECT id FROM titles ORDER BY t DESC LIMIT ?)', MAX_TITLES))
+			sql_do('DELETE FROM progress WHERE id NOT IN (SELECT id FROM titles)');
+	}
+	sql_exec('COMMIT');
+	changed(true);
+}
+
 // ---- saved titles ------------------------------------------------------------
 //
 // Titles saved to watch are listed under the recently watched ones and
@@ -3456,17 +3536,24 @@ const routes = {
 	'GET /progress': p => {
 		if (p.id == null)
 			return { recent: recent_rows(), saved: saved_rows() };
-		let id = title_id(p), e = title_row(id), progress = null;
-		if (e?.season != null) {
-			let eps = {};
-			for (let x in sql_rows("SELECT ep, pos, dur, done, t FROM progress WHERE id = ? AND ep != ''", id))
-				eps[x.ep] = { pos: x.pos, dur: x.dur, done: !!x.done, t: x.t };
-			progress = { last: { season: e.season, episode: e.episode }, eps };
-		} else if (e) {
-			let x = progress_row(id, '');
-			progress = x ? { pos: x.pos, dur: x.dur, done: x.done } : null;
+		return title_progress(title_id(p));
+	},
+
+	// Marks a title watched (on=1): a movie, or a series up to season and
+	// episode; or unmarks it (on=0), see mark_watched. Its progress as
+	// /progress tells it of one, and the lists as without id.
+	'POST /watched': p => {
+		let id = title_id(p), season = null;
+		if (!match(p.on ?? '', /^[01]$/))
+			fail(400, 'invalid on');
+		if (p.season != null) {
+			if (!match(p.season, /^[0-9]{1,4}$/) ||
+			    !match(p.episode ?? '', /^[0-9A-Za-z._-]{1,16}$/))
+				fail(400, 'invalid season or episode');
+			season = +p.season;
 		}
-		return { progress, prefs: e?.prefs ?? null };
+		mark_watched(id, p.on == '1', season, p.episode);
+		return { ...title_progress(id), recent: recent_rows(), saved: saved_rows() };
 	},
 
 
