@@ -891,6 +891,36 @@ svg.spring{animation:spring .3s ease-out}
   .chip:hover:not(.on),.pill:hover:not(.ac),.ib:hover{filter:brightness(1.25)}
   .pill.ac:hover{filter:brightness(1.08)}
 }
+/* The page's own player (device "here"): the video over the page, its
+   settings under it; folded, a bar at the bottom with the video live in it. */
+#lp{position:fixed;inset:0;z-index:6;overflow-y:auto;background:var(--bg);overscroll-behavior:contain}
+#lpv{position:sticky;top:0;z-index:1;width:100%;aspect-ratio:16/9;max-height:70dvh;margin:0 auto;padding-top:env(safe-area-inset-top);background:#000}
+#lpvid{display:block;width:100%;height:100%;background:#000}
+#lpvid::cue{background:#0009}
+#lpfold{position:absolute;left:4px;top:calc(4px + env(safe-area-inset-top));color:#fff;background:#0006}
+#lpskip{position:absolute;right:12px;bottom:56px;height:40px;padding:0 16px;font-size:14px;box-shadow:0 4px 16px #0008}
+#lpspin{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px;border-width:3px;border-color:#fff;border-top-color:transparent;pointer-events:none}
+#lpbody{max-width:720px;margin:0 auto;padding:16px 16px max(24px,env(safe-area-inset-bottom))}
+#lpbody h2{margin:0;font-size:22px}
+#lps{margin:4px 0 0;color:var(--mu);font-size:14px}
+#lpch{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.lpc{position:relative;display:flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:19px;background:var(--s2);font-size:14px;white-space:nowrap}
+.lpc em{font-style:normal;color:var(--mu)}
+.lpc select{position:absolute;inset:0;width:100%;opacity:0;cursor:pointer}
+#lpnav{display:flex;gap:8px;margin-bottom:8px}
+#lpnav .pill{flex:1}
+#lpcast{width:100%;color:var(--ac)}
+#lpmini{display:none}
+#lp.mini{inset:auto 8px max(8px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:10px;padding:6px;overflow:hidden;border-radius:16px;background:var(--s2);box-shadow:0 6px 30px #000c;cursor:pointer}
+#lp.mini #lpv{position:relative;flex:none;width:112px;max-height:none;margin:0;padding:0;border-radius:10px;overflow:hidden}
+#lp.mini #lpbody,#lp.mini #lpfold,#lp.mini #lpskip{display:none}
+#lp.mini #lpspin{width:20px;height:20px;margin:-10px;border-width:2px}
+#lp.mini #lpmini{display:flex;flex:1;min-width:0;align-items:center}
+#lpmini .t{flex:1;min-width:0}
+#lpmini b,#lpmini span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#lpmini b{font-size:15px;font-weight:600}
+#lpmini span{color:var(--mu);font-size:13px}
+@media (min-width:900px){#lp.mini{left:auto;width:420px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -921,6 +951,7 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-spark" viewBox="0 0 24 24"><path d="M10 2l1.9 5.6 5.6 1.9-5.6 1.9L10 17l-1.9-5.6-5.6-1.9 5.6-1.9zm8.5 11 .95 2.55L22 16.5l-2.55.95L18.5 20l-.95-2.55L15 16.5l2.55-.95z"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></symbol>
   <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm0 18H7V5h10v14z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
 
@@ -977,6 +1008,21 @@ svg.spring{animation:spring .3s ease-out}
   <p class="note" id="lmsg" hidden>Здесь пока пусто</p>
 </section>
 
+<section id="lp" hidden>
+  <div id="lpv"><video id="lpvid" playsinline preload="auto"></video><span class="spin" id="lpspin" hidden></span><button class="ib" id="lpfold" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button><button class="pill ac" id="lpskip" hidden></button></div>
+  <div id="lpmini"><div class="t"><b id="lpmt"></b><span id="lpms"></span></div><button class="ib" id="lptg" aria-label="Пауза"><svg><use href="#i-pause"/></svg></button><button class="ib" id="lpx" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button></div>
+  <div id="lpbody">
+    <h2 id="lpt"></h2><p id="lps"></p>
+    <div id="lpch">
+      <label class="lpc" id="lpac"><em>Озвучка</em><b></b><select id="lpaudio"></select></label>
+      <label class="lpc" id="lpsc"><em>Субтитры</em><b></b><select id="lpsubs"></select></label>
+      <label class="lpc" id="lpqc"><em>Качество</em><b></b><select id="lpqual"></select></label>
+      <label class="lpc" id="lpoc"><em>Источник</em><b></b><select id="lpsrc"></select></label>
+    </div>
+    <div id="lpnav"><button class="pill" id="lpprev"><svg><use href="#i-prev"/></svg>Пред.</button><button class="pill" id="lpnext">След.<svg><use href="#i-next"/></svg></button></div>
+    <button class="pill" id="lpcast"><svg><use href="#i-tv"/></svg><span>На телевизор</span></button>
+  </div>
+</section>
 <div id="shade" hidden></div>
 <section id="pl" hidden>
   <div id="plbg"></div>
@@ -1093,7 +1139,8 @@ const tmdbs = {};       // /tmdb/title answers by type and TMDB ID; null where T
 const tmdbSeasons = {}; // /tmdb/season answers by TMDB ID and season, as promises
 const layers = [];      // open overlays; the back button closes the last one
 let plOpen = false;     // the player is open; not an overlay, history leaves it be
-let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF default
+const HERE = 'here';     // the device of the page's own player (see localPlay)
+let device = localStorage.device || ''; // chosen Chromecast id; '' = BFF default; HERE = this browser
 let devices = null;     // last /devices answer
 let subStyle = JSON.parse(localStorage.subs || 'null'); // { size, bg } or null = receiver default
 localStorage.removeItem('subStyle'); // older format with colors
@@ -1727,7 +1774,7 @@ function saveButton(m) {
 // what its play button would (see /play's auto); the first start of one
 // with several sources asks for the source, as the page does (see play).
 function playButton(m) {
-  const b = el('button', { className: 'cp', ariaLabel: 'Смотреть на ТВ' });
+  const b = el('button', { className: 'cp', ariaLabel: 'Смотреть' + onTv() });
   b.append(svgIcon('play'));
   b.onclick = e => {
     e.stopPropagation();
@@ -2730,7 +2777,7 @@ function renderDetails() {
   const small = s => el('small', {}, s);
   $('dplab').replaceChildren(...starting ? ['Запускаю…'] : on ? ['Воспроизводится'] :
     t.resume ? ['Продолжить ', small([ep, left ? 'ещё ' + duration(left) : 'с ' + fmt(t.resume)].filter(Boolean).join(' · '))] :
-    series ? ['Смотреть ', small(ep)] : ['Смотреть на ТВ']);
+    series ? ['Смотреть ', small(ep)] : ['Смотреть' + onTv()]);
   $('dplay').disabled = $('dfrom0').disabled = !!pending || !!asking;
   $('dplay').classList.toggle('ac', !on || starting);
   if (on && !starting) $('dplay').disabled = true;
@@ -3592,6 +3639,7 @@ $('pback').onclick = closeTop;
 // m: { id, title, poster } plus season and episode for a series episode.
 let plays = 0; // the plays begun; a start waiting for its sources is let go by a later one
 async function play(m) {
+  if (device == HERE) return localPlay(m);
   if (pending) return;
   plays++;
   const req = { id: m.id, title: m.title };
@@ -3689,8 +3737,7 @@ function showSources(m, names, bad) {
 
 // Plays the episode next to the current one (dir = 1 or -1), crossing
 // season boundaries.
-async function stepEpisode(dir) {
-  const now = st?.now;
+async function stepEpisode(dir, now = st?.now) {
   if (now?.season == null) return;
   try {
     const { seasons } = await title(now.id);
@@ -3935,7 +3982,7 @@ async function cmd(c, arg, src = 'page') {
 
 async function poll() {
   // In the background only a lock screen widget needs the status.
-  if (busy || document.hidden && keep.paused) return;
+  if (busy || document.hidden && keep.paused || device == HERE) return;
   busy = true;
   const sent = device;  // the TV's icon tells of the one picked now only
   try {
@@ -4478,17 +4525,26 @@ document.addEventListener('visibilitychange', () => {
 // ---- devices ------------------------------------------------------------
 
 const currentDevice = () => device || st?.device?.id || devices?.default || '';
+const onTv = () => device == HERE ? '' : ' на ТВ';
 
 function renderDevices() {
   const list = devices?.devices || [];
-  $('devbtn').classList.toggle('on', list.length > 1);
+  $('devbtn').classList.toggle('on', device == HERE || list.length > 1);
+  $('devbtn').querySelector('use').setAttribute('href', device == HERE ? '#i-phone' : '#i-tv');
   if ($('devs').hidden) return;
   const cur = currentDevice();
-  $('devlist').replaceChildren(...list.map((d, i) => {
+  // The page's own player, always first.
+  const here = el('button', { className: 'dev' + (device == HERE ? ' on' : '') },
+    svgIcon('phone'), el('span', {}, el('b', {}, 'Здесь, в браузере'), el('small', {}, 'Без телевизора')), el('i'));
+  here.onclick = async () => {
+    await closePlayer();
+    selectDevice(HERE);
+  };
+  $('devlist').replaceChildren(here, ...list.map((d, i) => {
     const b = el('button', { className: 'dev' + (d.id == cur ? ' on' : '') },
       el('span', {}, el('b', {}, d.name || d.host), el('small', {}, [d.model, d.host].filter(Boolean).join(' · '))), el('i'));
-    b.prepend(document.querySelector('#devbtn svg').cloneNode(true));
-    b.style.setProperty('--i', i);
+    b.prepend(svgIcon('tv'));
+    b.style.setProperty('--i', i + 1);
     b.onclick = async () => {
       // The player may belong to the previous TV, so close it as well.
       await closePlayer();
@@ -4516,13 +4572,312 @@ function selectDevice(id) {
   if (id == currentDevice() && id == device) return;
   device = id;
   localStorage.device = id;
+  // A TV picked: what played here stops; "На телевизор" goes to it.
+  if (id != HERE) {
+    localStorage.tv = id;
+    lpClose();
+  }
   st = null;
   tvOff(false);
-  tvWait(true);
+  tvWait(id != HERE);
   refresh();
   renderDevices();
   poll();
 }
+
+// ---- the page's own player ----------------------------------------------
+//
+// With the device "here" Play goes to a <video> on this page instead of a
+// TV: the router prepares the stream as for one (/local) and the proxy
+// serves it as to one. hls.js plays it where the browser can't play HLS
+// itself (or can't switch its dubs: Chrome); Safari plays it natively.
+// The position goes to the router as a TV's status would (/local/progress),
+// so the history, the progress and the next episode work as they do there.
+const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js';
+const lpv = $('lpvid');
+let lp = null;        // /local's answer for what plays here, or null
+let lpHls = null;     // its hls.js, if it plays through one
+let lpSent = 0;       // when the position was last sent
+let lpSkipped = new Set(); // sections skipped (or rewound into), by start
+let lpWant = null;    // the dub to pick once the renditions are known, by name
+let lpGen = 0;        // the start under way; a later one wins
+
+const nativeHls = () => !!lpv.canPlayType('application/vnd.apple.mpegurl') && 'audioTracks' in lpv;
+let hlsLoad = null;
+const loadHls = () => hlsLoad ||= new Promise((ok, no) => {
+  const s = el('script', { src: HLS_JS, onload: ok, onerror: () => { hlsLoad = null; no(new Error('не загрузился hls.js')); } });
+  document.head.append(s);
+});
+
+async function localPlay(m) {
+  const gen = ++lpGen;
+  // Still inside the tap: iOS lets an element play only from one.
+  lpv.play().catch(() => {});
+  const req = { id: m.id, title: m.title };
+  if (m.poster) req.poster = m.poster;
+  for (const k of ['stream', 'start', 'audio', 'subs', 'reuse', 'auto', 'source'])
+    if (m[k] != null) req[k] = String(m[k]);
+  const quality = m.quality ?? localStorage.quality;
+  if (quality) req.quality = quality;
+  const drc = m.drc ?? localStorage.drc;
+  if (drc) req.drc = String(drc);
+  if (m.season != null) Object.assign(req, { season: String(m.season), episode: m.episode });
+  lpWant = m.keepAudio ?? null;
+  lpOpen(m);
+  if (!nativeHls()) loadHls().catch(() => {});
+  try {
+    const r = await api('local', req);
+    if (gen != lpGen) return;
+    await lpStart(r);
+    reloadProgress(r.id);
+  } catch (e) {
+    if (gen != lpGen) return;
+    lpClose(false);
+    const { source: bad, sources } = e.body || {};
+    if (sources?.some(n => n != bad)) {
+      openLayer('src');
+      showSources(m, sources, bad);
+    } else toast('Не удалось запустить: ' + e.message);
+  }
+}
+
+const lpEp = r => r.season != null ? `${r.season} сезон · ${r.episode} серия` : '';
+
+// Opens the player at once, with what is known before the router answers.
+function lpOpen(m) {
+  $('lp').hidden = false;
+  lpFold(false);
+  $('lpspin').hidden = false;
+  $('lpskip').hidden = true;
+  $('lpt').textContent = $('lpmt').textContent = m.title || '';
+  $('lps').textContent = $('lpms').textContent = lpEp(m);
+  $('lpch').hidden = $('lpnav').hidden = true;
+  lpv.poster = m.poster || '';
+}
+
+async function lpStart(r) {
+  lpStop();
+  lp = r;
+  lpSent = 0;
+  lpSkipped = new Set();
+  lp.sections = [];
+  lpv.poster = r.poster || '';
+  // Subtitles are the router's WebVTT files, beside the stream.
+  for (const t of r.subs)
+    lpv.append(el('track', { kind: 'subtitles', label: t.name, srclang: t.lang, src: t.url }));
+  lpSubs(r.subs.findIndex(t => t.on));
+  if (!lpWant) lpWant = r.audio;
+  if (nativeHls()) {
+    lpv.src = r.url;
+    lpv.addEventListener('loadedmetadata', () => {
+      if (r.start > 0) lpv.currentTime = r.start;
+      lpAudioPick();
+    }, { once: true });
+  } else {
+    await loadHls();
+    if (lp != r) return;
+    if (!Hls.isSupported()) throw new Error('браузер не умеет HLS');
+    // The router keeps little in memory: the browser reads about as far
+    // ahead as a TV does.
+    const h = lpHls = new Hls({ startPosition: r.start || -1, maxBufferLength: 30, maxMaxBufferLength: 60, backBufferLength: 30 });
+    h.on(Hls.Events.AUDIO_TRACKS_UPDATED, lpAudioPick);
+    h.on(Hls.Events.AUDIO_TRACK_SWITCHED, lpRender);
+    let tries = 0;
+    h.on(Hls.Events.ERROR, (_, d) => {
+      if (!d.fatal || h != lpHls) return;
+      if (d.type == Hls.ErrorTypes.MEDIA_ERROR && tries++ < 3) return h.recoverMediaError();
+      if (d.type == Hls.ErrorTypes.NETWORK_ERROR && tries++ < 3) return setTimeout(() => h == lpHls && h.startLoad(), 2000);
+      toast('Видео не играет: ' + (d.details || d.type));
+      $('lpspin').hidden = true;
+    });
+    h.loadSource(r.url);
+    h.attachMedia(lpv);
+  }
+  lpv.play().catch(() => {}); // refused without a tap: the controls offer Play
+  lpRender();
+}
+
+// Stops the video and forgets its stream; the player stays as it is.
+function lpStop() {
+  if (lpHls) lpHls.destroy();
+  lpHls = null;
+  lpv.removeAttribute('src');
+  for (const t of lpv.querySelectorAll('track')) t.remove();
+  lpv.load();
+}
+
+// Closes the player; report: the position goes to the router first.
+function lpClose(report = true) {
+  if (!lp && $('lp').hidden) return;
+  lpGen++;
+  if (report && lp) lpReport(lpv.ended ? 'ENDED' : 'PAUSED');
+  lpStop();
+  lp = null;
+  $('lp').hidden = true;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  loadRecent();
+}
+
+function lpFold(mini) {
+  $('lp').classList.toggle('mini', mini);
+  lpv.controls = !mini;
+}
+
+const lpAudios = () => lpHls ? lpHls.audioTracks.map(t => t.name) : [...(lpv.audioTracks || [])].map(t => t.label);
+const lpAudioAt = () => lpHls ? lpHls.audioTrack : [...(lpv.audioTracks || [])].findIndex(t => t.enabled);
+function lpAudioSet(i) {
+  if (lpHls) lpHls.audioTrack = i;
+  else for (const [j, t] of [...(lpv.audioTracks || [])].entries()) t.enabled = i == j;
+  lpRender();
+}
+// The dub asked for (the title's, or the one before a replay), once the
+// renditions are known.
+function lpAudioPick() {
+  const i = lpWant ? lpAudios().indexOf(lpWant) : -1;
+  lpWant = null;
+  if (i >= 0 && i != lpAudioAt()) lpAudioSet(i);
+  else lpRender();
+}
+
+function lpSubs(i) {
+  [...lpv.textTracks].forEach((t, j) => { t.mode = i == j ? 'showing' : 'disabled'; });
+  lpRender();
+}
+const lpSubsAt = () => [...lpv.textTracks].findIndex(t => t.mode == 'showing');
+
+// A chip: its options (value, label) and the one picked; one option alone
+// hides it.
+function lpChip(id, opts, cur) {
+  const sel = $(id), chip = sel.parentNode;
+  chip.hidden = opts.length < 2;
+  const key = JSON.stringify(opts);
+  if (sel.dataset.k != key) {
+    sel.dataset.k = key;
+    sel.replaceChildren(...opts.map(([v, l]) => el('option', { value: v, textContent: l })));
+  }
+  sel.value = cur;
+  chip.querySelector('b').textContent = opts.find(o => o[0] == cur)?.[1] ?? '';
+}
+
+function lpRender() {
+  if (!lp) return;
+  $('lpt').textContent = $('lpmt').textContent = lp.title || '';
+  $('lps').textContent = lpEp(lp);
+  $('lpch').hidden = false;
+  lpChip('lpaudio', lpAudios().map((n, i) => [i, n]), lpAudioAt());
+  lpChip('lpsubs', [[-1, 'Выкл'], ...lp.subs.map((t, i) => [i, t.name])], lpSubsAt());
+  lpChip('lpqual', lp.qualities.map(q => [q, q]), lp.quality);
+  lpChip('lpsrc', lp.sources.map(n => [n, n]), lp.source);
+  $('lpnav').hidden = lp.season == null;
+  $('lpcast').querySelector('span').textContent = 'На телевизор' + (lpv.currentTime > 10 ? ' — с ' + fmt(lpv.currentTime) : '');
+  icon('lptg', lpv.paused ? 'play' : 'pause');
+  lpShowTime();
+}
+
+function lpShowTime() {
+  if (!lp) return;
+  const t = lpv.currentTime;
+  $('lpms').textContent = [lp.season != null && `С${lp.season} Э${lp.episode}`, lpv.duration > 0 && fmt(t) + ' / ' + fmt(lpv.duration)].filter(Boolean).join(' · ');
+  // The recap or the intro under way: skipped by itself with autoskip
+  // (once: rewound into, it plays), else a pill skips it; the credits of an
+  // episode offer the next one.
+  const sec = lp.sections.find(x => t >= x.start - 0.5 && t < x.end - 1);
+  let pill = null;
+  if (sec && sec.kind != 'credits' && sec.skip) {
+    let to = sec.end;
+    for (const y of lp.sections) if (y.kind != 'credits' && y.skip && y.start > sec.start && y.start - to <= 1) to = y.end;
+    if (lp.autoskip && !lpSkipped.has(sec.start) && !lpv.paused) {
+      lpSkipped.add(sec.start);
+      lpv.currentTime = to;
+      return;
+    }
+    pill = [sec.kind == 'recap' ? 'Пропустить повтор' : 'Пропустить заставку', () => { lpSkipped.add(sec.start); lpv.currentTime = to; }];
+  } else if (sec?.kind == 'credits' && lp.season != null) {
+    pill = ['Следующая серия', () => stepEpisode(1, lp)];
+  }
+  $('lpskip').hidden = !pill;
+  if (pill) {
+    $('lpskip').textContent = pill[0];
+    $('lpskip').onclick = pill[1];
+  }
+}
+
+// Tells the router where the video is; keepalive, so a page closing
+// still gets it there.
+function lpReport(state) {
+  if (!lp || !(lpv.duration > 0) || !isFinite(lpv.duration)) return;
+  lpSent = Date.now();
+  const r = lp, subs = lpSubsAt();
+  const body = { id: r.id, time: lpv.currentTime.toFixed(1), duration: lpv.duration.toFixed(1), state,
+    subs: subs >= 0 ? r.subs[subs].name : '' };
+  const audio = lpAudios()[lpAudioAt()];
+  if (audio) body.audio = audio;
+  if (r.season != null) Object.assign(body, { season: String(r.season), episode: r.episode });
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['X-Token'] = token;
+  fetch('/api/local/progress', { method: 'POST', headers, body: JSON.stringify(body), keepalive: true })
+    .then(x => x.ok ? x.json() : null)
+    .then(j => { if (j?.sections && lp == r) lp.sections = j.sections; })
+    .catch(() => {});
+}
+
+// What plays here, as play takes it, from where it is.
+const lpHere = () => ({ id: lp.id, title: lp.title, poster: lp.poster, source: lp.source,
+  start: Math.floor(lpv.currentTime), season: lp.season ?? undefined, episode: lp.episode ?? undefined,
+  keepAudio: lpAudios()[lpAudioAt()] });
+
+lpv.addEventListener('timeupdate', () => {
+  if (!lp) return;
+  if (!lpv.paused && Date.now() - lpSent > 10000) lpReport('PLAYING');
+  lpShowTime();
+});
+lpv.addEventListener('waiting', () => { if (lp) $('lpspin').hidden = false; });
+// The first report once it plays from where it starts: it brings the sections.
+lpv.addEventListener('playing', () => { $('lpspin').hidden = true; if (!lpSent) lpReport('PLAYING'); lpRender(); });
+lpv.addEventListener('canplay', () => { $('lpspin').hidden = true; });
+lpv.addEventListener('pause', () => { lpReport('PAUSED'); lpRender(); });
+lpv.addEventListener('play', lpRender);
+// Seeking back into a section skipped lets it play.
+lpv.addEventListener('seeked', () => {
+  for (const x of lp?.sections || []) if (lpv.currentTime < x.start) lpSkipped.delete(x.start);
+});
+lpv.addEventListener('ended', () => {
+  lpReport('ENDED');
+  if (lp?.season != null && lp.autonext) stepEpisode(1, lp);
+});
+addEventListener('pagehide', () => lp && lpReport(lpv.paused ? 'PAUSED' : 'PLAYING'));
+document.addEventListener('visibilitychange', () => document.hidden && lp && lpReport(lpv.paused ? 'PAUSED' : 'PLAYING'));
+// Full screen turns the phone's picture sideways.
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement == lpv) screen.orientation?.lock?.('landscape').catch(() => {});
+  else screen.orientation?.unlock?.();
+});
+
+$('lpfold').onclick = () => lpFold(true);
+$('lp').addEventListener('click', e => {
+  if ($('lp').classList.contains('mini') && !e.target.closest('button')) lpFold(false);
+});
+$('lptg').onclick = () => lpv.paused ? lpv.play().catch(() => {}) : lpv.pause();
+$('lpx').onclick = () => lpClose();
+$('lpaudio').onchange = e => lpAudioSet(+e.target.value);
+$('lpsubs').onchange = e => lpSubs(+e.target.value);
+$('lpqual').onchange = e => {
+  localStorage.quality = e.target.value;
+  localPlay({ ...lpHere(), quality: e.target.value, reuse: 1 });
+};
+$('lpsrc').onchange = e => localPlay({ ...lpHere(), source: e.target.value });
+$('lpprev').onclick = () => stepEpisode(-1, lp);
+$('lpnext').onclick = () => stepEpisode(1, lp);
+// The same title, from where it is, on the TV picked last.
+$('lpcast').onclick = () => {
+  if (!lp) return;
+  const m = lpHere();
+  delete m.keepAudio;
+  lpClose();
+  selectDevice(localStorage.tv || '');
+  play(m);
+};
+if (device == HERE) tvWait(false);
 
 // ---- subtitle style -----------------------------------------------------
 

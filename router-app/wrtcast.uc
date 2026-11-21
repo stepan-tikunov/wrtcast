@@ -17,6 +17,7 @@ const MAX_EPISODES = 50;                     // and this many episodes of each
 const FLUSH = 300;                           // seconds between flash writes
 const DONE = 0.85;                           // an episode left this far in is watched
 const DEVICES_TTL = 60;                      // seconds before /devices rescans
+const HERE = 'here';                         // the device of the page's own player (see /local)
 const HORIZON = 75;                          // seconds ahead a section is waited for (see plan)
 const AHEAD = 120;                           // and the next episode is prepared (see ahead)
 const DRC = '/tmp/wrtcast.drc/';             // audio segments of the leveler
@@ -602,6 +603,10 @@ const is_host = s => match(s, /^[^ ]*[.:][^ ]*$/);
 // from the config (an address, a name or an id), else the first one found.
 function device(p) {
 	let want = p.device ?? '';
+	// The page's own player (see /local): streams are listed and kept
+	// for it as for a TV, under a key of its own; nothing is cast.
+	if (want == HERE)
+		return { id: HERE, name: 'Браузер', host: HERE };
 	if (want != '' && !match(want, /^[0-9A-Za-z-]{1,64}$/))
 		fail(400, 'invalid device');
 	if (want == '')
@@ -3761,6 +3766,84 @@ const routes = {
 		if (p.auto == '1' && p.season == null && p.episode == null)
 			auto_episode(p);
 		return play(dev, p);
+	},
+
+	// Plays in the page's own <video> (the device "here"): prepared as for a
+	// TV, the streams and the segment cache alike, but nothing is cast. Its
+	// state has no host, so the tick leaves it be; the page tells where it
+	// is (/local/progress). Subtitles are its /sub links, as a TV's.
+	'POST /local': p => {
+		let dev = device({ device: HERE });
+		if (p.auto == '1' && p.season == null && p.episode == null)
+			auto_episode(p);
+		let r = prepare(dev, p), key = r.key, last = now_get(key), s = r.s;
+		if (r.season != null)
+			next_episode(r.id, r.season, r.episode);
+		tv_set(key, 'subs', { urls: r.subs, headers: r.h, media: r.m });
+		if (last?.media != r.m)
+			media_end(last?.media);
+		let now = {
+			id: r.id, stream: r.n, source: s.name, url: r.url, media: r.m, c: r.c,
+			title: r.p.title ?? null, poster: own_poster(p.poster),
+			season: r.season, episode: r.episode, labels: r.labels, quality: r.quality,
+			qualities: map(r.quals, v => v.label), drc: r.drc, drc_ok: !!s.drc, fmp4: !!s.fmp4,
+			autoskip: r.autoskip, sections: s.sections ?? [], sdur: s.sdur ?? 0,
+			streams: r.list, fetched: r.fetched, started: time(),
+		};
+		now_set(key, now);
+		warm_begin(r);
+		if (r.m)
+			media_headers(r.m, quality_digits(r.quality), r.start != null ? +r.start : null, true);
+		let picked = pick_subs(s.subs);
+		return {
+			url: r.url, fmp4: !!s.fmp4, start: +(r.start ?? 0),
+			id: r.id, title: now.title, poster: now.poster, season: r.season, episode: r.episode,
+			quality: r.quality, qualities: now.qualities, drc: r.drc, drc_ok: !!s.drc,
+			source: s.name, sources: map(r.list, x => x.name), autoskip: r.autoskip,
+			autonext: settings().autonext,
+			// The dub to start with, by name: the page finds it among the
+			// renditions of the master.
+			audio: filter(s.audio ?? [], a => a.id == r.p.audio)[0]?.name ?? null,
+			subs: map(picked, (t, i) => ({ name: t.name, lang: t.lang || 'und',
+				url: `/api/sub/${key}/${i}.vtt`, on: 'sub' + t.id == r.p.subs })),
+		};
+	},
+
+	// Where the page's own player is: time and duration in seconds, state
+	// PLAYING, PAUSED or ENDED, the dub and the subtitles by name ('' off);
+	// kept as a TV's status would be (see remember). Answers the sections
+	// of the video, once its duration is known.
+	'POST /local/progress': p => {
+		let key = state_key(device({ device: HERE })), now = now_get(key);
+		if (!now || now.id != title_id(p) || `${now.season ?? ''}` != (p.season ?? '') ||
+		    `${now.episode ?? ''}` != (p.episode ?? ''))
+			fail(409, 'not playing');
+		for (let k in ['time', 'duration'])
+			if (!match(p[k] ?? '', /^[0-9]+(\.[0-9]+)?$/))
+				fail(400, `invalid ${k}`);
+		if (index(['PLAYING', 'PAUSED', 'BUFFERING', 'ENDED'], p.state ?? '') < 0)
+			fail(400, 'invalid state');
+		for (let k in ['audio', 'subs'])
+			if (p[k] != null && (length(p[k]) > 100 || match(p[k], /[[:cntrl:]]/)))
+				fail(400, `invalid ${k}`);
+		let tracks = [];
+		if (p.audio)
+			push(tracks, { type: 'AUDIO', active: true, label: p.audio });
+		if (p.subs != null)
+			push(tracks, { type: 'TEXT', active: p.subs != '', label: p.subs || '-' });
+		let ended = p.state == 'ENDED', t = +p.time, dur = +p.duration;
+		let m = { state: ended ? 'IDLE' : p.state, idleReason: ended ? 'FINISHED' : null,
+			time: t, duration: dur, tracks };
+		remember(now, m);
+		if (valid_media(now.media)) {
+			media_set(now.media, 'pos', { pos: t, dur, paused: p.state == 'PAUSED',
+				buffering: p.state == 'BUFFERING', rate: 1, at: time() });
+			if (ended)
+				media_end(now.media);
+			else
+				media_headers(now.media, quality_digits(now.quality), t);
+		}
+		return { sections: sections_of(now, dur) };
 	},
 
 	// Turns the next episode on or off for what is on (see ended).
