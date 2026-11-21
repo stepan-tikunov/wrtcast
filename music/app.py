@@ -25,9 +25,9 @@ best), answers
              "duration"} | null, "ms": 900}
 offset the seconds into the track where the audio starts, duration the
 track's length from Apple (null when unknown). Shazam is asked at most
-SHAZAM_MAX times in SHAZAM_WINDOW seconds; beyond that, after its 429 (for
-SHAZAM_COOLDOWN seconds) or with MUSIC_SHAZAM=off the answer is 503
-{"error": "limited" | "off", "retry_after": s}; nothing is retried here.
+SHAZAM_MAX times in SHAZAM_WINDOW seconds; beyond that, on its 429 or
+with MUSIC_SHAZAM=off the answer is 503 {"error": "limited" | "off",
+"retry_after": s}; nothing is retried here.
 GET /healthz answers ok once YAMNet is loaded.
 """
 
@@ -58,7 +58,6 @@ THREADS = int(os.environ.get("MUSIC_THREADS", "1"))
 SHAZAM_ON = os.environ.get("MUSIC_SHAZAM", "on") != "off"
 SHAZAM_MAX = int(os.environ.get("MUSIC_SHAZAM_MAX", "8"))
 SHAZAM_WINDOW = float(os.environ.get("MUSIC_SHAZAM_WINDOW", "300"))
-SHAZAM_COOLDOWN = float(os.environ.get("MUSIC_SHAZAM_COOLDOWN", "3600"))
 
 RATE = 16000
 HOP = 8000  # samples, half a second
@@ -154,13 +153,11 @@ class Limited(Exception):
 
 
 class Limiter:
-    """At most SHAZAM_MAX requests in any SHAZAM_WINDOW seconds, none for
-    SHAZAM_COOLDOWN seconds after a 429: bursts pass, a steady stream
-    doesn't."""
+    """At most SHAZAM_MAX requests in any SHAZAM_WINDOW seconds: bursts
+    pass, a steady stream doesn't. A 429 silences nothing beyond that."""
 
     def __init__(self):
         self.sent = deque()
-        self.quiet_until = 0.0
         self.lock = threading.Lock()
 
     def take(self):
@@ -168,18 +165,18 @@ class Limiter:
             raise Limited("off", None)
         with self.lock:
             now = time.time()
-            if now < self.quiet_until:
-                raise Limited("limited", round(self.quiet_until - now))
             while self.sent and self.sent[0] <= now - SHAZAM_WINDOW:
                 self.sent.popleft()
             if len(self.sent) >= SHAZAM_MAX:
                 raise Limited("limited", round(self.sent[0] + SHAZAM_WINDOW - now) + 1)
             self.sent.append(now)
 
-    def throttled(self):
+    def after(self):
+        """Seconds until the next request would pass the window."""
         with self.lock:
-            self.quiet_until = time.time() + SHAZAM_COOLDOWN
-        print(f"music: Shazam answered 429, quiet for {SHAZAM_COOLDOWN:.0f} s", flush=True)
+            if len(self.sent) < SHAZAM_MAX:
+                return SHAZAM_WINDOW / SHAZAM_MAX
+            return max(self.sent[0] + SHAZAM_WINDOW - time.time(), 0) + 1
 
 
 def wav(pcm):
@@ -274,8 +271,9 @@ class Recognizer:
         try:
             return self.run(self.ask(wav(pcm)))
         except RateLimited:
-            self.limiter.throttled()
-            raise Limited("limited", round(SHAZAM_COOLDOWN))
+            after = round(self.limiter.after())
+            print(f"music: Shazam answered 429, next ask in {after} s", flush=True)
+            raise Limited("limited", after)
 
 
 yamnet = None

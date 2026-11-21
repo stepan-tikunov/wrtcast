@@ -13,6 +13,5 @@ services:
       MUSIC_SHAZAM: "on"
       MUSIC_SHAZAM_MAX: "8"
       MUSIC_SHAZAM_WINDOW: "300"
-      MUSIC_SHAZAM_COOLDOWN: "3600"
     cpus: 1
     mem_limit: 512m
