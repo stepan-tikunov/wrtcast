@@ -84,6 +84,10 @@ func New(ctx context.Context, db *sql.DB, url, dir string) (*Service, error) {
 func (s *Service) Audio(ctx context.Context, v Video, start, stop float64, audio []byte) error {
 	video := v.key()
 	if done, err := s.store.hasAudio(ctx, video, start); err != nil || done {
+		if err == nil {
+			// Watched again: asked about as a video watched now.
+			err = s.store.touch(ctx, v)
+		}
 		return err
 	}
 	frames, err := s.client.classify(ctx, audio)

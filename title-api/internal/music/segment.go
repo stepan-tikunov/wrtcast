@@ -47,6 +47,9 @@ var ffmpegPath = sync.OnceValue(func() string {
 // it. A segment taken before is not looked at again.
 func (s *Service) Segment(ctx context.Context, v Video, start, stop float64, init, data []byte) error {
 	if done, err := s.store.hasAudio(ctx, v.key(), start); err != nil || done {
+		if err == nil {
+			err = s.store.touch(ctx, v)
+		}
 		return err
 	}
 	path := ffmpegPath()

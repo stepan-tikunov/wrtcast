@@ -41,7 +41,8 @@ const (
 	// length and this soon after the music of it: a song cut by a dialogue.
 	chainGap = 60.0
 	// How far before the stretch it was heard in a track is said to start,
-	// when Shazam says it started earlier, under the dialogue.
+	// when Shazam says it started earlier and music is heard there under
+	// the dialogue (see heardFrom).
 	leadMax = 30.0
 )
 
@@ -198,7 +199,7 @@ func plan(frames []frame, asks []ask) ([]occurrence, []float64) {
 			if a.Duration > 0 {
 				end = trackStart + a.Duration
 			}
-			start := math.Max(trackStart, s.Start-leadMax)
+			start := math.Max(trackStart, heardFrom(frames, s.Start))
 			if from > s.Start {
 				start = math.Max(trackStart, from)
 			}
@@ -229,6 +230,30 @@ func plan(frames []frame, asks []ask) ([]occurrence, []float64) {
 		}
 	}
 	return merged(occurrences), distinct(wanted)
+}
+
+// heardFrom is where the music heard up to a stretch starting at start
+// starts: the frames before it with music, under speech too, gaps of
+// gapMax at most, leadMax at most. Shazam's offset alone may say a track
+// started long before any music is heard: another version of it, or an
+// intro cut out.
+func heardFrom(frames []frame, start float64) float64 {
+	i := sort.Search(len(frames), func(i int) bool { return frames[i].T >= start })
+	from, previous := start, start
+	for i--; i >= 0; i-- {
+		f := frames[i]
+		if start-f.T > leadMax || previous-f.T > breakGap {
+			break
+		}
+		previous = f.T
+		if f.Music >= musicMin {
+			if from-f.T > gapMax {
+				break
+			}
+			from = f.T
+		}
+	}
+	return from
 }
 
 // probe is the ask of the audio just after a join at at, -1 if none.
