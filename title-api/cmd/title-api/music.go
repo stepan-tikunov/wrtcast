@@ -139,6 +139,67 @@ func musicMissesHandler(service *music.Service) runtime.HandlerFunc {
 	}
 }
 
+// musicVideoOf is the music's video of a provider's: the episode by its
+// number, the source by its name hashed (as the router hashes it).
+func musicVideoOf(v provider.Video) music.Video {
+	return music.Video{Title: v.Title, Season: v.Season, Episode: music.EpisodeOf(v.Episode), Source: music.SourceOf(v.Source)}
+}
+
+// musicWanted tells whether the audio of a video from start is still to be
+// taken (see provider.SegmentOptions.Wanted).
+func musicWanted(ctx context.Context, service *music.Service) func(provider.Video, float64) bool {
+	return func(v provider.Video, start float64) bool { return !service.Has(ctx, musicVideoOf(v), start) }
+}
+
+type audioFollower interface {
+	FollowAudio(play provider.AudioPlay) error
+}
+
+// musicPlayHandler serves POST
+// /v1/music/play?title_id=<id>&season=<n>&episode=<n>&source=<hash>, the
+// body {"name", "master", "audio", "position", "playing"}: the TV plays a
+// primary player's video (master) with the audio rendition named audio, at
+// position seconds, playing or not; its audio is loaded ahead of there
+// for the music (see provider.FollowAudio). name is the source's, which
+// source is the hash of: the stream's and the dub's.
+func musicPlayHandler(service *music.Service, follower audioFollower) runtime.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request, _ map[string]string) {
+		if musicDisabled(response, service) {
+			return
+		}
+		video, ok := musicVideo(response, request)
+		if !ok {
+			return
+		}
+		var body struct {
+			Name     string  `json:"name"`
+			Master   string  `json:"master"`
+			Audio    string  `json:"audio"`
+			Position float64 `json:"position"`
+			Playing  bool    `json:"playing"`
+		}
+		if err := json.NewDecoder(io.LimitReader(request.Body, 64<<10)).Decode(&body); err != nil {
+			http.Error(response, "invalid body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if music.SourceOf(body.Name) != video.Source || body.Audio == "" || body.Position < 0 {
+			http.Error(response, "the name is not the source's, or no audio", http.StatusBadRequest)
+			return
+		}
+		err := follower.FollowAudio(provider.AudioPlay{
+			Video:  provider.Video{Title: video.Title, Season: video.Season, Episode: strconv.Itoa(int(video.Episode)), Source: body.Name},
+			Master: body.Master, Audio: body.Audio, Position: body.Position, Playing: body.Playing,
+		})
+		if err != nil {
+			http.Error(response, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		musicReply(response, struct {
+			OK bool `json:"ok"`
+		}{true}, nil)
+	}
+}
+
 // musicSink takes the segments the relay passes on or loads ahead (see
 // provider.KeepSegments) for the music service, one at a time; while it
 // is behind, segments beyond the queue are left.
@@ -150,8 +211,7 @@ func musicSink(ctx context.Context, service *music.Service) func(provider.Segmen
 			case <-ctx.Done():
 				return
 			case s := <-queue:
-				v := music.Video{Title: s.Video.Title, Season: s.Video.Season,
-					Episode: music.EpisodeOf(s.Video.Episode), Source: music.SourceOf(s.Video.Source)}
+				v := musicVideoOf(s.Video)
 				if err := service.Segment(ctx, v, s.Start, s.End, s.Init, s.Data); err != nil && ctx.Err() == nil {
 					log.Printf("music %s|%d|%d at %.1f: %v", v.Title, v.Season, v.Episode, s.Start, err)
 				}

@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -59,11 +58,14 @@ type Segment struct {
 // SegmentOptions set up the segments kept: in Dir, Limit bytes at most
 // (the least used go first), Ahead seconds loaded ahead of the receiver (0
 // none), each whole segment told to Sink (nil none), which must not block.
+// A primary video's audio segment (see FollowAudio) is loaded only if
+// Wanted (nil: all) wants the one of the video starting there.
 type SegmentOptions struct {
-	Dir   string
-	Limit int64
-	Ahead float64
-	Sink  func(Segment)
+	Dir    string
+	Limit  int64
+	Ahead  float64
+	Sink   func(Segment)
+	Wanted func(v Video, start float64) bool
 }
 
 // KeepSegments has the relay keep the segments it passes on (see
@@ -89,8 +91,12 @@ type segmentCache struct {
 	total    int64
 	serial   int64
 	runs     map[*alternativeSource]*aheadRun
-	paused   time.Time // no loading ahead until then
+	audio    map[string]*audioRun // the primary videos' audio followed
+	paused   time.Time            // no loading ahead until then
 	failures int
+
+	initsMu    sync.Mutex
+	audioInits map[string][]byte
 }
 
 // keptSegment is a segment on disk, or one being loaded until done closes
@@ -435,23 +441,7 @@ func (cache *segmentCache) ahead(source *alternativeSource, run *aheadRun) {
 				break
 			}
 			err := cache.load(ctx, source, place)
-			cache.mu.Lock()
-			if err == nil {
-				cache.failures = 0
-			} else {
-				cache.failures++
-				var refused *alternativeStatusError
-				code := 0
-				if errors.As(err, &refused) {
-					code = refused.code
-				}
-				if code == http.StatusForbidden || code == http.StatusTooManyRequests ||
-					code == http.StatusUnavailableForLegalReasons || cache.failures >= segmentsFailures {
-					cache.paused = time.Now().Add(segmentsPause)
-					log.Printf("segments: no loading ahead for %s: %v", segmentsPause, err)
-				}
-			}
-			cache.mu.Unlock()
+			cache.failed(err)
 			if err != nil {
 				break
 			}

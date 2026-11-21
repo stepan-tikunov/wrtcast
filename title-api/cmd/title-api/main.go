@@ -129,7 +129,7 @@ func run() error {
 		ahead, _ := strconv.ParseFloat(envOrDefault("TITLE_API_AHEAD", "90"), 64)
 		options := provider.SegmentOptions{Dir: dir, Limit: megabytes << 20, Ahead: ahead}
 		if musicService != nil {
-			options.Sink = musicSink(ctx, musicService)
+			options.Sink, options.Wanted = musicSink(ctx, musicService), musicWanted(ctx, musicService)
 		}
 		if err := client.KeepSegments(options); err != nil {
 			return err
@@ -183,6 +183,7 @@ func run() error {
 		{http.MethodPost, "/v1/music/audio", musicAudioHandler(musicService)},
 		{http.MethodGet, "/v1/music", musicHandler(musicService)},
 		{http.MethodDelete, "/v1/music/misses", musicMissesHandler(musicService)},
+		{http.MethodPost, "/v1/music/play", musicPlayHandler(musicService, client)},
 	} {
 		if err := gateway.HandlePath(route.method, route.path, route.handler); err != nil {
 			_ = grpcListener.Close()

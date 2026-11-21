@@ -71,3 +71,9 @@ func (s *Service) Segment(ctx context.Context, v Video, start, stop float64, ini
 	}
 	return s.Audio(ctx, v, start, stop, out.Bytes())
 }
+
+// Has tells whether the audio of a video from start was taken.
+func (s *Service) Has(ctx context.Context, v Video, start float64) bool {
+	done, err := s.store.hasAudio(ctx, v.key(), start)
+	return err == nil && done
+}
