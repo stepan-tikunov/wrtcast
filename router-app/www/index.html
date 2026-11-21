@@ -2228,6 +2228,17 @@ function playTarget(m) {
   return c && { ...base, ...c };
 }
 
+// What the Play button would start is asked for ahead, once per page: the
+// router keeps its streams 10 minutes, and the start needn't wait for the
+// provider.
+const asked = new Set();
+function startAhead(t) {
+  const q = t.season != null ? `&season=${t.season}&episode=${encodeURIComponent(t.episode)}` : '';
+  if (asked.has(t.id + q)) return;
+  asked.add(t.id + q);
+  api(withDevice('streams?id=' + encodeURIComponent(t.id) + q + '&ahead=1')).catch(() => {});
+}
+
 // Play button, with how far what it goes on with was watched; grey and off
 // while the title is on. The buttons under it.
 function renderDetails() {
@@ -2248,6 +2259,7 @@ function renderDetails() {
   const t = playTarget(item);
   $('dplay').hidden = !t;
   if (!t) return;
+  if (!on) startAhead(t);
   const series = t.season != null, ep = series ? epShort(t) : '';
   const p = series ? item.progress?.eps?.[epKey(t)] : item.progress;
   const left = t.resume && p?.dur > t.resume + 30 ? p.dur - t.resume : 0;

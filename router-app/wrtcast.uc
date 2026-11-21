@@ -320,8 +320,19 @@ function shq(s) {
 	return "'" + replace(s, "'", "'\\''") + "'";
 }
 
+// A match costs some 100 µs on the router, a callback per character as
+// much again: a playlist's few hundred URLs took over a second. What URLs
+// have is escaped by string replaces, '%' first, anything else by the
+// regex.
+const URL_ESC = ['%', '/', ':', '?', '&', '=', '+', '#', ',', ';', '@', '!', '$', "'", '(', ')', '*', ' ', '[', ']'];
+const URL_ODD = regexp("[^][A-Za-z0-9._~%/:?&=+#,;@!$'()* -]");
 function urlenc(s) {
-	return replace(s, /[^A-Za-z0-9._~-]/g, c => sprintf('%%%02X', ord(c)));
+	if (match(s, URL_ODD))
+		return replace(s, /[^A-Za-z0-9._~-]/g, c => sprintf('%%%02X', ord(c)));
+	for (let c in URL_ESC)
+		if (index(s, c) >= 0)
+			s = replace(s, c, sprintf('%%%02X', ord(c)));
+	return s;
 }
 
 function urldec(s) {
@@ -936,25 +947,44 @@ const cache_id = (id, season, episode, source, width) =>
 // ms>-<stop ms> of a segment.
 const CACHE_KEY = /^([0-9a-f]{8})-[0-9a-f]{8}-(i|([0-9]+)-([0-9]+))$/;
 
+// The duration of an #EXTINF line as written, as /^#EXTINF: *([0-9.]+)/
+// would take it, or null.
+function extinf(l) {
+	if (substr(l, 0, 8) != '#EXTINF:')
+		return null;
+	let i = 8, n = length(l);
+	while (i < n && ord(l, i) == 32)
+		i++;
+	let j = i;
+	for (let ch = ord(l, j); j < n && (ch >= 48 && ch <= 57 || ch == 46); ch = ord(l, ++j))
+		;
+	return j > i ? substr(l, i, j - i) : null;
+}
+
 // The cache keys of the lines of a media playlist of video c, by line
 // index: of its URI lines and of its init segment's #EXT-X-MAP. None for
 // byte ranges or encryption, which the cache leaves alone.
 function seg_keys(lines, c) {
-	let durs = [], keys = [];
-	for (let l in lines) {
-		if (match(l, /^#EXT-X-BYTERANGE/) || match(l, /^#EXT-X-MAP:.*BYTERANGE/) ||
-		    match(l, /^#EXT-X-KEY:(.*,)?METHOD=(AES|SAMPLE)/))
+	let durs = [], keys = [], at = {};
+	for (let i, l in lines) {
+		if (substr(l, 0, 1) != '#')
+			continue;
+		if (substr(l, 0, 16) == '#EXT-X-BYTERANGE' ||
+		    substr(l, 0, 11) == '#EXT-X-MAP:' && index(l, 'BYTERANGE') >= 0 ||
+		    substr(l, 0, 11) == '#EXT-X-KEY:' && match(l, /^#EXT-X-KEY:(.*,)?METHOD=(AES|SAMPLE)/))
 			return keys;
-		let d = match(l, /^#EXTINF: *([0-9.]+)/);
-		if (d)
-			push(durs, d[1]);
+		let d = extinf(l);
+		if (d != null) {
+			push(durs, d);
+			at[i] = d;
+		}
 	}
 	let fp = hash(join(',', durs)), pos = 0, dur = null;
 	for (let i, l in lines) {
-		let d = match(l, /^#EXTINF: *([0-9.]+)/);
-		if (d) {
-			dur = +d[1];
-		} else if (match(l, /^#EXT-X-MAP:/)) {
+		let d = at[i];
+		if (d != null) {
+			dur = +d;
+		} else if (substr(l, 0, 11) == '#EXT-X-MAP:') {
 			keys[i] = `${c}-${fp}-i`;
 		} else if (l != '' && substr(l, 0, 1) != '#' && dur != null) {
 			keys[i] = sprintf('%s-%s-%d-%d', c, fp, int(pos * 1000 + 0.5), int((pos + dur) * 1000 + 0.5));
@@ -1018,11 +1048,14 @@ function cache_put(k, f, n, m, keep) {
 	let c = now?.c ?? '', pos = 0;
 	if (now && seen?.url == now.url)
 		pos = +(seen.pos ?? 0) + (seen.playing ? min(max(time() - seen.t, 0), 300) : 0);
+	// Those loaded or served within a minute go last: what a warm start
+	// loaded is still to be asked for (a dub's segments are of a video of
+	// their own).
 	for (let r in sql_rows(`SELECT key, bytes FROM cache ORDER BY
-			CASE WHEN c = ? AND (start IS NULL OR stop > ? AND start < ?) THEN 4
+			CASE WHEN t >= ? THEN 5 WHEN c = ? AND (start IS NULL OR stop > ? AND start < ?) THEN 4
 				WHEN keep = 1 THEN 3 WHEN c = ? AND stop <= ? THEN 0 WHEN c != ? THEN 1 ELSE 2 END,
 			CASE WHEN keep = 0 AND c = ? AND stop > ? THEN -start ELSE t END`,
-			c, pos - 10, pos + 30, c, pos - 10, c, c, pos - 10)) {
+			time() - 60, c, pos - 10, pos + 30, c, pos - 10, c, c, pos - 10)) {
 		if (over <= 0)
 			break;
 		cache_drop(r.key);
@@ -1171,19 +1204,38 @@ function streams(id, season, episode) {
 		})),
 		// Marked on a video of sdur seconds (see sections_of).
 		sections: sections(s.sections), sdur: +(s.sectionsDurationSeconds ?? 0),
+		// A primary player's master as title-api fetched it (see prepare).
+		master: s.masterPlaylist || null,
 	}));
 }
 
 // The streams of a title, remembered per TV for 10 minutes: the UI lists the
 // sources before playing and may retry with another, all from one provider
 // request. force asks the provider again.
-function title_streams(dev, id, season, episode, force) {
+// How long the last title_streams waited for the streams (see play's note).
+let streams_took = null;
+
+function title_streams(dev, id, season, episode, force, ahead) {
+	let t0 = clock_now();
 	let key = state_key(dev), c = tv_get(key, 'list');
-	if (!force && c?.streams && c.id == id && c.season == season &&
-	    c.episode == episode && time() - c.fetched < 600)
+	let fresh = c => c?.streams && c.id == id && c.season == season &&
+		c.episode == episode && time() - c.fetched < 600;
+	// The title's page asked for them a moment ago (see /streams with
+	// ahead): that answer is waited for, not asked for again.
+	for (let n = 0; !force && !ahead && !fresh(c) && n < 200; n++) {
+		let b = json(kv_get('ahead:' + key) ?? 'null');
+		if (b?.id != id || b.season != season || b.episode != episode || time() - b.t > 20)
+			break;
+		sleep(100);
+		c = tv_get(key, 'list');
+	}
+	if (!force && fresh(c)) {
+		streams_took = clock_now() - t0;
 		return c;
+	}
 	c = { id, season, episode, streams: streams(id, season, episode), fetched: time() };
 	tv_set(key, 'list', c);
+	streams_took = clock_now() - t0;
 	return c;
 }
 
@@ -1497,7 +1549,7 @@ function cache_trim() {
 		let x = v ? progress_row(v.id, ep_key(v.season, v.episode)) : null;
 		let all = !v || !!x?.done;
 		for (let y in sql_rows('SELECT key, keep, start, t FROM cache WHERE c = ?', r.c))
-			if (y.t < t - CACHE_DAYS * 86400 || !playing[r.c] && (all || !y.keep))
+			if (y.t < t - CACHE_DAYS * 86400 || !playing[r.c] && (all || !y.keep) && y.t < t - 60)
 				cache_drop(y.key);
 		// An init segment alone serves nothing.
 		if (!sql_row('SELECT 1 AS x FROM cache WHERE c = ? AND start IS NOT NULL', r.c))
@@ -1648,15 +1700,29 @@ function ext(name) {
 	return m ? lc(m[1]) : '';
 }
 
+// The media or the headers of purl's links, the same for a whole playlist.
+let tails = {};
+function purl_tail(h, m) {
+	let k = `${m}\n${h}`;
+	if (tails[k] == null)
+		tails[k] = valid_media(m) ? `&m=${m}` : valid_headers(h) ? `&h=${urlenc(h)}` : '';
+	return tails[k];
+}
+
 // Proxy path for an upstream URL; root-relative unless a base is given.
 // The name defaults to the upstream file name. A title-api media id (m)
 // stands for the headers.
 function purl(u, base, name, h, m) {
-	let f = match(u, /^[^?#]*\/([^\/?#]*)/);
-	name = replace(name ?? f?.[1] ?? '', /[^A-Za-z0-9._-]/g, '') || 'file';
-	return `${base ?? ''}/api/p/${name}?u=${urlenc(u)}` +
-		(valid_media(m) ? `&m=${m}` : valid_headers(h) ? `&h=${urlenc(h)}` : '');
+	if (name == null) {
+		let q = index(u, '?'), x = index(u, '#');
+		let path = substr(u, 0, q < 0 ? x : x < 0 ? q : min(q, x));
+		let slash = rindex(path, '/');
+		name = slash < 0 ? '' : substr(path, slash + 1);
+	}
+	name = replace(name, /[^A-Za-z0-9._-]/g, '') || 'file';
+	return `${base ?? ''}/api/p/${name}?u=${urlenc(u)}` + purl_tail(h, m);
 }
+
 
 function resolve(base, ref) {
 	if (match(ref, /^[A-Za-z][A-Za-z0-9+.-]*:/))
@@ -1671,17 +1737,28 @@ function resolve(base, ref) {
 	return m[1] + m[2] + replace(m[3], /[^\/]*$/, '') + ref;
 }
 
+// resolve against one base, for a playlist's many relative references.
+function resolver(base) {
+	let m = match(base, /^([a-z]+:)(\/\/[^\/?#]*)([^?#]*)/);
+	let dir = m ? m[1] + m[2] + replace(m[3], /[^\/]*$/, '') : null;
+	return ref => dir != null && index(ref, ':') < 0 && !(substr(ref, 0, 1) in ['/', '?']) ?
+		dir + ref : resolve(base, ref);
+}
+
 // Receivers switch audio by language, so of several dubs in one language
 // only the first is reachable. Such renditions get a private-use subtag
 // from their NAME (ru -> ru-x-rus1) to make every language distinct.
 function unique_audio_langs(lines) {
 	let count = {};
 	for (let l in lines) {
-		let m = match(l, /^#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="([^"]*)".*LANGUAGE="([^"]*)"/);
+		let m = substr(l, 0, 13) == '#EXT-X-MEDIA:' &&
+			match(l, /^#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="([^"]*)".*LANGUAGE="([^"]*)"/);
 		if (m)
 			count[m[1] + ' ' + m[2]] = (count[m[1] + ' ' + m[2]] ?? 0) + 1;
 	}
 	return map(lines, l => {
+		if (substr(l, 0, 13) != '#EXT-X-MEDIA:')
+			return l;
 		let m = match(l, /^#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="([^"]*)".*LANGUAGE="([^"]*)"/);
 		let name = match(l, /NAME="([^"]*)"/);
 		if (!m || count[m[1] + ' ' + m[2]] < 2 || !name)
@@ -1776,11 +1853,12 @@ function with_now(st, dev) {
 	return st;
 }
 
-// Whether a master's media playlists use fragmented MP4 (#EXT-X-MAP); the
-// receiver assumes MPEG-TS segments unless told. Of the variants it asks
-// for the one that will play: the first playable one of the chosen width,
-// else the first playable one, so no other playlist is fetched.
-function is_fmp4(master, body, h, width, m) {
+// The media playlist of a master (body) that tells whether it uses
+// fragmented MP4 (#EXT-X-MAP); the receiver assumes MPEG-TS segments unless
+// told. Of the variants the one that will play: the first playable one of
+// the chosen width, else the first playable one, so no other playlist is
+// fetched. Null for a media playlist, which tells by itself.
+function fmp4_uri(body, width) {
 	let inf = null, first = null, uri = null;
 	for (let l in split(body ?? '', '\n')) {
 		l = trim(l);
@@ -1797,11 +1875,7 @@ function is_fmp4(master, body, h, width, m) {
 			inf = null;
 		}
 	}
-	uri ??= first;
-	// A media playlist rather than a master tells by itself.
-	if (uri == null)
-		return index(body ?? '', '#EXT-X-MAP') >= 0;
-	return index(fetch_text(resolve(master, uri), h, m) ?? '', '#EXT-X-MAP') >= 0;
+	return uri ?? first;
 }
 
 // Drops the variants (#EXT-X-STREAM-INF and its URI line) that fail keep,
@@ -1830,7 +1904,8 @@ function keep_variants(lines, keep) {
 // of q, and in its media playlist the segments get their cache keys (see
 // seg_keys).
 function rewrite_playlist(body, base, q, h, drc, m, c) {
-	let fix = u => match(u, /^(data|skd):/) ? u : purl(resolve(base, u), null, null, h, m);
+	let abs = resolver(base);
+	let fix = u => substr(u, 0, 5) == 'data:' || substr(u, 0, 4) == 'skd:' ? u : purl(abs(u), null, null, h, m);
 	let lines = map(split(body, '\n'), line => rtrim(line, '\r'));
 	lines = keep_variants(lines, l => playable(match(l, /CODECS="([^"]*)"/)?.[1]));
 	if (q)
@@ -1844,8 +1919,15 @@ function rewrite_playlist(body, base, q, h, drc, m, c) {
 			push(out, l);
 		} else if (substr(l, 0, 1) != '#') {
 			push(out, fix(trim(l)) + k + (c && q && master ? `&c=${c}` : ''));
+		} else if (index(l, 'URI="') < 0) {
+			push(out, l);
 		} else {
-			let flag = drc && match(l, /^#EXT-X-MEDIA:(.*,)?TYPE=AUDIO(,|$)/) ? '&drc=1' : '';
+			let audio = substr(l, 0, 13) == '#EXT-X-MEDIA:' && match(l, /^#EXT-X-MEDIA:(.*,)?TYPE=AUDIO(,|$)/);
+			let flag = drc && audio ? '&drc=1' : '';
+			// A dub's segments are cached too, as a video of their
+			// own: its playlist may be cut as the variant's is.
+			if (c && q && master && audio)
+				flag += '&c=' + hash(`${c} audio ${match(l, /NAME="([^"]*)"/)?.[1] ?? ''}`);
 			push(out, replace(l, /URI="([^"]*)"/g, (all, u) => `URI="${fix(u)}${flag}${k}"`));
 		}
 	}
@@ -1880,10 +1962,11 @@ const DRC_FILTER = 'dynaudnorm=f=250:g=13:p=0.9:m=30:r=0.06:s=0,' +
 const DRC_PRE = 5;   // seconds of history, well over the leveler's window
 const DRC_POST = 3;  // seconds of look-ahead, over half the window (250 ms × 13)
 
-// Whether the audio of a master (url and body) can be leveled.
-function drc_supported(master, body, h, m) {
+// The audio playlist of a master (body) that tells whether its audio can be
+// leveled (see drc_of), or null when the master tells it can't.
+function drc_uri(body) {
 	if (body == null || !access(FFMPEG, 'x'))
-		return false;
+		return null;
 	let group = null;
 	for (let inf in match(body, /#EXT-X-STREAM-INF:[^\n]*/g) ?? []) {
 		let codecs = match(inf[0], /CODECS="([^"]*)"/)?.[1] ?? '';
@@ -1892,7 +1975,7 @@ function drc_supported(master, body, h, m) {
 		let g = match(inf[0], /AUDIO="([^"]*)"/)?.[1];
 		if (!g || !match(codecs, /mp4a\.40\.2/) ||
 		    match(codecs, /(ac-3|ec-3|mp4a\.40\.(5|29)|opus|flac)/))
-			return false;
+			return null;
 		group ??= g;
 	}
 	let uri = null;
@@ -1900,14 +1983,41 @@ function drc_supported(master, body, h, m) {
 		if (!uri && match(m[0], /TYPE=AUDIO(,|$)/) &&
 		    match(m[0], /GROUP-ID="([^"]*)"/)?.[1] == group)
 			uri = match(m[0], /URI="([^"]*)"/)?.[1];
-	if (!group || !uri)
-		return false;
-	let pl = fetch_text(resolve(master, uri), h, m) ?? '';
+	return group ? uri : null;
+}
+
+// Whether an audio playlist (pl) can be leveled: AAC in MPEG-TS on one
+// timeline.
+function drc_of(pl) {
+	pl ??= '';
 	let seg = trim(match(pl, /\n([^#\n][^\n]*)/)?.[1] ?? '');
 	return substr(pl, 0, 7) == '#EXTM3U' && index(pl, '#EXT-X-ENDLIST') >= 0 &&
 		!match(pl, /#EXT-X-(MAP|DISCONTINUITY|BYTERANGE)/) &&
 		!match(pl, /#EXT-X-KEY:(.*,)?METHOD=(AES|SAMPLE)/) &&
 		ext(match(seg, /^[^?#]*/)[0]) == 'ts';
+}
+
+// Whether a master (body, from url) uses fMP4 and whether its audio can be
+// leveled, of its playlists (see fmp4_uri, drc_uri) loaded side by side:
+// one after the other they took a second and a half of a first play. Also
+// the playlists by their URLs, for the warm start.
+function probe(url, body, h, width, m) {
+	let vu = fmp4_uri(body, width);
+	if (vu == null)
+		return { fmp4: index(body ?? '', '#EXT-X-MAP') >= 0, drc: false, lists: {} };
+	let au = PROXY ? drc_uri(body) : null, urls = [resolve(url, vu)];
+	if (au != null)
+		push(urls, resolve(url, au));
+	let pipes = map(urls, u => popen(fetch_cmd(u, h, null, m)));
+	let lists = {}, got = map(pipes, (p, i) => {
+		let b = p ? p.read('all') ?? '' : '';
+		b = p && p.close() == 0 ? b : null;
+		if (substr(b ?? '', 0, 7) == '#EXTM3U')
+			lists[urls[i]] = b;
+		return b;
+	});
+	let fmp4 = index(got[0] ?? '', '#EXT-X-MAP') >= 0;
+	return { fmp4, drc: !fmp4 && au != null && drc_of(got[1]), lists };
 }
 
 // Rewrites an audio media playlist so its segments point at /api/a/<key>/<n>.ts
@@ -2068,6 +2178,220 @@ function count_bytes(m, n, start) {
 		int((end[0] - start[0]) * 1000 + (end[1] - start[1]) / 1000000), time());
 }
 
+// ---- warm start ------------------------------------------------------------
+//
+// A play's first requests, the master, its variant's and dub's playlists and
+// the segments where it starts, cost the TV ~0.75 s each through the proxy
+// (a new connection of uclient-fetch to the CDN each), one after another as
+// it asks for them, some 6 s in all before it plays. While castctl starts
+// the receiver, a process of its own (wrtcast warm) loads them at once, the
+// segments side by side, into the segment cache and, the playlists as the
+// proxy would answer them, for PL_TTL seconds; the proxy hands them on,
+// waiting for those still under way (a file .w beside each, WARM_WAIT
+// seconds at most).
+
+const PL_TTL = 60, WARM_WAIT = 8, WARM_SPAN = 15;
+
+// The file a playlist the proxy answers is kept in, by the proxy's
+// arguments as the request has them.
+const pl_file = (name, u, q, h, drc, m, c) =>
+	CACHE + 'pl-' + hash(sprintf('%J', [name, u, q, h, !!drc, m, c]));
+
+// The file a subtitle of a play is kept in for a warm start.
+const sub_file = u => CACHE + 'sub-' + hash(u);
+
+// Whether a warm start loads file f now.
+function warming(f) {
+	let st = stat(f + '.w');
+	return st && st.mtime >= time() - WARM_WAIT;
+}
+
+// The playlist kept in f, waited for while it is being loaded; null when
+// there is none.
+function pl_wait(f) {
+	for (let n = 0; warming(f) && n < WARM_WAIT * 20; n++)
+		sleep(50);
+	let st = stat(f);
+	return st && st.mtime >= time() - PL_TTL ? readfile(f) : null;
+}
+
+// The cached segment of key k, waited for while a warm start loads it.
+function warm_wait(k) {
+	if (!warming(CACHE + k))
+		return null;
+	for (let n = 0; warming(CACHE + k) && n < WARM_WAIT * 20; n++)
+		sleep(50);
+	return cache_get(k);
+}
+
+// Starts loading the segments of media playlist body (from url, the proxy's
+// arguments a) that the TV starts from at start, side by side: from it for
+// WARM_SPAN seconds, the init segment and, of the video (first), its first
+// segment, which the TV looks at first. Their keys are those the proxy's
+// playlist gives them (see seg_keys); a cached one is left. Returns the
+// jobs for warm_finish.
+function warm_segments(body, url, a, start, first) {
+	let c = match(a.c ?? '', /^[0-9a-f]{8}$/) ? a.c : null;
+	if (!c)
+		return [];
+	let lines = map(split(body, '\n'), l => rtrim(l, '\r')), keys = seg_keys(lines, c), jobs = [];
+	let abs = resolver(url);
+	for (let i, l in lines) {
+		let x = keys[i] ? match(keys[i], CACHE_KEY) : null;
+		if (!x)
+			continue;
+		let k = keys[i], from = x[3] != null ? +x[3] / 1000.0 : null, to = x[4] != null ? +x[4] / 1000.0 : null;
+		if (x[2] != 'i' && !(from == 0 && first) && !(to > start && from < start + WARM_SPAN))
+			continue;
+		if (cache_get(k) || warming(CACHE + k))
+			continue;
+		let u = proxy_target(abs(substr(l, 0, 1) == '#' ? match(l, /URI="([^"]*)"/)?.[1] ?? '' : trim(l)));
+		if (!u)
+			continue;
+		writefile(CACHE + k + '.w', '');
+		let f = CACHE + k + '.' + clock()[1];
+		// Niced: the playlists being rewritten meanwhile are wanted
+		// first, and their TLS handshakes took the CPU from them.
+		push(jobs, { k, f, m: a.m, init: x[2] == 'i', t0: clock(),
+			pipe: popen(`nice -n 15 ${fetch_cmd(u, a.h, null, a.m)} >${shq(f)}`) });
+	}
+	return jobs;
+}
+
+// Waits for the jobs of warm_segments and keeps what they loaded, as
+// prefetch does. Returns how many.
+function warm_finish(jobs) {
+	let n = 0;
+	for (let j in jobs) {
+		let ok = j.pipe && j.pipe.close() == 0, size = ok ? stat(j.f)?.size : 0;
+		if (size > 0 && cache_room()) {
+			cache_put(j.k, j.f, size, j.m, false);
+			if (!j.init && valid_media(j.m))
+				count_bytes(j.m, size, j.t0);
+			n++;
+		} else {
+			unlink(j.f);
+		}
+		unlink(CACHE + j.k + '.w');
+	}
+	return n;
+}
+
+// Keeps playlist body (from url) as the proxy would answer it with
+// arguments a, in f. The leveled ones (see drc_playlist) are left to the
+// proxy. Returns the text, or null.
+function warm_keep(f, body, url, a) {
+	let drc = a.drc == '1', text = null;
+	if (substr(body ?? '', 0, 7) == '#EXTM3U' && !(drc && index(body, '#EXTINF') >= 0)) {
+		text = rewrite_playlist(body, url, match(a.q ?? '', /^[0-9]{1,5}$/) ? +a.q : null, a.h, drc, a.m,
+		                        match(a.c ?? '', /^[0-9a-f]{8}$/) ? a.c : null);
+		let part = f + '.' + clock()[1];
+		if (!writefile(part, text) || !rename(part, f)) {
+			unlink(part);
+			text = null;
+		}
+	}
+	unlink(f + '.w');
+	return text;
+}
+
+// The proxy's arguments of a link of a playlist it answered, with its name
+// and the file the proxy keeps it in for a warm start (see pl_file).
+function proxy_args(link) {
+	let m = match(link ?? '', /\/api\/p\/([^\/?]*)\?(.*)$/);
+	let a = m ? parse_form(m[2], { name: m[1] }) : null;
+	if (!a || !proxy_target(a.u) || a.h != null && !valid_headers(a.h) || a.m != null && !valid_media(a.m))
+		return null;
+	a.file = pl_file(a.name, a.u, a.q, a.h, a.drc == '1', a.m, a.c);
+	return a;
+}
+
+// The links of a master the proxy answered: of the variant (the first) and
+// of the audio renditions, the default and the one named audio.
+function warm_links(master, audio) {
+	let inf = false, variant = null, dubs = [];
+	for (let l in split(master, '\n')) {
+		if (substr(l, 0, 18) == '#EXT-X-STREAM-INF:')
+			inf = true;
+		else if (inf && l != '' && substr(l, 0, 1) != '#' && !variant)
+			variant = l;
+		else if (substr(l, 0, 13) == '#EXT-X-MEDIA:' && index(l, 'TYPE=AUDIO') >= 0 &&
+		         (index(l, 'DEFAULT=YES') >= 0 || audio != null && index(l, `NAME="${audio}"`) >= 0))
+			push(dubs, match(l, /URI="([^"]*)"/)?.[1]);
+	}
+	return filter(map(filter([variant, ...dubs], x => x != null), proxy_args), x => x != null);
+}
+
+// Before castctl is told to play what prepare made ready (r): the master
+// is marked as being loaded, so that the TV's first request waits for it,
+// and the process that loads it all is left, with the master prepare
+// fetched a moment ago.
+function warm_begin(r) {
+	let a = proxy_args(r.url);
+	if (!PROXY || !a || !cache_room())
+		return;
+	let fresh = r.body != null && time() - r.body_t < 600;
+	kv_set('warm:' + r.key, sprintf('%J', { t: time(), url: r.url, start: +(r.start ?? 0), audio: r.p.audio,
+		body: fresh ? r.body : null, lists: r.lists ?? {} }));
+	writefile(a.file + '.w', '');
+	system(`${shq(sourcepath())} warm ${shq(r.key)} </dev/null >/dev/null 2>&1 &`);
+}
+
+// The process warm_begin left for the TV of key: the master, then its
+// playlists side by side, and as each has come the segments the TV starts
+// from, side by side, while the playlists are rewritten.
+function warm(key) {
+	let w = json(kv_get('warm:' + key) ?? 'null'), a = proxy_args(w?.url);
+	if (!a)
+		return;
+	if (time() - w.t > 20)
+		return unlink(a.file + '.w');
+	let t0 = clock_now(), url = proxy_target(a.u), body = w.body;
+	if (body == null)
+		body = fetch_text(url, a.h, a.m);
+	let master = warm_keep(a.file, body, url, a);
+	let links = master ? warm_links(master, w.audio) : [];
+	for (let x in links)
+		writefile(x.file + '.w', '');
+	// Those prepare probed are at hand.
+	let pipes = map(links, x => w.lists?.[proxy_target(x.u)] != null ? null :
+		popen(fetch_cmd(proxy_target(x.u), x.h, null, x.m)));
+	let bodies = map(pipes, (p, i) => {
+		if (!p)
+			return w.lists?.[proxy_target(links[i].u)];
+		let b = p.read('all') ?? '';
+		return p.close() == 0 ? b : null;
+	});
+	let jobs = [];
+	for (let i, x in links)
+		if (bodies[i] != null && x.drc != '1')
+			push(jobs, ...warm_segments(bodies[i], proxy_target(x.u), x, w.start, i == 0));
+	// The subtitles, which the TV asks for with the segments (see /sub).
+	let st = tv_get(key, 'subs'), subs = [];
+	for (let u in st?.urls ?? []) {
+		let target = proxy_target(u), h = st.headers || null, m = st.media;
+		if (!target || h != null && !valid_headers(h) || m != null && !valid_media(m))
+			continue;
+		let f = sub_file(u), part = f + '.' + clock()[1];
+		writefile(f + '.w', '');
+		push(subs, { f, part, pipe: popen(`nice -n 15 ${fetch_cmd(target, h, null, m)} >${shq(part)}`) });
+	}
+	let kept = 0;
+	for (let i, x in links)
+		if (warm_keep(x.file, bodies[i], proxy_target(x.u), x) != null)
+			kept++;
+	let n = warm_finish(jobs);
+	for (let j in subs) {
+		let ok = j.pipe && j.pipe.close() == 0;
+		if (!ok || !rename(j.part, j.f))
+			unlink(j.part);
+		unlink(j.f + '.w');
+	}
+	pause_note(key, sprintf('warm start: master %s, %d of %d playlists, %d of %d segments, %d subtitles in %.1f s',
+	                        master ? 'kept' : 'failed', kept, length(links), n, length(jobs), length(subs),
+	                        clock_now() - t0));
+}
+
 // pv marks the fetches of the seek preview (the web UI's frames over the
 // seek bar): not the receiver's, they don't count as its segments. c is
 // the video of a play's playlists and k a segment's cache key (see
@@ -2085,7 +2409,14 @@ function proxy(name, u, q, h, drc, m, pv, c, k) {
 	c = match(c ?? '', /^[0-9a-f]{8}$/) ? c : null;
 	k = match(k ?? '', CACHE_KEY) ? k : null;
 	let e = ext(name), err = ERR + clock()[1];
-	let hit = k ? cache_get(k) : null, f = hit ? open(CACHE + k) : null;
+	// A playlist a warm start loaded (see warm).
+	let pl = (e == 'm3u8' || e == 'm3u') && !pv ? pl_wait(pl_file(name, u, q, h, drc, m, c)) : null;
+	if (pl != null) {
+		media_head(200, MIME[e]);
+		print(pl, '\n');
+		exit(0);
+	}
+	let hit = k ? cache_get(k) ?? warm_wait(k) : null, f = hit ? open(CACHE + k) : null;
 	if (f) {
 		media_head(200, MIME[e] ?? 'application/octet-stream');
 		let n = 0;
@@ -2158,6 +2489,8 @@ function proxy(name, u, q, h, drc, m, pv, c, k) {
 let next_base = null;
 // When play sent the TV what to load, for play_next's note.
 let load_at = null;
+// When /play was asked, for its note.
+let play_at = null;
 function public_base() {
 	return next_base ?? rtrim(conf('public_url', '') || `http://${getenv('HTTP_HOST')}`, '/');
 }
@@ -2238,11 +2571,17 @@ function prepare(dev, p, keep) {
 	let s = list[n];
 	if (!s || !s.url)
 		fail(404, 'stream not found');
-	let h = s.headers ?? '', m = media_id(s.url), body = null;
+	let h = s.headers ?? '', m = media_id(s.url), body = null, body_t = time();
 	if (s.variants == null) {
 		// title-api assembles a source's master on first request; a
-		// source the CDN rejects fails here instead of on the TV.
-		body = fetch_text(s.url, h, m);
+		// source the CDN rejects fails here instead of on the TV. A
+		// primary player's title-api fetched just now.
+		if (s.master != null && time() - fetched < 600) {
+			body = s.master;
+			body_t = fetched;
+		} else {
+			body = fetch_text(s.url, h, m);
+		}
 		// title-api forgets its masters when it restarts, so one of
 		// the streams of an earlier play may be gone: the provider is
 		// asked for them again.
@@ -2309,16 +2648,24 @@ function prepare(dev, p, keep) {
 				media_headers(m, quality_digits(quality), start, true);
 		}
 	}
-	// Probed once per source, on the variant this play picks; another
-	// episode of the source the last play was of is taken to be alike.
+	// Probed once per source of a title, on the variant this play
+	// picks; its other episodes are taken to be alike. The playlists
+	// probed go to the warm start.
+	let probed = null;
 	if (body != null) {
+		let pk = 'probe:' + hash(`${id}|${s.name}`), was = json(kv_get(pk) ?? 'null');
 		if (last?.id == id && last.source == s.name && last.fmp4 != null) {
 			s.fmp4 = last.fmp4;
 			s.drc = last.drc_ok;
+		} else if (type(was) == 'object') {
+			s.fmp4 = was.fmp4;
+			s.drc = was.drc;
 		} else {
-			s.fmp4 = is_fmp4(s.url, body, h, width, m);
-			s.drc = PROXY && !s.fmp4 && drc_supported(s.url, body, h, m);
+			probed = probe(s.url, body, h, width, m);
+			s.fmp4 = probed.fmp4;
+			s.drc = probed.drc;
 		}
+		kv_set(pk, sprintf('%J', { fmp4: !!s.fmp4, drc: !!s.drc, t: time() }));
 	}
 	let drc = p.drc == '1' && !!s.drc;
 	// The video's segments are cached (see "segment cache"), of a known
@@ -2349,7 +2696,8 @@ function prepare(dev, p, keep) {
 	if (p.style != null)
 		push(args, '-y', p.style);
 	return {
-		key, id, season, episode, n, s, list, fetched, m, h, c, url, width, quality, quals,
+		key, id, season, episode, n, s, list, fetched, m, h, c, url, width, quality, quals, body, body_t,
+		lists: probed?.lists,
 		start, lead, drc, autoskip, sections, args, labels, subs: map(picked, t => t.url),
 		p: { title: p.title, poster: p.poster, style: p.style, autonext: p.autonext,
 			audio: p.audio, subs: p.subs, rate: p.rate },
@@ -2400,7 +2748,8 @@ function start(dev, r) {
 	sql_do('INSERT OR REPLACE INTO played (url, now, t) VALUES (?, ?, ?)', url, now, time());
 	undo = put_back;
 	load_at = clock_now();
-	let st = castctl(dev, ...r.args);
+	warm_begin(r);
+	let st = castctl(dev, ...r.args), playing_at = clock_now();
 	undo = null;
 	busy_set(key, false);
 	// The socket of what this replaces says it ended.
@@ -2419,6 +2768,12 @@ function start(dev, r) {
 	// A replay keeps the speed (see the page's replay).
 	if (p.rate != null && +p.rate != 1)
 		st = castctl_try(dev, 'speed', p.rate) ?? st;
+	// How long a start from the page took: the streams (title-api, unless
+	// asked for ahead), the router's own and the TV's.
+	if (play_at != null)
+		pause_note(key, sprintf('play %s, streams in %.1f s, sent to the TV after %.1f s, playing after %.1f s',
+		                        r.season != null ? `${r.season}:${r.episode}` : r.id, streams_took ?? 0,
+		                        load_at - play_at, playing_at - play_at));
 	st = volume_back(dev, st);
 	st = with_now(st, dev);
 	// The TV plays: title-api learns the duration and the position now.
@@ -3022,7 +3377,24 @@ const routes = {
 			season = +p.season;
 			episode = p.episode;
 		}
-		return { streams: title_streams(device(p), title_id(p), season, episode).streams };
+		// ahead=1: the title's page asks for what its Play button would
+		// start, so that the start needn't wait for the provider (some 5
+		// s); once in 5 minutes of a title, kept 10 minutes.
+		let dev = device(p), id = title_id(p);
+		if (p.ahead == '1') {
+			let k = 'pre:' + hash(`${id}|${season}|${episode}`), key = state_key(dev);
+			if (time() - +(kv_get(k) ?? 0) < 300)
+				return { streams: [] };
+			kv_set(k, `${time()}`);
+			kv_set('ahead:' + key, sprintf('%J', { id, season, episode, t: time() }));
+			let done = () => sql_do('DELETE FROM kv WHERE key = ?', 'ahead:' + key);
+			undo = done; // a failure ends the wait too
+			let c = title_streams(dev, id, season, episode, false, true);
+			undo = null;
+			done();
+			return { streams: c.streams };
+		}
+		return { streams: title_streams(dev, id, season, episode).streams };
 	},
 
 	'GET /title': p => {
@@ -3121,7 +3493,11 @@ const routes = {
 	// title's page would start (see auto_episode); a title never started
 	// answers 409 with the sources to pick from, if there are several.
 	'POST /play': p => {
+		play_at = clock_now();
 		let dev = device(p);
+		// The receiver starts while title-api finds the streams: from
+		// another app or none it takes the TV some 3 s.
+		system(`castctl -H ${shq(host_of(dev))} launch </dev/null >/dev/null 2>&1 &`);
 		if (p.auto == '1' && p.season == null && p.episode == null)
 			auto_episode(p);
 		return play(dev, p);
@@ -3407,6 +3783,10 @@ if (ARGV[0] == 'music' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
 	music_fetch(ARGV[1]);
 	exit(0);
 }
+if (ARGV[0] == 'warm' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
+	warm(ARGV[1]);
+	exit(0);
+}
 if (ARGV[0] == 'due' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
 	wake(ARGV[1], ARGV[2]);
 	exit(0);
@@ -3438,6 +3818,12 @@ if (sm) {
 	let url = subs?.urls?.[+sm[2]];
 	if (!url)
 		fail(404, 'no such subtitle');
+	let text = pl_wait(sub_file(url));
+	if (text != null && text != '') {
+		media_head(200, MIME.vtt ?? 'application/octet-stream');
+		stdout.write(text);
+		exit(0);
+	}
 	proxy('sub.vtt', url, null, subs.headers || null, false, subs.media);
 }
 
