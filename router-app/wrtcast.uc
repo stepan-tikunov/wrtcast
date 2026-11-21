@@ -1562,8 +1562,10 @@ function cache_trim() {
 		for (let y in sql_rows('SELECT key, keep, start, t FROM cache WHERE c = ?', r.c))
 			if (y.t < t - CACHE_DAYS * 86400 || !playing[r.c] && (all || !y.keep) && y.t < t - 60)
 				cache_drop(y.key);
-		// An init segment alone serves nothing.
-		if (!sql_row('SELECT 1 AS x FROM cache WHERE c = ? AND start IS NOT NULL', r.c))
+		// An init segment alone serves nothing, unless its segments are
+		// still to come: a play's init lands first, and the TV asks for it
+		// only once.
+		if (!sql_row('SELECT 1 AS x FROM cache WHERE c = ? AND (start IS NOT NULL OR t >= ?)', r.c, t - 300))
 			for (let y in sql_rows('SELECT key FROM cache WHERE c = ?', r.c))
 				cache_drop(y.key);
 	}
@@ -2837,9 +2839,10 @@ function now_ready(now) {
 // Loads into the cache the segments of CACHE_KEEP seconds from each of
 // starts of what prepare made ready (r), one at a time through title-api as
 // the TV would load them: the variant's media playlist, its init segment and
-// the segments. A failure ends it. Returns the segments loaded.
+// the segments; with no starts, the init segment alone. A failure ends it.
+// Returns the segments loaded.
 function prefetch(r, starts) {
-	if (!r?.c || !r.s?.url || !r.width || !valid_media(r.m) || !length(starts) || !cache_room())
+	if (!r?.c || !r.s?.url || !r.width || !valid_media(r.m) || type(starts) != 'array' || !cache_room())
 		return 0;
 	let inf = null, uri = null;
 	for (let l in split(fetch_text(r.s.url, r.h, r.m) ?? '', '\n')) {
@@ -3904,6 +3907,12 @@ const routes = {
 		if (!seg || !cache_get(seg.key))
 			return { reason: 'no_segment' };
 		let init = replace(seg.key, /-[0-9]+-[0-9]+$/, '-i'), files = [];
+		// A fragment of fMP4 is nothing without its init segment, which
+		// the TV loaded once at the start and the cache may have lost.
+		let f = open(CACHE + seg.key), box = f ? substr(f.read(8) ?? '', 4) : '';
+		f?.close();
+		if ((box == 'moof' || box == 'styp') && !cache_get(init))
+			prefetch(now_ready(now), []);
 		if (cache_get(init))
 			push(files, CACHE + init);
 		push(files, CACHE + seg.key);
