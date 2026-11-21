@@ -1057,8 +1057,12 @@ type MediaStream struct {
 	// Another stream's video may be a little longer or shorter.
 	Sections                []*Section `protobuf:"bytes,6,rep,name=sections,proto3" json:"sections,omitempty"`
 	SectionsDurationSeconds float64    `protobuf:"fixed64,7,opt,name=sections_duration_seconds,json=sectionsDurationSeconds,proto3" json:"sections_duration_seconds,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// The master playlist as title-api fetched it from the CDN, of a primary
+	// player's stream: the router needn't fetch it again before the TV does.
+	// Empty for the alternative player's, which title-api assembles.
+	MasterPlaylist string `protobuf:"bytes,8,opt,name=master_playlist,json=masterPlaylist,proto3" json:"master_playlist,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *MediaStream) Reset() {
@@ -1138,6 +1142,13 @@ func (x *MediaStream) GetSectionsDurationSeconds() float64 {
 		return x.SectionsDurationSeconds
 	}
 	return 0
+}
+
+func (x *MediaStream) GetMasterPlaylist() string {
+	if x != nil {
+		return x.MasterPlaylist
+	}
+	return ""
 }
 
 type GetMarkingSettingsQuery struct {
@@ -3668,7 +3679,7 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"KIND_RECAP\x10\x01\x12\x0e\n" +
 	"\n" +
 	"KIND_INTRO\x10\x02\x12\x10\n" +
-	"\fKIND_CREDITS\x10\x03\"\xde\x05\n" +
+	"\fKIND_CREDITS\x10\x03\"\x87\x06\n" +
 	"\vMediaStream\x12.\n" +
 	"\x13master_playlist_url\x18\x01 \x01(\tR\x11masterPlaylistUrl\x12C\n" +
 	"\faudio_tracks\x18\x02 \x03(\v2 .title.v1.MediaStream.AudioTrackR\vaudioTracks\x12A\n" +
@@ -3676,7 +3687,8 @@ const file_api_title_v1_title_proto_rawDesc = "" +
 	"\rproxy_headers\x18\x04 \x03(\v2!.title.v1.MediaStream.ProxyHeaderR\fproxyHeaders\x12\x12\n" +
 	"\x04name\x18\x05 \x01(\tR\x04name\x12-\n" +
 	"\bsections\x18\x06 \x03(\v2\x11.title.v1.SectionR\bsections\x12:\n" +
-	"\x19sections_duration_seconds\x18\a \x01(\x01R\x17sectionsDurationSeconds\x1a7\n" +
+	"\x19sections_duration_seconds\x18\a \x01(\x01R\x17sectionsDurationSeconds\x12'\n" +
+	"\x0fmaster_playlist\x18\b \x01(\tR\x0emasterPlaylist\x1a7\n" +
 	"\vProxyHeader\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\x1a\x89\x01\n" +

@@ -440,6 +440,28 @@ func (player *alternativePlayer) startupRequests(ready time.Time) {
 	}
 }
 
+// alternativeResult is what alternativeStreams answered of one player.
+type alternativeResult struct {
+	streams []MovieStream
+	err     error
+}
+
+// startAlternatives asks each alternative player of a title's page for its
+// streams at once, as a browser loads the page's frames side by side, while
+// the primary players' are asked for: one after the other they took two
+// seconds more of a start. The results come in the players' order.
+func (c *Client) startAlternatives(ctx context.Context, title string, playerURLs []string, season int32, episode string) []chan alternativeResult {
+	results := make([]chan alternativeResult, len(playerURLs))
+	for index, playerURL := range playerURLs {
+		results[index] = make(chan alternativeResult, 1)
+		go func() {
+			streams, err := c.alternativeStreams(ctx, title, playerURL, season, episode)
+			results[index] <- alternativeResult{streams: streams, err: err}
+		}()
+	}
+	return results
+}
+
 // alternativeStreams are the sources of the title's (title, its id)
 // movie, or its season's episode, of the alternative player at rawPlayerURL.
 func (c *Client) alternativeStreams(ctx context.Context, title, rawPlayerURL string, season int32, episode string) ([]MovieStream, error) {

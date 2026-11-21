@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -101,26 +102,19 @@ func (s *Server) GetPlaybackStreams(
 		return nil, status.Error(codes.InvalidArgument, "title_id is required")
 	}
 
-	metadata, err := s.client.TitleMetadata(ctx, query.GetTitleId())
-	if err != nil {
-		return nil, providerStatus(err)
-	}
-
+	started := time.Now()
+	defer func() {
+		log.Printf("playback streams of %s found in %s", query.GetTitleId(), time.Since(started).Round(time.Millisecond))
+	}()
+	// A movie or a series is told by the streams themselves, not by the
+	// title's metadata first: that took the page and the player's embed
+	// once more, some two seconds of a start. An episode asked for of a
+	// movie is the movie (the selectors have no effect for movies); a
+	// series asked for without one is refused.
 	var streams []provider.MovieStream
-	switch metadata.MediaType {
-	case provider.MediaTypeMovie:
-		// Episode selectors intentionally have no effect for movies.
-		streams, err = s.client.Streams(ctx, query.GetTitleId())
-	case provider.MediaTypeSeries:
-		if query.SeasonNumber == nil {
-			return nil, status.Error(codes.InvalidArgument, "season_number is required for a series")
-		}
-		if query.GetSeasonNumber() < 0 {
-			return nil, status.Error(codes.InvalidArgument, "season_number must not be negative")
-		}
-		if query.EpisodeNumber == nil || strings.TrimSpace(query.GetEpisodeNumber()) == "" {
-			return nil, status.Error(codes.InvalidArgument, "episode_number is required for a series")
-		}
+	var err error
+	if query.SeasonNumber != nil && query.GetSeasonNumber() >= 0 &&
+		query.EpisodeNumber != nil && strings.TrimSpace(query.GetEpisodeNumber()) != "" {
 		if query.GetFirstPlay() && s.marking != nil {
 			s.marking.Opened(ctx, query.GetTitleId())
 		}
@@ -130,8 +124,21 @@ func (s *Server) GetPlaybackStreams(
 			query.GetSeasonNumber(),
 			query.GetEpisodeNumber(),
 		)
-	default:
-		return nil, status.Error(codes.FailedPrecondition, "unsupported media type")
+		if errors.Is(err, provider.ErrNotSeries) {
+			streams, err = s.client.Streams(ctx, query.GetTitleId())
+		}
+	} else {
+		streams, err = s.client.Streams(ctx, query.GetTitleId())
+		if errors.Is(err, provider.ErrNotMovie) {
+			switch {
+			case query.SeasonNumber == nil:
+				return nil, status.Error(codes.InvalidArgument, "season_number is required for a series")
+			case query.GetSeasonNumber() < 0:
+				return nil, status.Error(codes.InvalidArgument, "season_number must not be negative")
+			default:
+				return nil, status.Error(codes.InvalidArgument, "episode_number is required for a series")
+			}
+		}
 	}
 	if err != nil {
 		return nil, providerStatus(err)
@@ -720,6 +727,7 @@ func mediaStreams(streams []provider.MovieStream) []*titlev1.MediaStream {
 			MasterPlaylistUrl:       stream.MasterPlaylistURL,
 			Sections:                sections(stream.Sections),
 			SectionsDurationSeconds: stream.SectionsDuration,
+			MasterPlaylist:          stream.MasterPlaylist,
 			ProxyHeaders: make(
 				[]*titlev1.MediaStream_ProxyHeader,
 				0,

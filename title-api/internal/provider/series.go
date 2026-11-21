@@ -151,6 +151,8 @@ func (c *Client) EpisodeStreams(
 	if err != nil {
 		return nil, err
 	}
+	playerURLs := alternativePlayerURLs(movieHTML, c.providerURL().Scheme)
+	alternatives := c.startAlternatives(ctx, externalMovieID, playerURLs, seasonNumber, episodeNumber)
 
 	streams := make([]MovieStream, 0, len(embedURLs))
 	streamErrors := make([]error, 0)
@@ -250,8 +252,9 @@ func (c *Client) EpisodeStreams(
 		}
 		streams = append(streams, stream)
 	}
-	for _, playerURL := range alternativePlayerURLs(movieHTML, c.providerURL().Scheme) {
-		alternative, alternativeErr := c.alternativeStreams(ctx, externalMovieID, playerURL, seasonNumber, episodeNumber)
+	for index, playerURL := range playerURLs {
+		result := <-alternatives[index]
+		alternative, alternativeErr := result.streams, result.err
 		if errors.Is(alternativeErr, ErrEpisodeNotFound) {
 			continue
 		}

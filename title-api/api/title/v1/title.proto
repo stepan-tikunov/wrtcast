@@ -281,6 +281,10 @@ message MediaStream {
   // Another stream's video may be a little longer or shorter.
   repeated Section sections = 6;
   double sections_duration_seconds = 7;
+  // The master playlist as title-api fetched it from the CDN, of a primary
+  // player's stream: the router needn't fetch it again before the TV does.
+  // Empty for the alternative player's, which title-api assembles.
+  string master_playlist = 8;
 }
 
 message GetMarkingSettingsQuery {}

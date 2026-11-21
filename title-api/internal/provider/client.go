@@ -34,6 +34,8 @@ type MovieStream struct {
 	// little: another player's streams share the primary player's.
 	Sections         []Section
 	SectionsDuration float64
+	// The master as fetched, of a primary player's stream.
+	MasterPlaylist string
 }
 
 type ProxyHeader struct {
@@ -68,10 +70,13 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 		return nil, err
 	}
 	baseURL := c.providerURL()
+	playerURLs := alternativePlayerURLs(movieHTML, baseURL.Scheme)
+	alternatives := c.startAlternatives(ctx, externalMovieID, playerURLs, 0, "")
 
 	streams := make([]MovieStream, 0, len(embedURLs))
 	streamErrors := make([]error, 0)
 	seriesEmbeds := 0
+	seriesPlayers := 0
 	var movieSections []Section
 	var sectionsDuration float64
 	var referenceMaster string
@@ -94,16 +99,19 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 		stream.Name = primaryStreamName(index, len(embedURLs))
 		streams = append(streams, stream)
 	}
-	for _, playerURL := range alternativePlayerURLs(movieHTML, baseURL.Scheme) {
-		alternative, alternativeErr := c.alternativeStreams(ctx, externalMovieID, playerURL, 0, "")
-		if alternativeErr != nil {
-			streamErrors = append(streamErrors, fmt.Errorf("%s: %w", playerURL, alternativeErr))
+	for index, playerURL := range playerURLs {
+		result := <-alternatives[index]
+		if errors.Is(result.err, ErrEpisodeNotFound) {
+			seriesPlayers++
+		}
+		if result.err != nil {
+			streamErrors = append(streamErrors, fmt.Errorf("%s: %w", playerURL, result.err))
 			continue
 		}
-		streams = append(streams, alternative...)
+		streams = append(streams, result.streams...)
 	}
 	if len(streams) == 0 {
-		if len(embedURLs) > 0 && seriesEmbeds == len(embedURLs) {
+		if seriesEmbeds+seriesPlayers > 0 && seriesEmbeds == len(embedURLs) {
 			return nil, ErrNotMovie
 		}
 		return nil, fmt.Errorf("no playable embed found: %w", errors.Join(streamErrors...))
@@ -210,7 +218,9 @@ func (c *Client) streamFromHLS(
 	if !strings.Contains(string(masterBody), "#EXTM3U") {
 		return MovieStream{}, errors.New("HLS master response is not an m3u8 playlist")
 	}
-	return parseMaster(masterURL, string(masterBody), audioNames, subtitles)
+	stream, err := parseMaster(masterURL, string(masterBody), audioNames, subtitles)
+	stream.MasterPlaylist = string(masterBody)
+	return stream, err
 }
 
 func appendDynamicMarker(hlsURL, marker string) string {
