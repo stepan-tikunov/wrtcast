@@ -107,6 +107,12 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 #cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* Someone's page, over the title's or its cast's. */
 #person{position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+/* Only the page on top scrolls: the main one (html.paged) and the pages
+   under it (.covered) are held, so a swipe doesn't go on to them, past the
+   top page's end or when it has nothing to scroll, nor (iOS, now and then,
+   with a page just shown) land on them in its place. */
+html.paged,:is(#det,#list,#cast,#person).covered{overflow:hidden}
+#det,#list,#cast,#person{overscroll-behavior-y:contain}
 /* The header names them once their name has scrolled away. */
 #person .lhead b{display:none;overflow:hidden;font-size:17px;font-weight:650;white-space:nowrap;text-overflow:ellipsis;animation:pop .2s ease-out}
 #person.scr .lhead b:not(:empty){display:block}
@@ -1097,6 +1103,7 @@ function openLayer(name, url) {
   showLayer(name, true);
 }
 
+const PAGES = ['det', 'list', 'cast', 'person']; // the overlays that are pages, not sheets
 function showLayer(name, on) {
   const show = e => {
     e.classList.remove('out');
@@ -1104,13 +1111,16 @@ function showLayer(name, on) {
     e.hidden = false;
     e.classList.toggle('stuck', e.scrollTop > 0);
   };
-  const page = name == 'det' || name == 'list' || name == 'cast' || name == 'person';
+  const page = PAGES.includes(name);
   const e = $(page ? name : 'shade');
   // The shade is shared by the player and the sheets.
   if (on) show(e);
   else if (page || !plOpen && !layers.some(l => l in SHEETS)) animateOut(e);
   if (name in SHEETS) on ? show($(SHEETS[name])) : animateOut($(SHEETS[name]));
   $('shade').classList.toggle('top', layers.some(l => l in SHEETS));
+  const pages = layers.filter(l => PAGES.includes(l));
+  for (const p of PAGES) $(p).classList.toggle('covered', pages.includes(p) && p != pages.at(-1));
+  document.documentElement.classList.toggle('paged', pages.length > 0);
 }
 
 // Opens the player or folds it into the mini player.
