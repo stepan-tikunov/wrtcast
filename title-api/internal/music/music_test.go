@@ -105,9 +105,9 @@ func TestPlanFollowsATrackAcrossADialogue(t *testing.T) {
 		t.Fatalf("occurrences %v", occurrences)
 	}
 	o := occurrences[0]
-	// Heard from 80, under the dialogue: Shazam's 70 is before any music.
-	if o.Start != 80 || math.Abs(o.Stop-224) > 1e-9 {
-		t.Fatalf("the song heard %v–%v, want 80–224", o.Start, o.Stop)
+	// Heard from where its stretch starts, whatever Shazam says.
+	if o.Start != 100 || math.Abs(o.Stop-224) > 1e-9 {
+		t.Fatalf("the song heard %v–%v, want 100–224", o.Start, o.Stop)
 	}
 	// Only what follows the song's end is asked about.
 	if len(wanted) != 1 || wanted[0] < 224 {
@@ -242,8 +242,7 @@ func TestServiceTellsTheMusicOfAVideo(t *testing.T) {
 	if track.Title != "Song" || track.Artist != "Band" || track.Duration != 200 {
 		t.Fatalf("track %+v", track)
 	}
-	// Told 30 s in at the ask's start: Shazam says it started before the
-	// stretch, but no music is heard before it.
+	// Told 30 s in at the ask's start: shown from where its stretch starts.
 	ask, _ := service.store.asks(ctx, v.key())
 	if track.Start != 20 || math.Abs(track.Offset-(track.Start-(ask[0].Start-30))) > 0.1 {
 		t.Fatalf("track %+v of ask %+v", track, ask[0])
