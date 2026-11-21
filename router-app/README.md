@@ -305,7 +305,7 @@ scripts/deploy.sh          # по умолчанию ROUTER=root@192.168.1.1
 | `POST /api/tmdb/settings` `key` | задаёт ключ API или токен доступа TMDB (title-api сперва проверяет его; неподходящий — `400`), пустой `key` удаляет; ключ уходит в title-api так же, как у `/api/marking`; возвращает то же, что `GET` |
 | `GET /api/tmdb/title?type=&id=` | что есть на TMDB о тайтле — есть он у провайдера или нет (`type` — `movie` или `tv`, `id` — его ID на TMDB, как их отдаёт `tmdb` у `/api/title`): `{id,type,title_id,title,original,year,date,tagline,overview,backdrop:{w780,w1280},logo:{url,aspect},poster,age,rating,runtime,genres,countries,directors,creators,status,last,next,seasons:[{season,episodes,date,title}],cast:[{name,character,photo}],trailers:[{name,lang,kind,url,thumb}],collection:{id,name,parts},recommendations}`; `cast` — первые 12 по титрам (`photo` — `null` без фото), `cast_total` — сколько их всего (см. `/api/tmdb/cast`); `title_id` — тайтл title-api, если он сопоставлен (так же у частей коллекции и рекомендаций: `{id,type,title_id,title,year,date,poster,backdrop}`); `age` — `0+`…`18+`, `runtime` — минуты фильма; `status` (`returning`, `ended`, `canceled`, `other`), `last` и `next` (`{season,episode,date,title}`) — у сериала; картинки — URL через title-api (и `/api/p`, если включён `proxy`); `null`, если на TMDB такого нет или в title-api не задан ключ; хранит title-api, роутер не кэширует |
 | `GET /api/faces` `device`? | кто в кадре у ТВ на паузе: роутер отправляет в title-api сегмент паузы из кэша сегментов и позицию в нём (см. «Кто в кадре» в README title-api). Отвечает, как только кадр вырезан: `faces` пустые, `finding` — лица ещё ищутся, их отдаёт `/api/faces/pause`. `{pause,frame,width,height,preparing,finding,faces:[{box,crop,person:{id,name,character,photo,portrait},score,sure,alternatives:[{id,name,character,photo,portrait,score}]}]}`: `frame` — стоп-кадр, `box` — лицо в его пикселях, `crop` — картинка лица из кадра, `photo` — фото TMDB, `portrait` — лучшее лицо этого человека из прошлых пауз; `sure` — узнан точно, иначе `person` — «похоже» или `null`, а `alternatives` — два самых похожих; `preparing` — фото части актёров ещё смотрятся, паузу стоит спросить снова через `/api/faces/pause`. Без лиц — `{reason}`: `no_play`, `playing`, `no_cache` (качество `auto` или выключен `proxy`), `no_segment`, `not_matched` (тайтл не сопоставлен с TMDB), `off` (у title-api нет сервиса лиц) |
-| `GET /api/music` `device`? | музыка того, что играет на ТВ, узнанная к этому моменту (см. «Музыка»): `{tracks:[{start,stop,offset,key,title,artist,cover,url,apple_url,spotify,duration}],pending,received}`. `start`–`stop` — где трек звучит на видео, в секундах; `offset` — секунда трека в `start`; `url` — страница Shazam; `duration` — длина трека; `pending` — сколько вопросов к Shazam ещё в очереди; `received` — сколько секунд аудио получил title-api. Без ответа — `{reason}`: `no_play`, `not_fmp4` (видео не на fMP4: у основного плеера аудио пока не берётся), `off` (выключено на роутере или у title-api нет музыкального сервиса). То же приносит статус (`now.music`) |
+| `GET /api/music` `device`? | музыка того, что играет на ТВ, узнанная к этому моменту (см. «Музыка»): `{tracks:[{start,stop,offset,key,title,artist,cover,url,apple_url,spotify,duration}],pending,received}`. `start`–`stop` — где трек звучит на видео, в секундах; `offset` — секунда трека в `start`; `url` — страница Shazam; `duration` — длина трека; `pending` — сколько вопросов к Shazam ещё в очереди; `received` — сколько секунд аудио получил title-api. Без ответа — `{reason}`: `no_play`, `no_audio` (у основного плеера ещё не видно, какую озвучку играет ТВ), `off` (выключено на роутере или у title-api нет музыкального сервиса). То же приносит статус (`now.music`) |
 | `GET /api/faces/pause?id=` | лица паузы, по фото актёров, просмотренным к этому моменту; пока ищутся — ждёт до 15 с, не дождался — снова `finding`; `{reason:"gone"}`, если паузы нет |
 | `POST /api/faces/prepare` `device`? | фото актёров серии, которая играет на ТВ, title-api смотрит заранее: `{preparing}` |
 | `GET /api/tmdb/cast?type=&id=` | весь состав тайтла на TMDB по порядку титров: `{cast:[{name,character,photo}]}`, `photo` — `null`, если фото у TMDB нет; `null` — как у `/api/tmdb/title` |
@@ -603,20 +603,26 @@ AAC. Видео идёт через прокси как раньше.
 ## Музыка
 
 Что играет в фильме или серии, узнаёт title-api (см. «Музыка» в его
-README).
-- Работает с видео альтернативного плеера: его сегменты идут к ТВ через
-  relay title-api.
-- title-api сам качает их на 90 с вперёд ТВ и сам вырезает звук, так что
-  трек известен до того, как заиграет.
-- Роутер звук не режет и не отправляет, кэш и качество не важны.
+README). Звук он качает сам, на 90 с вперёд ТВ, так что трек известен до
+того, как заиграет. Роутер звук не режет и не отправляет, кэш и качество не
+важны.
+- **Альтернативный плеер:** его сегменты (fMP4, видео и звук вместе) идут к
+  ТВ через relay title-api, тот их и разбирает.
+- **Основной плеер:** звук у него отдельной дорожкой на каждую озвучку, и
+  мимо title-api. Роутер сообщает title-api (`POST /v1/music/play`), какую
+  серию, какую озвучку (NAME дорожки, которую ТВ выбрал) и с какой позиции
+  играет ТВ. title-api качает вперёд только эту звуковую дорожку. Озвучка —
+  часть источника: «Основной плеер | <озвучка>».
 
 Статус (`/api/status`, `now.music`) несёт последнее, что сказал title-api.
-- Спрашивает его фоновый процесс `wrtcast music <ТВ>`, не чаще раза в 10 с.
-- Статус его не ждёт.
+- Сообщает позицию и спрашивает музыку фоновый процесс `wrtcast music <ТВ>`,
+  не чаще раза в 10 с. Статус его не ждёт.
+- Без открытой страницы процесс оставляет `tick` раз в минуту, пока ТВ
+  играет. title-api перестаёт качать звук через 3 минуты без сообщений.
 - Последний ответ лежит в `mz:<ТВ>` в `kv`, замок — `mzl:<ТВ>`.
 
-Источник для title-api — хеш названия потока (озвучки, FNV-1a): у разных
-озвучек может быть разный монтаж.
+Источник для title-api — хеш (FNV-1a) названия потока, у основного плеера с
+озвучкой: у разных озвучек может быть разный монтаж и разный звук.
 
 ## Повтор, заставка и титры
 

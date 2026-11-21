@@ -3036,15 +3036,15 @@ async function poll() {
 
 // ---- music ----------------------------------------------------------------
 //
-// What plays in the video on the TV, told by title-api from the segments it
-// passes on and loads ahead, about a minute and a half before they play:
+// What plays in the video on the TV, told by title-api from the audio it
+// loads ahead, about a minute and a half before it plays:
 // the status carries it (now.music). A pill over the player names the track
 // playing now; it, and the button "Музыка" in the settings, open the sheet
 // of all the tracks told so far.
 let mz = null;          // the music of what plays, as the status told it
 
 const MUSIC_WHY = {
-  not_fmp4: 'У этого источника музыка пока не распознаётся',
+  no_audio: 'Жду, какую озвучку играет ТВ',
   off: 'Распознавание музыки не настроено',
 };
 

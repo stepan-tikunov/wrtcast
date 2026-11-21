@@ -1040,28 +1040,41 @@ function cache_mark(c, starts) {
 
 // ---- music -----------------------------------------------------------------
 //
-// What plays in a video: title-api tells the music of the alternative
-// player's videos (fMP4) from the segments its relay passes on to the TV
-// and loads a minute and a half ahead of it, so a track is known before it
-// plays. The status carries it (see music_of): title-api is asked again
-// at most every MUSIC_EVERY seconds by a process of its own, the status
-// never waiting for it.
+// What plays in a video: title-api tells it, a minute and a half before it
+// plays. The alternative player's videos (fMP4) it hears in the segments
+// its relay passes on to the TV and loads ahead. A primary player's video
+// doesn't pass it, and has its audio apart, a rendition per dub: the router
+// tells title-api where the TV plays it and in which dub (POST
+// /v1/music/play), and title-api loads that audio ahead itself; the dub is
+// then part of the video's source. The status carries the music (see
+// music_of): title-api is told and asked again at most every MUSIC_EVERY
+// seconds, by a process of its own the status never waits for; the tick
+// keeps telling it while no page asks for the status.
 const MUSIC_EVERY = 10;
 
-// The query of title-api's music of a video: the source is the stream's
-// name (a dub, which may be cut otherwise), hashed (FNV-1a), as title-api
-// hashes it.
+// The query of title-api's music of a video: the source (see music_source)
+// hashed (FNV-1a), as title-api hashes it.
 const music_query = (id, season, episode, source) => sprintf('title_id=%s&season=%d&episode=%d&source=%s',
 	urlenc(id), +(season ?? 0), +(match(`${episode ?? ''}`, /^[0-9]+/)?.[0] ?? 0), hash(source ?? ''));
 
-// title-api's music of what now plays: { tracks, pending, received } (see
-// GET /music), or { reason }; null for none.
-function music_ask(now) {
+// The source of the music of what now plays: the stream's name (a dub's,
+// which may be cut otherwise), and a primary player's dub the TV plays, as
+// seen (null while unknown).
+function music_source(now, seen) {
+	if (now.fmp4)
+		return now.source;
+	let a = seen?.url == now.url ? seen.audio ?? seen.audio_name : null;
+	return a != null ? `${now.source} | ${a}` : null;
+}
+
+// title-api's music of what now plays of source: { tracks, pending,
+// received } (see GET /music), or { reason }.
+function music_ask(now, source) {
 	if (!MUSIC)
 		return { reason: 'off' };
-	if (!now.fmp4)
-		return { reason: 'not_fmp4' };
-	let r = api('/v1/music?' + music_query(now.id, now.season, now.episode, now.source), [503]);
+	if (source == null)
+		return { reason: 'no_audio' };
+	let r = api('/v1/music?' + music_query(now.id, now.season, now.episode, source), [503]);
 	if (!r)
 		return { reason: 'off' };
 	return { tracks: r.tracks ?? [], pending: +(r.pending ?? 0), received: +(r.received ?? 0) };
@@ -1071,9 +1084,12 @@ function music_ask(now) {
 // null before; told again in the background once MUSIC_EVERY old, by one
 // process at a time (its lock mzl:<key> in kv, held 30 s at most).
 function music_of(key, now) {
-	if (!MUSIC || !now.fmp4)
-		return music_ask(now);
-	let q = music_query(now.id, now.season, now.episode, now.source), x = json(kv_get('mz:' + key) ?? 'null'), t = time();
+	if (!MUSIC)
+		return { reason: 'off' };
+	let source = music_source(now, tv_get(key, 'seen'));
+	if (source == null)
+		return null;
+	let q = music_query(now.id, now.season, now.episode, source), x = json(kv_get('mz:' + key) ?? 'null'), t = time();
 	if ((x?.q != q || t - x.t >= MUSIC_EVERY) &&
 	    sql_do('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE ' +
 	           'SET value = excluded.value WHERE CAST(value AS INTEGER) < ?', 'mzl:' + key, t, t - 30))
@@ -1081,13 +1097,19 @@ function music_of(key, now) {
 	return x?.q == q ? x.r : null;
 }
 
-// The process music_of left: asks title-api for the music of what the TV
-// of key plays.
+// The process music_of left: tells title-api where the TV of key plays a
+// primary player's video, and asks it for the music of what it plays.
 function music_fetch(key) {
-	let now = now_get(key);
-	if (now?.id) {
-		let q = music_query(now.id, now.season, now.episode, now.source);
-		kv_set('mz:' + key, { q, t: time(), r: music_ask(now) });
+	let now = now_get(key), seen = tv_get(key, 'seen'), source = now?.id ? music_source(now, seen) : null;
+	if (source != null) {
+		let q = music_query(now.id, now.season, now.episode, source);
+		let master = now.streams?.[now.stream]?.url;
+		if (!now.fmp4 && master && seen.audio_name != null)
+			api_post('/v1/music/play?' + q, {
+				name: source, master, audio: seen.audio_name,
+				position: +seen.pos + (seen.playing ? max(time() - seen.t, 0) : 0), playing: !!seen.playing,
+			});
+		kv_set('mz:' + key, { q, t: time(), r: music_ask(now, source) });
 	}
 	kv_set('mzl:' + key, 0);
 }
@@ -1403,11 +1425,14 @@ function watch_end(now, st) {
 		    (sent == null || +sent < was.t - 1))
 			pause_note(key, sprintf('paused on the TV, not by the router, at %.0f of %.0f s (playing at %.0f s %d s ago)',
 			                        +(m.time ?? 0), +(m.duration ?? 0), was.pos, time() - was.t));
-		let active = type => now.labels?.[filter(m.tracks ?? [], t => t.type == type && t.active)[0]?.name];
+		let track = type => filter(m.tracks ?? [], t => t.type == type && t.active)[0]?.name;
+		let active = type => now.labels?.[track(type)];
 		tv_set(key, 'seen', {
 			url: now.url, pos: +(m.time ?? 0), dur: +(m.duration ?? 0),
 			playing: m.state != 'PAUSED', t: time(),
 			audio: active('AUDIO'), subs: active('TEXT'),
+			// The audio's manifest NAME, which title-api follows (see "music").
+			audio_name: track('AUDIO'),
 		});
 		// For the next headers refresh of a title-api media (see
 		// media_headers), with no castctl call of its own.
@@ -1505,6 +1530,9 @@ function tick() {
 			watch_end(now, st);
 		if (m?.url == now.url)
 			remember(now, m);
+		// title-api follows a primary video's audio while told (see "music").
+		if (m?.url == now.url && index(['PLAYING', 'BUFFERING'], m.state) >= 0)
+			music_of(k, now);
 		misses = m?.url == now.url && m.state != 'IDLE' ? 0 : misses + 1;
 		if (misses != w?.misses || w?.url != now.url)
 			tv_set(k, 'watch', { url: now.url, misses });
@@ -3286,11 +3314,12 @@ const routes = {
 	// at start), title, artist, cover, url (Shazam's), apple_url, spotify,
 	// duration }], pending (asks of Shazam yet to be made), received
 	// (seconds of audio title-api has); or, with none, why (reason):
-	// no_play, not_fmp4, off (no music on the router or title-api). The
+	// no_play, no_audio (the dub a primary player's video plays in is not
+	// seen yet), off (no music on the router or title-api). The
 	// status carries the same, as last told (see music_of).
 	'GET /music': p => {
-		let now = now_get(state_key(device(p)));
-		return now?.id ? music_ask(now) : { reason: 'no_play' };
+		let key = state_key(device(p)), now = now_get(key);
+		return now?.id ? music_ask(now, music_source(now, tv_get(key, 'seen'))) : { reason: 'no_play' };
 	},
 
 	// A pause /faces told of (id its pause): its faces, told by the cast's
