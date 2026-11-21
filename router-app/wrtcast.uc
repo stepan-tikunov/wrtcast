@@ -3080,7 +3080,8 @@ function title_progress(id) {
 // ---- marked watched ----------------------------------------------------------
 //
 // A title marked watched from its page (see /watched), as if it had been
-// watched to the end here: a movie, or a series up to an episode, that one
+// watched to the end here: a movie, or a series up to an episode (its last
+// if none is given), that one
 // its last and those up to it watched (the MAX_EPISODES latest of them,
 // as play keeps); those after it watched are no longer, those begun keep
 // where they were left. Unmarked, a movie forgets where it was left and a
@@ -3090,14 +3091,15 @@ function mark_watched(id, on, season, episode) {
 	let series = r.mediaType == 'MEDIA_TYPE_SERIES', t = time();
 	let all = [], upto = -1;
 	if (series && on) {
-		if (season == null)
-			fail(400, 'season and episode required');
 		for (let s in r.seasons ?? [])
 			for (let e in s.episodes ?? [])
 				push(all, { season: +s.seasonNumber, episode: `${e.episodeNumber}`,
 				            dur: +(e.durationSeconds ?? 0) });
+		// Without an episode, to its last.
+		if (season == null)
+			upto = length(all) - 1;
 		for (let i, e in all)
-			if (e.season == season && e.episode == episode)
+			if (season != null && e.season == season && e.episode == episode)
 				upto = i;
 		if (upto < 0)
 			fail(404, 'no such episode');
@@ -3156,7 +3158,8 @@ function mark_watched(id, on, season, episode) {
 
 // A title of TMDB ("movie:<id>" or "tv:<id>") is marked watched at once,
 // whether or not the provider is known to have it: a movie, or a series up
-// to an episode by TMDB's numbers (done: its last; a movie always is). title-api looks for it
+// to an episode by TMDB's numbers (done: its last; a movie always is, and
+// a series without an episode, all of which is watched). title-api looks for it
 // on the provider meanwhile (wrtcast seen), and once found the mark is the
 // provider's title's (see mark_watched), the row left to tell it by.
 const TMDB_SEEN_MAX = 500;
@@ -3646,7 +3649,7 @@ const routes = {
 	},
 
 	// Marks a title watched (on=1): a movie, or a series up to season and
-	// episode; or unmarks it (on=0), see mark_watched. Its progress as
+	// episode, without them to its last; or unmarks it (on=0), see mark_watched. Its progress as
 	// /progress tells it of one, and the lists as without id. A title of
 	// TMDB (tmdb: "movie:<id>" or "tv:<id>", done=1 to a series' last
 	// episode) whether or not the provider has it, see mark_tmdb; with id,

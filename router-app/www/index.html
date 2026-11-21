@@ -2556,68 +2556,48 @@ function tileSeen(r) {
 // The page's title as a title of TMDB, if it is one alone.
 const tmdbRef = m => m.tmdbOnly ? { type: m.tmdb.type, id: m.tmdb.id, title_id: null } : null;
 
+// Whether the page's title is watched (see showSeen), and the episode of
+// a series it was watched up to.
+function pageSeen(m) {
+  const r = tmdbRef(m), series = r ? r.type == 'tv' : m.type == 'series';
+  if (r) {
+    const t = tmdbSeen[tmdbKey(r)];
+    return { on: tileSeen(r), mk: series && t && !t.title_id && t.season != null ? t : null };
+  }
+  // A series shows the episode it was watched up to, lit once that is
+  // its last.
+  const mk = series ? seenMark(m) : null, last = m.seasons?.findLast(s => s.episodes.length);
+  const on = m.id in want ? want[m.id] : series ? !!mk && mk.season == last.season && mk.episode == last.episodes.at(-1).episode :
+    m.type ? !!m.progress?.done : isSeen(m.id);
+  return { on, mk };
+}
+
 function showSeen() {
   const b = $('dseen'), m = item;
   if (!m) return;
   const r = tmdbRef(m), series = r ? r.type == 'tv' : m.type == 'series';
   b.hidden = series && m.type && !m.seasons?.length;
-  let on, mk;
-  if (r) {
-    const t = tmdbSeen[tmdbKey(r)];
-    on = tileSeen(r);
-    mk = series && t && !t.title_id && t.season != null ? t : null;
-  } else {
-    // A series shows the episode it was watched up to, lit once that is
-    // its last.
-    mk = series ? seenMark(m) : null;
-    const last = m.seasons?.findLast(s => s.episodes.length);
-    on = m.id in want ? want[m.id] : series ? !!mk && mk.season == last.season && mk.episode == last.episodes.at(-1).episode :
-      m.type ? !!m.progress?.done : isSeen(m.id);
-  }
+  const { on, mk } = pageSeen(m);
   b.classList.toggle('on', on);
-  b.querySelector('span').textContent = on ? 'Просмотрен' : mk ? 'До ' + epShort(mk) : 'Просмотрено';
-  b.setAttribute('aria-label', series ? 'Отметить, до какой серии смотрели' : on ? 'Отметить непросмотренным' : 'Отметить просмотренным');
+  b.querySelector('span').textContent = on ? 'Просмотрен' : mk ? 'До ' + epShort(mk) : 'Не просмотрен';
+  b.setAttribute('aria-label', on ? 'Отметить непросмотренным' : 'Отметить просмотренным');
 }
 
 // The button over a frame or a card, lit while its title is watched.
 function showSeenTile(b) {
   const on = b.r ? tileSeen(b.r) : isSeen(b.dataset.id);
   b.classList.toggle('on', on);
-  b.setAttribute('aria-label', b.r?.type == 'tv' ? 'Отметить, до какой серии смотрели' :
-    on ? 'Отметить непросмотренным' : 'Отметить просмотренным');
+  b.setAttribute('aria-label', on ? 'Отметить непросмотренным' : 'Отметить просмотренным');
 }
 
-// Whether a title of the provider's is a series, as far as known without
-// asking: its page's answer, or the history; undefined if not known.
-function knownSeries(id) {
-  const t = titles[id], r = recent.find(e => e.id == id) ?? saved.find(e => e.id == id && e.season != null);
-  return t ? t.type == 'series' : r ? r.season != null : undefined;
-}
-
-// The button over a search's card. Of a title not known to be a movie or a
-// series, a tap is shown as a movie's at once; a series' sheet opens once
-// its page's answer tells it is one.
+// The button over a search's card: the title marked watched, all of it,
+// or no longer.
 function cardSeen(m) {
   const b = el('button', { className: 'ws' }, svgIcon('check'));
   b.dataset.id = m.id;
-  b.onclick = async e => {
+  b.onclick = e => {
     e.stopPropagation();
-    const series = knownSeries(m.id), on = !isSeen(m.id);
-    if (series) return openSeenSheet({ id: m.id });
-    if (series === false) return markMovie(m.id, on);
-    want[m.id] = on;
-    refreshSeen();
-    let t;
-    try {
-      t = await title(m.id);
-    } catch (err) {
-      toast(err);
-    }
-    if (!seenQ[m.id]) delete want[m.id];
-    refreshSeen();
-    if (!t) return;
-    if (t.type == 'series') return openSeenSheet({ id: m.id });
-    markMovie(m.id, on);
+    markWhole(m.id, !isSeen(m.id));
   };
   showSeenTile(b);
   return b;
@@ -2670,11 +2650,20 @@ function seenRedraw() {
   else renderEpisodes();
 }
 
-// A movie of the provider's (id) marked (on) or no longer; tmdb: its key,
-// whose mark of TMDB's it takes over.
-function markMovie(id, on, tmdb) {
+// A title of the provider's (id) marked watched (on), a series to its last
+// episode, or no longer; tmdb: its key, whose mark of TMDB's it takes
+// over.
+function markWhole(id, on, tmdb) {
   if (item?.id == id && !item.tmdbOnly && item.type) {
-    item.progress = on ? { pos: item.progress?.dur ?? 0, dur: item.progress?.dur ?? 0, done: true } : null;
+    if (!on) item.progress = null;
+    else if (item.type != 'series') item.progress = { pos: item.progress?.dur ?? 0, dur: item.progress?.dur ?? 0, done: true };
+    else {
+      const eps = {};
+      for (const s of item.seasons)
+        for (const e of s.episodes) eps[epKey({ season: s.season, episode: e.episode })] = { pos: e.duration || 0, dur: e.duration || 0, done: true };
+      const last = item.seasons.findLast(s => s.episodes.length);
+      item.progress = last ? { last: { season: last.season, episode: String(last.episodes.at(-1).episode) }, eps } : null;
+    }
     seenRedraw();
   }
   sendSeen(id, { id, on: on ? '1' : '0', ...tmdb ? { tmdb } : {} }, on, seenAnswer(id));
@@ -2691,32 +2680,35 @@ function markTmdb(k, on, last) {
   sendSeen(k, req, !!on && (!ep || !!last));
 }
 
-// A tap on a frame's button: a movie is marked at once, a series' sheet
-// opens.
+// A tap on a frame's button: the title marked watched, a series all of
+// it, or no longer.
 function tapTile(r) {
-  if (r.type == 'tv') return openSeenSheet(r.title_id ? { id: r.title_id, tmdb: tmdbKey(r) } : { r });
   const on = !tileSeen(r);
-  if (r.title_id) markMovie(r.title_id, on, tmdbKey(r));
+  if (r.title_id) markWhole(r.title_id, on, tmdbKey(r));
   else markTmdb(tmdbKey(r), on);
 }
 
+// On a title's page, a series watched here (begun or marked) has the
+// episode it was watched up to picked in the sheet; anything else is
+// marked watched all of it, or no longer, as a frame's button does.
 $('dseen').onclick = async () => {
   const m = item;
   if (!m) return;
   const r = tmdbRef(m);
-  if (r) return tapTile(r);
-  if (m.type == 'series') return openSeenSheet({ id: m.id });
-  if (m.type) return markMovie(m.id, !m.progress?.done);
-  // Not loaded yet: a series' sheet opens as it loads, a movie is marked
-  // once it is known to be one.
-  let t;
+  if (r) return r.type == 'tv' && tmdbSeen[tmdbKey(r)] && !tmdbSeen[tmdbKey(r)].title_id ? openSeenSheet({ r }) : tapTile(r);
+  if (m.type && m.progress !== undefined) {
+    if (m.type == 'series' && m.progress) return openSeenSheet({ id: m.id });
+    return markWhole(m.id, !pageSeen(m).on);
+  }
+  // Not loaded yet: what it is is waited for.
+  let t, p;
   try {
-    t = await title(m.id);
+    [t, p] = await Promise.all([title(m.id), api('progress?id=' + encodeURIComponent(m.id))]);
   } catch (e) {
     return toast(e);
   }
-  if (t.type == 'series') return openSeenSheet({ id: m.id });
-  markMovie(m.id, !(m.id in want ? want[m.id] : isSeen(m.id)));
+  if (t.type == 'series' && p.progress) return openSeenSheet({ id: m.id });
+  markWhole(m.id, !isSeen(m.id));
 };
 $('wcollapse').onclick = closeTop;
 $('wclear').onclick = async () => {
