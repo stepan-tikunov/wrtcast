@@ -104,14 +104,18 @@ function load(f) {
 // flash every few minutes (see keep) and back on the first request after a
 // boot. Files are left for the leveler's segments and fetches' stderr.
 
-const SCHEMA = 4;
+const SCHEMA = 5;
 
 // The history tables in schema s: per title, when it was last watched, its
 // name and poster for the recently watched list, a series' last episode and
 // what it was watched with (see watched_with); the position in a movie (ep
 // '') or in each episode ("season:episode"); the settings (see setting);
-// and the titles saved to watch, with when they were saved.
+// the titles saved to watch, with when they were saved; and the titles of
+// TMDB marked watched (see "marked watched").
 const SAVED = s => `CREATE TABLE ${s}.saved (id TEXT PRIMARY KEY, title TEXT, poster TEXT, t INTEGER NOT NULL)`;
+const TMDB_SEEN = s => `CREATE TABLE ${s}.tmdb_seen (key TEXT PRIMARY KEY, title_id TEXT,
+	season INTEGER, episode TEXT, done INTEGER NOT NULL, t INTEGER NOT NULL)`;
+const TMDB_SEEN_COLS = 'key, title_id, season, episode, done, t';
 const HISTORY = s => `
 	CREATE TABLE ${s}.titles (
 		id TEXT PRIMARY KEY, title TEXT, poster TEXT,
@@ -122,7 +126,8 @@ const HISTORY = s => `
 		done INTEGER NOT NULL, t INTEGER NOT NULL, PRIMARY KEY (id, ep)
 	);
 	CREATE TABLE ${s}.settings (key TEXT PRIMARY KEY, value TEXT);
-	${SAVED(s)};`;
+	${SAVED(s)};
+	${TMDB_SEEN(s)};`;
 const TITLE_COLS = 'id, title, poster, season, episode, prefs, t';
 const PROGRESS_COLS = 'id, ep, pos, dur, done, t';
 
@@ -184,8 +189,9 @@ function import_json(P) {
 // Another request may be doing the same: the one that gets the write lock
 // first does it. A database of schema 1 (before the settings) gets the
 // settings table, one before the segment cache its table and one before
-// the saved titles theirs; a copy on flash of schema 1 has no settings,
-// and one before schema 4 no saved titles.
+// the saved titles theirs, one before the titles of TMDB marked watched
+// theirs; a copy on flash of schema 1 has no settings, one before schema 4
+// no saved titles and one before schema 5 none of TMDB marked.
 function init() {
 	let exec = q => db.exec(q) ?? db_fail();
 	let version = () => (db.query('PRAGMA user_version') ?? db_fail())[0].user_version;
@@ -210,6 +216,8 @@ function init() {
 			exec(CACHE_TABLE);
 		if (v < 4)
 			exec(SAVED('main'));
+		if (v < 5)
+			exec(TMDB_SEEN('main'));
 	}
 	if (v != SCHEMA) {
 		let kept = name => keep && length(db.query('SELECT 1 FROM keep.sqlite_master WHERE name = ?', name) ?? []);
@@ -217,6 +225,8 @@ function init() {
 			exec('INSERT OR REPLACE INTO settings (key, value) SELECT key, value FROM keep.settings');
 		if (v < 4 && kept('saved'))
 			exec('INSERT OR REPLACE INTO saved (id, title, poster, t) SELECT id, title, poster, t FROM keep.saved');
+		if (v < 5 && kept('tmdb_seen'))
+			exec(`INSERT OR REPLACE INTO tmdb_seen (${TMDB_SEEN_COLS}) SELECT ${TMDB_SEEN_COLS} FROM keep.tmdb_seen`);
 		exec(`PRAGMA user_version = ${SCHEMA}`);
 	}
 	exec('COMMIT');
@@ -1249,6 +1259,7 @@ function keep() {
 		INSERT INTO keep.progress (${PROGRESS_COLS}) SELECT ${PROGRESS_COLS} FROM progress;
 		INSERT INTO keep.settings (key, value) SELECT key, value FROM settings;
 		INSERT INTO keep.saved (id, title, poster, t) SELECT id, title, poster, t FROM saved;
+		INSERT INTO keep.tmdb_seen (${TMDB_SEEN_COLS}) SELECT ${TMDB_SEEN_COLS} FROM tmdb_seen;
 		COMMIT`) != null;
 	if (!ok)
 		d.exec('ROLLBACK');
@@ -3095,6 +3106,7 @@ function mark_watched(id, on, season, episode) {
 	if (!on) {
 		sql_do(series ? 'DELETE FROM progress WHERE id = ?' :
 		       "DELETE FROM progress WHERE id = ? AND ep = ''", id);
+		sql_do('DELETE FROM tmdb_seen WHERE title_id = ?', id);
 		if (series)
 			sql_do('DELETE FROM titles WHERE id = ?', id);
 	} else {
@@ -3129,6 +3141,89 @@ function mark_watched(id, on, season, episode) {
 	}
 	sql_exec('COMMIT');
 	changed(true);
+}
+
+// A title of TMDB ("movie:<id>" or "tv:<id>") is marked watched at once,
+// whether or not the provider is known to have it: a movie, or a series up
+// to an episode by TMDB's numbers (done: its last). title-api looks for it
+// on the provider meanwhile (wrtcast seen), and once found the mark is the
+// provider's title's (see mark_watched), the row left to tell it by.
+const TMDB_SEEN_MAX = 500;
+
+// The provider's title of a title of TMDB, if title-api has found it;
+// pending ones it goes on looking for.
+function tmdb_found(key) {
+	let k = split(key, ':');
+	let r = api_post(`/v1/tmdb/${k[0]}/${k[1]}/lookup`, {});
+	let j = r.status == 200 ? json(r.out) : null;
+	return j?.state == 'STATE_FOUND' && j.titleId ? j.titleId : (j?.state == 'STATE_PENDING' ? '' : null);
+}
+
+function mark_tmdb(key, on, season, episode, done) {
+	if (!on) {
+		let x = sql_row('SELECT title_id FROM tmdb_seen WHERE key = ?', key);
+		sql_do('DELETE FROM tmdb_seen WHERE key = ?', key);
+		let id = x?.title_id ?? tmdb_found(key);
+		if (id)
+			mark_watched(id, false);
+		changed(true);
+		return;
+	}
+	sql_do(`INSERT INTO tmdb_seen (${TMDB_SEEN_COLS}) VALUES (?, NULL, ?, ?, ?, ?)
+		ON CONFLICT (key) DO UPDATE SET title_id = NULL, season = excluded.season,
+		episode = excluded.episode, done = excluded.done, t = excluded.t`,
+		key, season, season != null ? episode : null, !!done, time());
+	sql_do('DELETE FROM tmdb_seen WHERE key NOT IN (SELECT key FROM tmdb_seen ORDER BY t DESC LIMIT ?)',
+	       TMDB_SEEN_MAX);
+	changed(true);
+	system(`${shq(sourcepath())} seen ${shq(key)} </dev/null >/dev/null 2>&1 &`);
+}
+
+// Moves the mark of a title of TMDB to the provider's title, once title-api
+// finds it there (a few minutes at most). A series' episode is the
+// provider's of the same numbers or the last one before them.
+function seen_lookup(key) {
+	let id = null;
+	for (let i = 0; i < 12 && !id; i++) {
+		id = tmdb_found(key);
+		if (id == null)
+			return;
+		if (!id)
+			sleep(5000);
+	}
+	let x = sql_row(`SELECT ${TMDB_SEEN_COLS} FROM tmdb_seen WHERE key = ?`, key);
+	if (!id || !x || x.title_id)
+		return;
+	let season = null, episode = null, num = e => +(match(`${e}`, /^[0-9]+/)?.[0] ?? 0);
+	if (x.season != null) {
+		let r = api(`/v1/titles/${id}`), at = null;
+		for (let s in r.seasons ?? [])
+			for (let e in s.episodes ?? []) {
+				let n = { season: +s.seasonNumber, episode: `${e.episodeNumber}` };
+				if (n.season < x.season || n.season == x.season && num(n.episode) <= num(x.episode))
+					at = n;
+			}
+		if (!at)
+			return;
+		season = at.season;
+		episode = at.episode;
+	}
+	// Unmarked or marked anew meanwhile: that one is moved by its own.
+	if (sql_row('SELECT t FROM tmdb_seen WHERE key = ?', key)?.t != x.t)
+		return;
+	mark_watched(id, true, season, episode);
+	sql_do('UPDATE tmdb_seen SET title_id = ? WHERE key = ? AND t = ?', id, key, x.t);
+	changed(true);
+}
+
+// The titles of TMDB marked watched, as the page tells them: by key, the
+// provider's title once found (watched as that is), else whether watched
+// to the end and up to which episode.
+function tmdb_rows() {
+	let out = {};
+	for (let x in sql_rows(`SELECT ${TMDB_SEEN_COLS} FROM tmdb_seen`))
+		out[x.key] = { title_id: x.title_id, done: !!x.done, season: x.season, episode: x.episode };
+	return out;
 }
 
 // ---- saved titles ------------------------------------------------------------
@@ -3535,15 +3630,18 @@ const routes = {
 	// watch, latest saved first, with the same of those watched.
 	'GET /progress': p => {
 		if (p.id == null)
-			return { recent: recent_rows(), saved: saved_rows() };
+			return { recent: recent_rows(), saved: saved_rows(), tmdb: tmdb_rows() };
 		return title_progress(title_id(p));
 	},
 
 	// Marks a title watched (on=1): a movie, or a series up to season and
 	// episode; or unmarks it (on=0), see mark_watched. Its progress as
-	// /progress tells it of one, and the lists as without id.
+	// /progress tells it of one, and the lists as without id. A title of
+	// TMDB (tmdb: "movie:<id>" or "tv:<id>", done=1 to a series' last
+	// episode) whether or not the provider has it, see mark_tmdb; with id,
+	// the provider's title of it, its mark of TMDB's dropped.
 	'POST /watched': p => {
-		let id = title_id(p), season = null;
+		let season = null;
 		if (!match(p.on ?? '', /^[01]$/))
 			fail(400, 'invalid on');
 		if (p.season != null) {
@@ -3552,8 +3650,20 @@ const routes = {
 				fail(400, 'invalid season or episode');
 			season = +p.season;
 		}
+		if (p.tmdb != null && !match(p.tmdb, /^(movie|tv):[0-9]{1,10}$/))
+			fail(400, 'invalid tmdb');
+		if (p.id == null) {
+			if (p.tmdb == null)
+				fail(400, 'id or tmdb required');
+			mark_tmdb(p.tmdb, p.on == '1', season, p.episode, p.done == '1');
+			return { recent: recent_rows(), saved: saved_rows(), tmdb: tmdb_rows() };
+		}
+		// The provider's title of a title of TMDB: its mark is the title's.
+		let id = title_id(p);
+		if (p.tmdb != null)
+			sql_do('DELETE FROM tmdb_seen WHERE key = ?', p.tmdb);
 		mark_watched(id, p.on == '1', season, p.episode);
-		return { ...title_progress(id), recent: recent_rows(), saved: saved_rows() };
+		return { ...title_progress(id), recent: recent_rows(), saved: saved_rows(), tmdb: tmdb_rows() };
 	},
 
 
@@ -3725,7 +3835,7 @@ const routes = {
 		let r = api(`/v1/tmdb/person/${tmdb_id(p)}`, [400, 404]);
 		if (!r)
 			return null;
-		let watched = {};
+		let watched = {}, marked = tmdb_rows();
 		for (let t in sql_rows('SELECT id FROM titles'))
 			watched[t.id] = true;
 		return {
@@ -3739,7 +3849,8 @@ const routes = {
 				let t = tmdb_related(c.title ?? {});
 				return {
 					...t, character: c.character || null, jobs: c.jobs ?? [],
-					episodes: +(c.episodes ?? 0) || null, acting: !!c.acting, seen: !!watched[t.title_id],
+					episodes: +(c.episodes ?? 0) || null, acting: !!c.acting,
+					seen: !!watched[t.title_id] || !!marked[`${t.type}:${t.id}`],
 				};
 			}),
 		};
@@ -3879,6 +3990,10 @@ if (ARGV[0] == 'ahead' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
 }
 if (ARGV[0] == 'mark' && match(ARGV[1] ?? '', /^[0-9A-Za-z]{1,64}$/)) {
 	mark_saved(ARGV[1]);
+	exit(0);
+}
+if (ARGV[0] == 'seen' && match(ARGV[1] ?? '', /^(movie|tv):[0-9]{1,10}$/)) {
+	seen_lookup(ARGV[1]);
 	exit(0);
 }
 if (ARGV[0] == 'music' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
