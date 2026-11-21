@@ -45,12 +45,15 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:16px 12px;padding:4px 12px 0}
 #home{padding-bottom:120px}
+/* The pills over the mini player (music, skip, faces) reach higher than it:
+   the pages end above them. */
+:root:has(#pl:not([hidden],.pending) :is(#mpill,#skipb,#fpill):not([hidden])) :is(#home,#det,#list,#cast,#person){padding-bottom:calc(176px + env(safe-area-inset-bottom))}
 .card{position:relative;align-self:start}
 .card .open{display:block;width:100%;padding:0;border:0;background:none;text-align:left}
 .card img,.card i{display:block;width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--s2)}
 .card i{display:grid;place-items:center;color:#55555c;font:600 40px system-ui;font-style:normal}
 .pf{display:block;border-radius:12px}
-.card b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:7px;font-size:14px;font-weight:550}
+.card b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:7px;font-size:14px;font-weight:550;overflow-wrap:anywhere}
 .card span{color:var(--mu);font-size:13px}
 .badge{position:absolute;top:6px;left:6px;padding:2px 7px;border-radius:6px;background:#000c;color:#ddd!important;font-size:11px!important;font-weight:600}
 .badge.on{background:var(--ac);color:#111!important}
@@ -179,7 +182,7 @@ html.settled :is(body>header,#home,#msg,.covered){visibility:hidden}
 .work .th{width:34px;aspect-ratio:2/3;border-radius:5px;background:var(--s2) center/cover}
 .work .th.none{background:repeating-linear-gradient(135deg,var(--s2) 0 6px,var(--s1) 6px 12px)}
 .work>div{min-width:0}
-.work b{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600}
+.work b{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600;overflow-wrap:anywhere}
 .work span{display:block;overflow:hidden;color:var(--mu);font-size:13px;white-space:nowrap;text-overflow:ellipsis}
 .work small{display:flex;flex-direction:column;align-items:flex-end;gap:3px;color:#6b6b72;font-size:12px;white-space:nowrap}
 .work small .soon{margin:0}
@@ -227,13 +230,13 @@ html.settled :is(body>header,#home,#msg,.covered){visibility:hidden}
 #dbg{position:absolute;inset:-40px;background:center/cover;filter:blur(40px) brightness(.45);transform:scale(1.2)}
 #det .nav{position:relative;margin-left:-8px}
 #det .hero{position:relative;display:flex;gap:16px;align-items:flex-end}
-#det .hero>div{flex:1}
+#det .hero>div{flex:1;min-width:0}
 #dposter{width:112px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--s2);box-shadow:0 8px 24px #0008}
-#det h1{margin:0 0 4px;font-size:22px;line-height:1.2}
+#det h1{margin:0 0 4px;font-size:22px;line-height:1.2;overflow-wrap:anywhere}
 /* Visually hidden, still read out: the title under its logo. */
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 #dmeta{color:#c8c8cc;font-size:14px}
-#dmeta .orig{margin-bottom:2px;color:var(--mu)}
+#dmeta .orig{margin-bottom:2px;color:var(--mu);overflow-wrap:anywhere}
 .age{display:inline-block;padding:0 5px;border:1px solid #ffffff59;border-radius:4px;font-size:.8em;font-weight:600;line-height:1.45;vertical-align:1px}
 #dmeta .gen{margin-top:8px;color:var(--mu)}
 /* TMDB's backdrop (#det.bd): the picture across the top, the logo or the
@@ -515,6 +518,12 @@ button.fr{cursor:pointer}
 /* The episode; a movie has no line. */
 #st{display:block;overflow:hidden;color:var(--mu);font-size:13px;white-space:nowrap;text-overflow:ellipsis}
 #st:empty{display:none}
+/* The TV not answering for a while (see lost): said instead of the episode,
+   the controls dimmed. */
+#lost{display:none;overflow:hidden;color:var(--err);font-size:13px;white-space:nowrap;text-overflow:ellipsis}
+#pl.lost:not(.pending) #lost{display:block}
+#pl.lost:not(.pending) #st{display:none}
+#pl.lost:not(.pending) :is(.live,#tg,#spd){opacity:.4}
 #tg{background:var(--tx);color:#111;width:46px;height:46px}
 /* Out of the way where it stood in the mini player, to fade in on folding. */
 #pl.open #tg{position:absolute;right:0;top:13px;visibility:hidden}
@@ -633,8 +642,11 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 #devname{display:flex;align-items:center;gap:6px;margin:8px auto 0;padding:6px 12px;border:0;border-radius:16px;background:none;color:var(--mu);font-size:14px}
 #devname svg{width:18px;height:18px}
 
-#toast{position:fixed;left:50%;bottom:96px;z-index:9;transform:translateX(-50%);width:max-content;max-width:90%;padding:10px 16px;border-radius:12px;background:var(--err);color:#fff;font-size:14px;box-shadow:0 4px 16px #0008}
+/* Only text: taps go through it to what is under it. */
+#toast{position:fixed;left:50%;bottom:96px;z-index:9;transform:translateX(-50%);width:max-content;max-width:90%;padding:10px 16px;border-radius:12px;background:var(--err);color:#fff;font-size:14px;box-shadow:0 4px 16px #0008;pointer-events:none}
 #toast:empty{display:none}
+/* Over the open player it would hide its controls: at the top instead. */
+:root:has(#pl.open) #toast{top:max(12px,env(safe-area-inset-top));bottom:auto}
 
 /* motion */
 @keyframes pop{from{opacity:0;transform:translateY(12px) scale(.97)}}
@@ -909,7 +921,7 @@ svg.spring{animation:spring .3s ease-out}
   <button id="mpill" hidden></button>
   <div id="bar">
     <span id="thumb"><img alt=""></span>
-    <div class="t"><b id="title"></b><span id="st"></span></div>
+    <div class="t"><b id="title"></b><span id="st"></span><span id="lost"></span></div>
     <button class="ib" id="tg" data-c="toggle" aria-label="Пауза"><svg><use href="#i-play"/></svg></button>
     <div id="spd" hidden><span id="speed">1x</span><select id="spdsel" aria-label="Скорость"></select></div>
     <button class="ib" id="more" aria-label="Настройки" hidden><svg><use href="#i-tune"/></svg></button>
@@ -1034,8 +1046,19 @@ localStorage.removeItem('backdrops'); // pages no longer open laid out for a bac
 // Requests that talk to the TV carry the chosen device.
 const withDevice = path => device ? path + (path.includes('?') ? '&' : '?') + 'device=' + encodeURIComponent(device) : path;
 
+// Refused together (on load the page, the status, the lists and the
+// devices are), the requests ask for the token once, and go again with the
+// one given; those refused once it was given go again too, or, declined, fail.
+let tokenAsked = 0, tokenAsk = null; // the prompts answered; the one open
+const askToken = () => tokenAsk ||= Promise.resolve().then(() => {
+  token = prompt('Токен доступа') || '';
+  if (token) localStorage.token = token;
+  tokenAsked++;
+  tokenAsk = null;
+});
+
 async function api(path, body) {
-  const o = { headers: {} };
+  const o = { headers: {} }, prompted = tokenAsked;
   if (token) o.headers['X-Token'] = token;
   if (body) {
     o.method = 'POST';
@@ -1044,9 +1067,9 @@ async function api(path, body) {
   }
   const r = await fetch('/api/' + path, o); // pages live at /title/… too
   const j = await r.json().catch(() => ({ error: r.statusText }));
-  if (r.status == 401 && (token = prompt('Токен доступа') || '')) {
-    localStorage.token = token;
-    return api(path, body);
+  if (r.status == 401) {
+    if (prompted == tokenAsked) await askToken();
+    if (token) return api(path, body);
   }
   if (!r.ok) throw Object.assign(new Error(j.error || r.status), { body: j });
   return j;
@@ -1658,6 +1681,7 @@ async function toggleSave(m) {
   const req = { id: m.id, on: on ? '1' : '0' };
   if (m.title) req.title = m.title;
   if (m.poster) req.poster = m.poster;
+  savedAt = ++listsAsked; // what was asked before shows the toggle as well
   try {
     const r = await api('save', req);
     if (n != saving) return;
@@ -1674,14 +1698,22 @@ async function toggleSave(m) {
 // The main page lists the watch history, and the saved titles under it,
 // until something is searched for; clearing the query brings them back.
 
+// The answers come in any order: one asked before a mark, or before
+// another ask, would put back what was before. Each is numbered as asked,
+// one older than the lists shown is dropped, and one older than the last
+// save keeps the saved titles as shown.
+let listsAsked = 0, listsShown = 0, savedAt = 0;
 async function loadRecent() {
+  const n = ++listsAsked;
   let r;
   try {
     r = await api('progress');
   } catch {
     return; // the list is a convenience; search still works
   }
-  gotLists(r);
+  if (n < listsShown) return;
+  listsShown = n;
+  gotLists(n < savedAt ? { ...r, saved } : r);
 }
 
 // The lists as /progress (or /watched) tells them.
@@ -2732,7 +2764,8 @@ function refreshSeen() {
 function sendSeen(key, req, on, done) {
   want[key] = on;
   refreshSeen();
-  const p = (seenQ[key] ?? Promise.resolve()).then(() => api('watched', req)).then(r => ({ r }), e => ({ e }));
+  let at;
+  const p = (seenQ[key] ?? Promise.resolve()).then(() => (at = ++listsAsked, api('watched', req))).then(r => ({ r }), e => ({ e }));
   seenQ[key] = p;
   p.then(({ r, e }) => {
     if (e) toast(e);
@@ -2740,12 +2773,14 @@ function sendSeen(key, req, on, done) {
     delete seenQ[key];
     delete want[key];
     if (r) {
-      gotLists(r);
+      // The lists of /watched, unless /progress has told later ones.
+      if (at >= listsShown) {
+        listsShown = at;
+        gotLists(at < savedAt ? { ...r, saved } : r);
+      }
       done?.(r);
-    } else {
-      loadRecent();
-      if (item && !item.tmdbOnly && item.id == req.id) reloadProgress(item.id);
-    }
+    } else if (item && !item.tmdbOnly && item.id == req.id) reloadProgress(item.id); // the lists too
+    else loadRecent();
     refreshSeen();
   });
 }
@@ -3250,8 +3285,10 @@ $('pback').onclick = closeTop;
 // ---- playback -----------------------------------------------------------
 
 // m: { id, title, poster } plus season and episode for a series episode.
+let plays = 0; // the plays begun; a start waiting for its sources is let go by a later one
 async function play(m) {
   if (pending) return;
+  plays++;
   const req = { id: m.id, title: m.title };
   if (m.poster) req.poster = m.poster;
   // Quality switches replay the same stream from the current position.
@@ -3313,6 +3350,7 @@ async function start(m) {
   if (m.source || pending || item?.id != m.id || item.prefs?.source) return play(m);
   asking = m;
   renderDetails();
+  const n = plays;
   let names = [];
   try {
     const q = m.season != null ? `&season=${m.season}&episode=${encodeURIComponent(m.episode)}` : '';
@@ -3320,8 +3358,10 @@ async function start(m) {
   } catch {} // play tells what went wrong
   asking = null;
   renderDetails();
-  if (item?.id != m.id) return;
-  if (names.length < 2) return play(m);
+  if (n != plays) return;
+  // Its page left meanwhile, it plays anyway, from the main player: the
+  // sources would be picked over another page.
+  if (names.length < 2 || item?.id != m.id) return play(m);
   openLayer('src');
   showSources(m, names);
 }
@@ -3384,8 +3424,7 @@ function fill(sel, tracks, off) {
 function showTime() {
   const m = st?.media;
   if (!m || pending) return;
-  let t = m.time || 0;
-  if (m.state == 'PLAYING') t += (Date.now() - statusAt) / 1000 * (m.rate || 1);
+  let t = position(m);
   if (m.duration) t = Math.min(t, m.duration);
   $('st').textContent = epLine(st.now);
   $('prog').firstChild.style.width = m.duration ? (100 * t / m.duration) + '%' : 0;
@@ -3536,8 +3575,9 @@ function render(s) {
   $('drc').checked = !!s.now?.drc;
 }
 
-// Where playback is now, extrapolated from the last status.
-const position = m => (m.time || 0) + (m.state == 'PLAYING' ? (Date.now() - statusAt) / 1000 * (m.rate || 1) : 0);
+// Where playback is now, extrapolated from the last status; where it was
+// last known while the status fails (see lost).
+const position = m => (m.time || 0) + (m.state == 'PLAYING' && !stale ? (Date.now() - statusAt) / 1000 * (m.rate || 1) : 0);
 
 // Repeated ±10 taps move the timer right away and add up into one seek sent
 // once the tapping stops; polled status would undo them until then.
@@ -3598,6 +3638,7 @@ async function poll() {
     const s = await api(withDevice('status'));
     pollError = '';
     pollFails = 0;
+    lost(false);
     if (sent == device) tvOff(false);
     // A poll answered while a command is on its way may tell the state
     // before it (a volume takes the TV a second).
@@ -3610,6 +3651,7 @@ async function poll() {
       busy = false;
       return;
     }
+    lost(true);
     // A TV starting a stream drops the channel of the one before now and
     // then, a second (castctl: device closed the channel): a play under
     // way, or a single failed poll, isn't a lost connection, unless the TV
@@ -3622,6 +3664,7 @@ async function poll() {
     }
     // The router answered and the TV didn't: its icon says so, no toast.
     // No answer at all is the router out of reach.
+    lost(true, e.body ? 'ТВ не отвечает' : 'Нет связи с роутером');
     if (e.body) {
       if (sent == device) tvOff(true);
     } else {
@@ -3631,6 +3674,21 @@ async function poll() {
     pollError = e.message;
   }
   busy = false;
+}
+
+// Once a poll fails, what is on is no longer known: the time stands where it
+// was last known (stale), the next good poll moves it on. Failing on (the
+// TV off, or 2 polls in a row), the player dims, and says why (why).
+let stale = false;
+function lost(on, why) {
+  if (on && !stale && st?.media) {
+    st.media.time = position(st.media);
+    statusAt = Date.now();
+  }
+  if (!on && stale) statusAt = Date.now(); // from where it stood, until a status tells
+  stale = on;
+  if (why) $('lost').textContent = why;
+  if (why || !on) $('pl').classList.toggle('lost', !!why);
 }
 
 // A cross at the TV's icon while it doesn't answer, e.g. switched off; a
@@ -4841,6 +4899,9 @@ async function openNow() {
   const n = st?.now;
   if (!n) return;
   await closePlayer();
+  // A cast's or someone's page over the title's would stay over it, the
+  // title changing under them; their history entries go first.
+  if (layers.includes('det')) while (layers.at(-1) != 'det') await closeTop();
   openDetails({ id: n.id, title: n.title, poster: n.poster });
 }
 $('eplist').onclick = openNow;
