@@ -224,7 +224,16 @@ func (source *alternativeSource) initialQuality() string {
 // reply handed on, or, should that be refused, with a fresh copy of the
 // page and its viewporti nonce. A CDN that blocks the client itself ends
 // the attempts.
-func (source *alternativeSource) resolve(ctx context.Context) ([]byte, error) {
+func (source *alternativeSource) resolve(ctx context.Context) (body []byte, err error) {
+	started := time.Now()
+	label := strings.TrimSpace(source.label)
+	defer func() {
+		if err != nil {
+			log.Printf("alternative source %q: not resolved in %s: %v", label, time.Since(started).Round(time.Millisecond), err)
+		} else {
+			log.Printf("alternative source %q: resolved in %s", label, time.Since(started).Round(time.Millisecond))
+		}
+	}()
 	var lastErr error
 	for attempt, delay := range []time.Duration{0, time.Second, 3 * time.Second} {
 		if attempt > 0 {
@@ -233,16 +242,32 @@ func (source *alternativeSource) resolve(ctx context.Context) ([]byte, error) {
 				return nil, ctx.Err()
 			case <-time.After(delay):
 			}
+			resigned := time.Now()
 			if err := source.resign(ctx); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("sign again (attempt %d): %w", attempt+1, err)
 			}
+			log.Printf("alternative source %q: signed again in %s (attempt %d)", label, time.Since(resigned).Round(time.Millisecond), attempt+1)
 		}
+		opening := time.Now()
 		source.startSession(ctx)
+		source.mu.Lock()
+		session := source.session
+		source.mu.Unlock()
+		if session != nil {
+			session.mu.Lock()
+			opened := !session.openedAt.IsZero()
+			session.mu.Unlock()
+			log.Printf("alternative source %q: playback socket %s after %s (attempt %d)", label,
+				map[bool]string{true: "open", false: "not open"}[opened], time.Since(opening).Round(time.Millisecond), attempt+1)
+		}
+		loading := time.Now()
 		_, err := source.loadQuality(ctx, source.initialQuality())
 		if err == nil {
 			source.loadOtherQualities(ctx)
 			return source.master(), nil
 		}
+		log.Printf("alternative source %q: manifest failed in %s (attempt %d): %v", label,
+			time.Since(loading).Round(time.Millisecond), attempt+1, err)
 		if vd, blocked := cdnBlocked(err); blocked {
 			return nil, fmt.Errorf("%w (X-VD: %s)", ErrCDNBlocked, vd)
 		}
