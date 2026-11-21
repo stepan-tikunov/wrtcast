@@ -89,6 +89,11 @@ type Client struct {
 
 	marks Marks
 
+	// The segments the relay keeps and loads ahead (see segments.go), and
+	// the video each alternative source (by its media id) is of.
+	segments *segmentCache
+	videos   sync.Map
+
 	// The series' episodes fetched lately (see Series).
 	seriesMu     sync.Mutex
 	series       map[string]seriesEntry

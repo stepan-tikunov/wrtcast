@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -137,10 +138,11 @@ func TestPlanAsksAgainOfATrackOfUnknownLength(t *testing.T) {
 // fakeMusic is a music service: audio "M" is music, anything else
 // speech; Shazam tells what recognize says, or is over its limit.
 type fakeMusic struct {
-	mu        sync.Mutex
-	asked     [][]byte
-	limited   bool
-	recognize *match
+	mu         sync.Mutex
+	classified [][]byte
+	asked      [][]byte
+	limited    bool
+	recognize  *match
 }
 
 func (f *fakeMusic) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +151,7 @@ func (f *fakeMusic) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer f.mu.Unlock()
 	switch r.URL.Path {
 	case "/v1/classify":
+		f.classified = append(f.classified, body)
 		var frames [][4]float64
 		for t := 0.0; t < 3.5; t += 0.5 {
 			if strings.HasPrefix(string(body), "M") {
@@ -286,5 +289,45 @@ func TestServiceWaitsWhenShazamIsLimited(t *testing.T) {
 	service.trim(ctx)
 	if files, _, _ := service.store.files(ctx); len(files) != 0 {
 		t.Fatalf("files left %v", files)
+	}
+}
+
+// A segment of the alternative player (fMP4, video and audio) has its
+// audio cut out as it is, ADTS.
+func TestSegmentCutsTheAudio(t *testing.T) {
+	path := ffmpegPath()
+	if path == "" {
+		t.Skip("no ffmpeg")
+	}
+	file := filepath.Join(t.TempDir(), "s.mp4")
+	if out, err := exec.Command(path, "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x36:rate=10:duration=4",
+		"-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=4", "-c:v", "libx264", "-c:a", "aac",
+		"-movflags", "frag_keyframe+empty_moov+default_base_moof", file).CombinedOutput(); err != nil {
+		t.Skipf("ffmpeg cannot make a segment: %v %s", err, out)
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakeMusic{}
+	service := newTestService(t, fake)
+	if err := service.Segment(context.Background(), Video{Title: "t", Source: SourceOf("x")}, 8, 12, nil, data); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.classified) != 1 || len(fake.classified[0]) < 1000 || fake.classified[0][0] != 0xff {
+		t.Fatalf("classified %d", len(fake.classified))
+	}
+	if _, from, seconds := adtsCut(fake.classified[0], 0, 100); from != 0 || math.Abs(seconds-4) > 0.1 {
+		t.Fatalf("audio of %v s", seconds)
+	}
+}
+
+// The source of a stream is its name hashed as the router hashes it.
+func TestSourceOf(t *testing.T) {
+	if got := SourceOf("abc"); got != "1a47e90b" {
+		t.Fatalf("SourceOf(abc) = %s", got)
+	}
+	if EpisodeOf("12a") != 12 || EpisodeOf("") != 0 {
+		t.Fatal("EpisodeOf")
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 
 	"title-api/internal/music"
+	"title-api/internal/provider"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 )
@@ -110,5 +112,57 @@ func musicHandler(service *music.Service) runtime.HandlerFunc {
 		}
 		result, err := service.Tracks(request.Context(), video)
 		musicReply(response, result, err)
+	}
+}
+
+// musicMissesHandler serves DELETE
+// /v1/music/misses[?title_id=<id>&season=<n>&episode=<n>&source=<player>]:
+// what Shazam found nothing in, of the video or of all, is asked again
+// (see music.Service.ForgetMisses).
+func musicMissesHandler(service *music.Service) runtime.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request, _ map[string]string) {
+		if musicDisabled(response, service) {
+			return
+		}
+		var video *music.Video
+		if request.URL.Query().Has("title_id") {
+			v, ok := musicVideo(response, request)
+			if !ok {
+				return
+			}
+			video = &v
+		}
+		n, err := service.ForgetMisses(request.Context(), video)
+		musicReply(response, struct {
+			Forgotten int64 `json:"forgotten"`
+		}{n}, err)
+	}
+}
+
+// musicSink takes the segments the relay passes on or loads ahead (see
+// provider.KeepSegments) for the music service, one at a time; while it
+// is behind, segments beyond the queue are left.
+func musicSink(ctx context.Context, service *music.Service) func(provider.Segment) {
+	queue := make(chan provider.Segment, 64)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case s := <-queue:
+				v := music.Video{Title: s.Video.Title, Season: s.Video.Season,
+					Episode: music.EpisodeOf(s.Video.Episode), Source: music.SourceOf(s.Video.Source)}
+				if err := service.Segment(ctx, v, s.Start, s.End, s.Init, s.Data); err != nil && ctx.Err() == nil {
+					log.Printf("music %s|%d|%d at %.1f: %v", v.Title, v.Season, v.Episode, s.Start, err)
+				}
+			}
+		}
+	}()
+	return func(s provider.Segment) {
+		select {
+		case queue <- s:
+		default:
+			log.Printf("music: behind, a segment at %.1f left", s.Start)
+		}
 	}
 }

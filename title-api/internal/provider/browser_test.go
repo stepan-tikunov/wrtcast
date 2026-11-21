@@ -342,7 +342,7 @@ func TestAlternativePlayerPageLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	streams, err := client.alternativeStreams(context.Background(), server.URL+"/?token_movie=abc&token=tok", 0, "")
+	streams, err := client.alternativeStreams(context.Background(), "title", server.URL+"/?token_movie=abc&token=tok", 0, "")
 	if err != nil || len(streams) != 1 {
 		t.Fatalf("streams %+v, %v", streams, err)
 	}

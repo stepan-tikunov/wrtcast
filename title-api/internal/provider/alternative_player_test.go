@@ -35,7 +35,7 @@ func TestRealAlternativePlayer(t *testing.T) {
 	if len(urls) == 0 {
 		t.Fatalf("alternative player not found; token_movie offset=%d, cdn offset=%d", strings.Index(string(page), "token_movie"), strings.Index(string(page), "cdn."))
 	}
-	streams, err := client.alternativeStreams(ctx, urls[0], 1, "1")
+	streams, err := client.alternativeStreams(ctx, "title", urls[0], 1, "1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 
 	playerURL, _ := url.Parse("https://player.example/?token_movie=abc&token=def")
 	player := &alternativePlayer{browser: client.browser, playerURL: playerURL, fingerprint: fingerprint}
-	streams := client.alternativePlaybackStreams(player, alternativeFile{ID: 7}, playback)
+	streams := client.alternativePlaybackStreams(player, alternativeFile{ID: 7}, playback, Video{})
 	if requests != 0 {
 		t.Fatalf("listing sources made %d CDN requests", requests)
 	}

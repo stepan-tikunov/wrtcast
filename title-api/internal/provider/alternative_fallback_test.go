@@ -263,7 +263,7 @@ func (fake *fakeAlternativePlayer) counts() (pages, playbacks, cdnRequests int) 
 
 func alternativeMasterID(t *testing.T, client *Client, fake *fakeAlternativePlayer) string {
 	t.Helper()
-	streams, err := client.alternativeStreams(context.Background(), fake.url(), 0, "")
+	streams, err := client.alternativeStreams(context.Background(), "title", fake.url(), 0, "")
 	if pages, playbacks, cdnRequests := fake.counts(); err != nil || len(streams) != 1 ||
 		pages != 1 || playbacks != 1 || cdnRequests != 0 {
 		t.Fatalf("streams = %+v, err = %v after %d pages, %d playback and %d CDN requests",

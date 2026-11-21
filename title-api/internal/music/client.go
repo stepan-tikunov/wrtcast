@@ -71,10 +71,12 @@ func (c *client) post(ctx context.Context, path string, audio []byte, result any
 	return nil
 }
 
-// classify is YAMNet's frames of audio, their T from its start.
+// classify is YAMNet's frames of audio, their T from its start, with
+// their MFCCs.
 func (c *client) classify(ctx context.Context, audio []byte) ([]frame, error) {
 	var result struct {
-		Frames [][4]float64 `json:"frames"`
+		Frames   [][4]float64 `json:"frames"`
+		Features [][]float32  `json:"features"`
 	}
 	if err := c.post(ctx, "/v1/classify", audio, &result); err != nil {
 		return nil, err
@@ -82,6 +84,9 @@ func (c *client) classify(ctx context.Context, audio []byte) ([]frame, error) {
 	frames := make([]frame, len(result.Frames))
 	for i, f := range result.Frames {
 		frames[i] = frame{T: f[0], Music: f[1], Speech: f[2], Song: f[3]}
+		if i < len(result.Features) && len(result.Features[i]) == mfccs {
+			frames[i].MFCC = result.Features[i]
+		}
 	}
 	return frames, nil
 }

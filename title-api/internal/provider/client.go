@@ -95,7 +95,7 @@ func (c *Client) Streams(ctx context.Context, externalMovieID string) ([]MovieSt
 		streams = append(streams, stream)
 	}
 	for _, playerURL := range alternativePlayerURLs(movieHTML, baseURL.Scheme) {
-		alternative, alternativeErr := c.alternativeStreams(ctx, playerURL, 0, "")
+		alternative, alternativeErr := c.alternativeStreams(ctx, externalMovieID, playerURL, 0, "")
 		if alternativeErr != nil {
 			streamErrors = append(streamErrors, fmt.Errorf("%s: %w", playerURL, alternativeErr))
 			continue

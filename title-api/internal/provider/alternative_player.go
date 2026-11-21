@@ -440,7 +440,9 @@ func (player *alternativePlayer) startupRequests(ready time.Time) {
 	}
 }
 
-func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, season int32, episode string) ([]MovieStream, error) {
+// alternativeStreams are the sources of the title's (title, its id)
+// movie, or its season's episode, of the alternative player at rawPlayerURL.
+func (c *Client) alternativeStreams(ctx context.Context, title, rawPlayerURL string, season int32, episode string) ([]MovieStream, error) {
 	player, err := c.loadAlternativePlayer(ctx, rawPlayerURL)
 	if err != nil {
 		return nil, err
@@ -454,7 +456,7 @@ func (c *Client) alternativeStreams(ctx context.Context, rawPlayerURL string, se
 	if err != nil {
 		return nil, err
 	}
-	streams := c.alternativePlaybackStreams(player, file, playback)
+	streams := c.alternativePlaybackStreams(player, file, playback, Video{Title: title, Season: season, Episode: episode})
 	if len(streams) == 0 {
 		return nil, fmt.Errorf("none of %d sources has a quality", len(playback.HLSSource))
 	}
@@ -626,7 +628,7 @@ func (catalog alternativeCatalog) selectedFile(season int32, episode string) (al
 // alternativePlaybackStreams lists every source without touching the CDN:
 // each master is assembled only when a player first asks for it, so starting
 // a title costs requests for the chosen source alone.
-func (c *Client) alternativePlaybackStreams(player *alternativePlayer, file alternativeFile, playback alternativePlayback) []MovieStream {
+func (c *Client) alternativePlaybackStreams(player *alternativePlayer, file alternativeFile, playback alternativePlayback, video Video) []MovieStream {
 	subtitles := make([]SubtitleTrack, 0, len(playback.Tracks))
 	for index, track := range playback.Tracks {
 		if track.Source == "" {
@@ -661,6 +663,8 @@ func (c *Client) alternativePlaybackStreams(player *alternativePlayer, file alte
 		}
 		id := c.masters.putSource(alternative)
 		alternative.id = id
+		video.Source = label
+		c.videos.Store(id, video)
 		streams = append(streams, MovieStream{
 			Name:              label,
 			MasterPlaylistURL: c.mediaBaseURL + "/v1/media/" + id + "/master.m3u8",

@@ -7,9 +7,11 @@ import (
 
 // frame is YAMNet's look at a 0.975 s window of a video's audio starting
 // at T seconds: how much it is music, speech and a song (the highest of
-// the classes of songs).
+// the classes of songs); and the window's timbre, its MFCCs (none from
+// before the music service told them).
 type frame struct {
 	T, Music, Speech, Song float64
+	MFCC                   []float32
 }
 
 // What a stretch of music is, measured on two episodes of Russian sitcoms
@@ -108,38 +110,76 @@ type occurrence struct {
 // the order of the video. A stretch is asked about once, twice if long and
 // the first finds nothing; one heard within the length of a track told
 // before it, soon after its music, is that track's and not asked about,
-// up to where the track ends.
+// up to where the track ends. A track told goes on up to a join of songs
+// (see joins) after where it was told, if an ask just after the join tells
+// another track or none; until one is asked, it goes on.
 func plan(frames []frame, asks []ask) ([]occurrence, []float64) {
 	asks = append([]ask(nil), asks...)
 	sort.Slice(asks, func(i, j int) bool { return asks[i].Start < asks[j].Start })
+	cuts := joins(frames)
 	var occurrences []occurrence
 	var wanted []float64
 	// The track told last, where it ends on the video (+Inf unknown, for
-	// within its stretch only), and where its music was last heard.
-	current, currentEnd, lastMusic := -1, 0.0, 0.0
+	// within its stretch only), where its music was last heard, and up to
+	// where an ask told it.
+	current, currentEnd, lastMusic, told := -1, 0.0, 0.0, 0.0
+	// follow takes the current track on up to limit, within a stretch to
+	// stop, unless an ask just after a join past where it was told tells
+	// another track or none: then it ends at the join, which is answered
+	// (else -1). A join not asked about yet is asked about.
+	follow := func(limit, stop float64) float64 {
+		o := &occurrences[current]
+		for _, at := range cuts {
+			if at <= told || at <= o.Start {
+				continue
+			}
+			if at >= limit {
+				break
+			}
+			p := probe(asks, at)
+			if p < 0 {
+				if t, ok := bestWindow(frames, at, math.Min(stop, at+probeReach), nil); ok {
+					wanted = append(wanted, t)
+				}
+				break
+			}
+			if asks[p].Key == o.Key {
+				told = math.Max(told, asks[p].Stop)
+				continue
+			}
+			o.Stop = at
+			current = -1
+			return at
+		}
+		o.Stop = math.Max(o.Stop, limit)
+		lastMusic = limit
+		return -1
+	}
 	for _, s := range spans(frames) {
-		from := s.Start
+		from, joined := s.Start, false
 		if current >= 0 && s.Start < currentEnd && s.Start-lastMusic <= chainGap {
-			o := &occurrences[current]
-			o.Stop = math.Min(s.Stop, currentEnd)
-			lastMusic = o.Stop
-			from = currentEnd
+			if at := follow(math.Min(s.Stop, currentEnd), s.Stop); at >= 0 {
+				from, joined = at, true
+			} else {
+				from = currentEnd
+			}
 		} else {
 			current = -1
 		}
-		for from < s.Stop && s.Stop-from >= spanMin {
+		for from < s.Stop && (s.Stop-from >= spanMin || joined) {
+			joined = false
 			var failed []ask
-			told := -1
+			found := -1
 			for i, a := range asks {
 				if m := a.middle(); m >= from && m < s.Stop {
 					if a.Key != "" {
-						told = i
+						found = i
 						break
 					}
 					failed = append(failed, a)
 				}
 			}
-			if told < 0 {
+			if found < 0 {
 				switch {
 				case len(failed) == 0:
 					if t, ok := bestWindow(frames, from, s.Stop, nil); ok {
@@ -152,7 +192,7 @@ func plan(frames []frame, asks []ask) ([]occurrence, []float64) {
 				}
 				break
 			}
-			a := asks[told]
+			a := asks[found]
 			trackStart := a.Start - a.Offset
 			end := math.Inf(1)
 			if a.Duration > 0 {
@@ -162,25 +202,55 @@ func plan(frames []frame, asks []ask) ([]occurrence, []float64) {
 			if from > s.Start {
 				start = math.Max(trackStart, from)
 			}
+			// Not before a join of songs before where it was told.
+			for _, at := range cuts {
+				if at > start && at <= a.Start {
+					start = at
+				}
+			}
 			start = math.Max(start, 0)
-			occurrences = append(occurrences, occurrence{
-				Key: a.Key, Start: start, Stop: math.Min(s.Stop, end), TrackStart: trackStart,
-			})
-			current, lastMusic = len(occurrences)-1, math.Min(s.Stop, end)
+			occurrences = append(occurrences, occurrence{Key: a.Key, Start: start, Stop: start, TrackStart: trackStart})
+			current, told = len(occurrences)-1, a.Stop
 			if math.IsInf(end, 1) {
 				// Of an unknown length, the track is this stretch's only.
 				currentEnd = s.Stop
-				break
+			} else {
+				currentEnd = end
 			}
-			currentEnd = end
-			if end <= from {
-				// Told, but over before where it was heard: ask no further here.
+			if at := follow(math.Min(s.Stop, end), s.Stop); at >= 0 {
+				from, joined = at, true
+				continue
+			}
+			if math.IsInf(end, 1) || end <= from {
+				// Over before where it was heard: ask no further here.
 				break
 			}
 			from = end
 		}
 	}
-	return merged(occurrences), wanted
+	return merged(occurrences), distinct(wanted)
+}
+
+// probe is the ask of the audio just after a join at at, -1 if none.
+func probe(asks []ask, at float64) int {
+	for i, a := range asks {
+		if a.Start >= at-1 && a.Start < at+probeReach-askLength+1 {
+			return i
+		}
+	}
+	return -1
+}
+
+// distinct are the times in order, each once.
+func distinct(times []float64) []float64 {
+	sort.Float64s(times)
+	var result []float64
+	for _, t := range times {
+		if n := len(result); n == 0 || t-result[n-1] > 0.01 {
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 // merged joins a track's occurrences that follow one another.

@@ -220,7 +220,7 @@ func TestMediaSessionHandler(t *testing.T) {
 
 type fakeRelay struct{}
 
-func (fakeRelay) FetchMedia(_ context.Context, id, rawURL string, _ bool) (*http.Response, error) {
+func (fakeRelay) RelayMedia(_ context.Context, id, rawURL string, _ bool) (*http.Response, error) {
 	switch {
 	case id != "known":
 		return nil, provider.ErrMasterNotFound

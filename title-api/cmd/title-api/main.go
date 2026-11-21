@@ -121,6 +121,20 @@ func run() error {
 		}
 		go musicService.Run(ctx)
 	}
+	// The relay keeps the alternative player's segments and loads them
+	// ahead of the receiver (TITLE_API_AHEAD seconds, 0 not), for the music
+	// to be told before it plays; TITLE_API_SEGMENTS=off keeps none.
+	if dir := envOrDefault("TITLE_API_SEGMENTS", filepath.Join(filepath.Dir(stateDBPath), "segments")); dir != "off" {
+		megabytes, _ := strconv.ParseInt(envOrDefault("TITLE_API_SEGMENTS_MB", "2048"), 10, 64)
+		ahead, _ := strconv.ParseFloat(envOrDefault("TITLE_API_AHEAD", "90"), 64)
+		options := provider.SegmentOptions{Dir: dir, Limit: megabytes << 20, Ahead: ahead}
+		if musicService != nil {
+			options.Sink = musicSink(ctx, musicService)
+		}
+		if err := client.KeepSegments(options); err != nil {
+			return err
+		}
+	}
 
 	grpcListener, err := net.Listen("tcp", grpcAddress)
 	if err != nil {
@@ -168,6 +182,7 @@ func run() error {
 		{http.MethodGet, "/v1/faces/portraits/{scope}/{person}", facesPortraitHandler(faceService)},
 		{http.MethodPost, "/v1/music/audio", musicAudioHandler(musicService)},
 		{http.MethodGet, "/v1/music", musicHandler(musicService)},
+		{http.MethodDelete, "/v1/music/misses", musicMissesHandler(musicService)},
 	} {
 		if err := gateway.HandlePath(route.method, route.path, route.handler); err != nil {
 			_ = grpcListener.Close()
@@ -279,7 +294,7 @@ func qualityPlaylistHandler(source qualityPlaylistSource) runtime.HandlerFunc {
 }
 
 type mediaRelaySource interface {
-	FetchMedia(ctx context.Context, id, rawURL string, preview bool) (*http.Response, error)
+	RelayMedia(ctx context.Context, id, rawURL string, preview bool) (*http.Response, error)
 }
 
 // mediaRelayHandler serves GET /v1/media/{id}/cdn?u=<CDN URL>[&pv=1]: the
@@ -288,7 +303,7 @@ type mediaRelaySource interface {
 // marks a seek preview's fetch, which the player's view doesn't count.
 func mediaRelayHandler(source mediaRelaySource) runtime.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
-		upstream, err := source.FetchMedia(request.Context(), pathParams["id"], request.URL.Query().Get("u"),
+		upstream, err := source.RelayMedia(request.Context(), pathParams["id"], request.URL.Query().Get("u"),
 			request.URL.Query().Get("pv") == "1")
 		if err != nil && request.Context().Err() == nil {
 			log.Printf("media relay %s: %v", pathParams["id"], err)

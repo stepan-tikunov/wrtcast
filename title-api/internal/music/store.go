@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -78,9 +79,13 @@ func (s *store) hasAudio(ctx context.Context, video string, start float64) (bool
 }
 
 func (s *store) putAudio(ctx context.Context, video string, start, stop float64, frames []frame, file string) error {
-	encoded := make([][4]float64, len(frames))
+	// [t, music, speech, song, mfcc…]
+	encoded := make([][]float64, len(frames))
 	for i, f := range frames {
-		encoded[i] = [4]float64{f.T, f.Music, f.Speech, f.Song}
+		encoded[i] = append(make([]float64, 0, 4+len(f.MFCC)), f.T, f.Music, f.Speech, f.Song)
+		for _, c := range f.MFCC {
+			encoded[i] = append(encoded[i], math.Round(float64(c)*100)/100)
+		}
 	}
 	data, err := json.Marshal(encoded)
 	if err != nil {
@@ -112,12 +117,22 @@ func (s *store) frames(ctx context.Context, video string) ([]frame, float64, err
 		if err := rows.Scan(&start, &stop, &data); err != nil {
 			return nil, 0, err
 		}
-		var encoded [][4]float64
+		var encoded [][]float64
 		if err := json.Unmarshal([]byte(data), &encoded); err != nil {
 			return nil, 0, err
 		}
 		for _, f := range encoded {
-			result = append(result, frame{T: f[0], Music: f[1], Speech: f[2], Song: f[3]})
+			if len(f) < 4 {
+				continue
+			}
+			g := frame{T: f[0], Music: f[1], Speech: f[2], Song: f[3]}
+			if len(f) == 4+mfccs {
+				g.MFCC = make([]float32, mfccs)
+				for i, c := range f[4:] {
+					g.MFCC[i] = float32(c)
+				}
+			}
+			result = append(result, g)
 		}
 		seconds += stop - start
 	}
@@ -240,4 +255,14 @@ func (s *store) track(ctx context.Context, key string) (match, error) {
 	}
 	err := json.Unmarshal([]byte(data), &m)
 	return m, err
+}
+
+// forgetMisses forgets the asks of a video ("" all) that found nothing:
+// they are made again of the audio kept.
+func (s *store) forgetMisses(ctx context.Context, video string) (int64, error) {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM music_asks WHERE track IS NULL AND (? = '' OR video = ?)`, video, video)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

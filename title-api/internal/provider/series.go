@@ -251,7 +251,7 @@ func (c *Client) EpisodeStreams(
 		streams = append(streams, stream)
 	}
 	for _, playerURL := range alternativePlayerURLs(movieHTML, c.providerURL().Scheme) {
-		alternative, alternativeErr := c.alternativeStreams(ctx, playerURL, seasonNumber, episodeNumber)
+		alternative, alternativeErr := c.alternativeStreams(ctx, externalMovieID, playerURL, seasonNumber, episodeNumber)
 		if errors.Is(alternativeErr, ErrEpisodeNotFound) {
 			continue
 		}

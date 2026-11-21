@@ -1,11 +1,13 @@
-// Package music tells what music plays in a film or an episode: the router
-// sends the audio of each segment of a video it gets (the TV's, and those
-// it loads ahead of the TV), the music service (music/ in the repository)
-// scores each half second of it for music, speech and song by YAMNet, and
-// of each stretch of music Shazam is asked about eight seconds, once, or
-// twice if long and the first finds nothing; a stretch heard within the
-// length of a track told before it, soon after, is that track's, not
-// asked about again: a song cut by a dialogue. Shazam is asked one ask at
+// Package music tells what music plays in a film or an episode: the relay
+// gives the segments it passes on or loads ahead of the TV (Segment), or
+// their audio comes (Audio); the music service (music/ in the repository)
+// scores each half second of it for music, speech and song by YAMNet and
+// tells its timbre, and of each stretch of music Shazam is asked about
+// eight seconds, once, or twice if long and the first finds nothing; a
+// stretch heard within the length of a track told before it, soon after,
+// is that track's, not asked about again: a song cut by a dialogue; unless
+// the timbre changes (see joins) and an ask after the change tells another
+// track. Shazam is asked one ask at
 // a time, the latest video's first, as often as the music service lets
 // it. What was told is kept for good: a video watched again shows its
 // music at once.
@@ -181,6 +183,25 @@ func (s *Service) Tracks(ctx context.Context, v Video) (Result, error) {
 	return result, nil
 }
 
+// ForgetMisses forgets what Shazam found nothing in, of a video (nil: of
+// all), for it to be asked again: after the asking changed. Only the audio
+// still kept (audioAge) can be asked again; the rest finds nothing again
+// without asking. It tells how many asks were forgotten.
+func (s *Service) ForgetMisses(ctx context.Context, v *Video) (int64, error) {
+	video := ""
+	if v != nil {
+		video = v.key()
+	}
+	n, err := s.store.forgetMisses(ctx, video)
+	if err == nil && n > 0 {
+		select {
+		case s.wake <- struct{}{}:
+		default:
+		}
+	}
+	return n, err
+}
+
 func round(x float64) float64 { return math.Round(x*10) / 10 }
 
 // Run asks Shazam about the music of the videos played, one ask at a
@@ -240,8 +261,9 @@ func (s *Service) next(ctx context.Context) time.Duration {
 	return time.Hour
 }
 
-// ask asks Shazam about askLength seconds of a video's audio from at (the
-// pieces kept around it, whole): how long to wait before the next ask.
+// ask asks Shazam about askLength seconds of a video's audio from at (of
+// the pieces kept around it, cut to the frame): how long to wait before the
+// next ask.
 func (s *Service) ask(ctx context.Context, video string, at float64) time.Duration {
 	pieces, err := s.store.pieces(ctx, video, at, at+askLength)
 	if err != nil {
@@ -270,6 +292,14 @@ func (s *Service) ask(ctx context.Context, video string, at float64) time.Durati
 		stop = p.Stop
 	}
 	a := ask{Start: at, Stop: at + askLength}
+	if len(audio) > 0 {
+		// The askLength seconds from at, by whole frames of the audio.
+		cut, from, seconds := adtsCut(audio, at-start, askLength)
+		if seconds < 0 {
+			from, seconds = 0, stop-start
+		}
+		audio, start, stop = cut, start+from, start+from+seconds
+	}
 	var m *match
 	if len(audio) > 0 && stop-math.Max(start, at) >= askMinimum {
 		a.Start, a.Stop = start, stop
