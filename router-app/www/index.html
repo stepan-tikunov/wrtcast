@@ -33,6 +33,9 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 #devbtn .x{position:absolute;top:7px;right:6px;display:none;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--err);color:#fff;box-shadow:0 0 0 2px var(--s2)}
 #devbtn .x svg{width:11px;height:11px}
 #devbtn.off .x{display:grid}
+/* Its status not known yet (the page just opened, another TV picked): a spinner there. */
+#devbtn .w{position:absolute;top:8px;right:7px;display:none;width:9px;height:9px;border:2px solid var(--mu);border-top-color:transparent;border-radius:50%;box-shadow:0 0 0 2px var(--s2);animation:spin .8s linear infinite}
+#devbtn.wait .w{display:block}
 #f svg{position:absolute;left:14px;top:13px;width:20px;height:20px;color:var(--mu)}
 #q{width:100%;height:46px;padding:0 46px 0 42px;border:0;border-radius:14px;background:var(--s2);outline:none;font-size:17px;-webkit-user-select:text;user-select:text}
 #q:focus{box-shadow:0 0 0 2px var(--ac)}
@@ -804,7 +807,7 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
 
-<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg><i class="x"><svg><use href="#i-close"/></svg></i></button><button class="ib" id="mkbtn" aria-label="Настройки"><svg><use href="#i-gear"/></svg></button></header>
+<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib wait" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg><i class="x"><svg><use href="#i-close"/></svg></i><i class="w"></i></button><button class="ib" id="mkbtn" aria-label="Настройки"><svg><use href="#i-gear"/></svg></button></header>
 <main id="home">
   <h2 class="sec" id="rtitle" hidden>Недавно смотрели<svg><use href="#i-more"/></svg></h2>
   <div class="grid" id="grid"></div>
@@ -3018,12 +3021,13 @@ async function poll() {
   // In the background only a lock screen widget needs the status.
   if (busy || document.hidden && keep.paused) return;
   busy = true;
+  const sent = device;  // the TV's icon tells of the one picked now only
   try {
-    const sent = device, at = Date.now();
+    const at = Date.now();
     const s = await api(withDevice('status'));
     pollError = '';
     pollFails = 0;
-    tvOff(false);
+    if (sent == device) tvOff(false);
     // A poll answered while a command is on its way may tell the state
     // before it (a volume takes the TV a second).
     if (!pending && !seekTimer && !inflight && sent == device && at > cmdAt) render(s);
@@ -3047,15 +3051,22 @@ async function poll() {
     }
     // The router answered and the TV didn't: its icon says so, no toast.
     // No answer at all is the router out of reach.
-    if (e.body) tvOff(true);
-    else if (e.message != pollError) toast('Нет связи с роутером: ' + e.message);
+    if (e.body) {
+      if (sent == device) tvOff(true);
+    } else {
+      tvWait(false);
+      if (e.message != pollError) toast('Нет связи с роутером: ' + e.message);
+    }
     pollError = e.message;
   }
   busy = false;
 }
 
-// A cross at the TV's icon while it doesn't answer, e.g. switched off.
+// A cross at the TV's icon while it doesn't answer, e.g. switched off; a
+// spinner there while that isn't known yet.
+const tvWait = on => $('devbtn').classList.toggle('wait', on);
 function tvOff(on) {
+  tvWait(false);
   $('devbtn').classList.toggle('off', on);
   $('devbtn').ariaLabel = on ? 'Устройство: ТВ не отвечает' : 'Устройство';
 }
@@ -3572,6 +3583,8 @@ function selectDevice(id) {
   device = id;
   localStorage.device = id;
   st = null;
+  tvOff(false);
+  tvWait(true);
   refresh();
   renderDevices();
   poll();
