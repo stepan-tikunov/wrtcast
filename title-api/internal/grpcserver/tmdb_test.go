@@ -47,6 +47,20 @@ func TestGetTmdbDetails(t *testing.T) {
 	if _, err := server.GetTmdbPerson(ctx, &titlev1.GetTmdbPersonQuery{TmdbId: 819}); status.Code(err) != codes.FailedPrecondition {
 		t.Errorf("person: %v", err)
 	}
+	for _, test := range []struct {
+		query *titlev1.SearchTmdbPeopleQuery
+		code  codes.Code
+	}{
+		{&titlev1.SearchTmdbPeopleQuery{Query: "  "}, codes.InvalidArgument},
+		{&titlev1.SearchTmdbPeopleQuery{Query: "Том", Page: 501}, codes.InvalidArgument},
+		{&titlev1.SearchTmdbPeopleQuery{Query: "Том", WatchedTmdb: make([]string, 1001)}, codes.InvalidArgument},
+		// No TMDB key.
+		{&titlev1.SearchTmdbPeopleQuery{Query: "Том"}, codes.FailedPrecondition},
+	} {
+		if _, err := server.SearchTmdbPeople(ctx, test.query); status.Code(err) != test.code {
+			t.Errorf("people %v: %v, want %s", test.query, err, test.code)
+		}
+	}
 	if _, err := server.GetTmdbSeason(ctx, &titlev1.GetTmdbSeasonQuery{TmdbId: 1405, SeasonNumber: 1}); status.Code(err) != codes.FailedPrecondition {
 		t.Errorf("season: %v", err)
 	}

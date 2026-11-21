@@ -35,6 +35,7 @@ func newFakeTMDB(t *testing.T) *fakeTMDB {
 		"/collection/726871":                  "dune-collection",
 		"/tv/1405":                            "dexter",
 		"/person/819":                         "person-norton",
+		"/search/person":                      "search-person",
 		"/tv/1405/season/1":                   "dexter-s1",
 		"/person/819/images":                  "person-norton-images",
 		"/person/819/tagged_images":           "person-norton-tagged",
@@ -378,6 +379,48 @@ func TestPerson(t *testing.T) {
 
 	if _, err := service.Person(ctx, 1); !errors.Is(err, ErrNotFound) {
 		t.Errorf("no such person: %v", err)
+	}
+}
+
+func TestSearchPeople(t *testing.T) {
+	fake := newFakeTMDB(t)
+	service, now := newServingService(t, fake, "key")
+	ctx := context.Background()
+	if err := service.store.matched(ctx, "fight-club", 550, KindMovie, byName, "", 0); err != nil {
+		t.Fatal(err)
+	}
+
+	people, err := service.SearchPeople(ctx, "Эдвард", 1, []string{"movie:120467", "movie:1"}, []string{"fight-club", "other"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if people.Page != 1 || people.Pages != 3 || people.Total != 47 || len(people.People) != 3 {
+		t.Fatalf("people %+v", people)
+	}
+	// Those of whom titles were watched first; TMDB's order else.
+	norton := people.People[0]
+	if norton.ID != 819 || norton.Name != "Эдвард Нортон" || norton.OriginalName != "Edward Norton" ||
+		norton.Profession != "Актёр" || norton.Watched != 2 || len(norton.KnownFor) == 0 || norton.KnownFor[0].ID != 550 {
+		t.Errorf("norton %+v", norton)
+	}
+	// Not on TMDB: as the search has them.
+	if p := people.People[1]; p.ID != 5 || p.Name != "Edward Furlong" || p.Profile != "furlong.jpg" || p.Profession != "Актёр" || p.Watched != 0 {
+		t.Errorf("furlong %+v", p)
+	}
+	if p := people.People[2]; p.ID != 6 || p.Profession != "Актриса" || p.Profile != "" {
+		t.Errorf("fake %+v", p)
+	}
+
+	// Their cards kept for a month.
+	now.advance(29 * 24 * time.Hour)
+	if _, err := service.SearchPeople(ctx, "Эдвард", 1, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if n := fake.count("/person/819"); n != 1 {
+		t.Errorf("%d requests of the person", n)
+	}
+	if n := fake.count("/search/person"); n != 2 {
+		t.Errorf("%d searches", n)
 	}
 }
 

@@ -445,6 +445,43 @@ func (s *Server) GetTmdbPerson(
 	return tmdbPerson(person), nil
 }
 
+// SearchTmdbPeople tells of the people TMDB finds by name, and how many
+// of their titles were watched.
+func (s *Server) SearchTmdbPeople(
+	ctx context.Context,
+	query *titlev1.SearchTmdbPeopleQuery,
+) (*titlev1.TmdbPeople, error) {
+	if s.tmdb == nil {
+		return nil, status.Error(codes.Unimplemented, "TMDB is off")
+	}
+	text := strings.TrimSpace(query.GetQuery())
+	page := max(query.GetPage(), 1)
+	switch {
+	case text == "":
+		return nil, status.Error(codes.InvalidArgument, "query is required")
+	case page > 500:
+		return nil, status.Error(codes.InvalidArgument, "page must be 500 at most")
+	case len(query.GetWatchedTmdb()) > 1000 || len(query.GetWatchedTitleIds()) > 1000:
+		return nil, status.Error(codes.InvalidArgument, "1000 watched titles of each at most")
+	}
+	people, err := s.tmdb.SearchPeople(ctx, text, int(page), query.GetWatchedTmdb(), query.GetWatchedTitleIds())
+	if err != nil {
+		return nil, tmdbStatus(err)
+	}
+	response := &titlev1.TmdbPeople{
+		Page: uint32(max(people.Page, 0)), TotalPages: uint32(max(people.Pages, 0)), TotalResults: uint32(max(people.Total, 0)),
+		People: make([]*titlev1.TmdbPersonFound, 0, len(people.People)),
+	}
+	for _, p := range people.People {
+		response.People = append(response.People, &titlev1.TmdbPersonFound{
+			Id: p.ID, Name: p.Name, OriginalName: p.OriginalName, ProfilePath: p.Profile,
+			Profession: p.Profession, Gender: tmdbGenders[p.Gender], Watched: uint32(p.Watched),
+			KnownFor: tmdbRelated(p.KnownFor),
+		})
+	}
+	return response, nil
+}
+
 var tmdbGenders = map[int]titlev1.TmdbGender{
 	tmdb.GenderFemale:    titlev1.TmdbGender_TMDB_GENDER_FEMALE,
 	tmdb.GenderMale:      titlev1.TmdbGender_TMDB_GENDER_MALE,

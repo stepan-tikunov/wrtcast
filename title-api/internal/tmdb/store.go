@@ -167,3 +167,32 @@ func (s *store) titleIDs(ctx context.Context, kind string, ids []uint64) (map[ui
 	}
 	return result, rows.Err()
 }
+
+// matches are the TMDB titles of title-api's titles, as kind:id, of those
+// matched.
+func (s *store) matches(ctx context.Context, titles []string) ([]string, error) {
+	if len(titles) == 0 {
+		return nil, nil
+	}
+	args := []any{stateMatched}
+	for _, title := range titles {
+		args = append(args, title)
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT kind, tmdb_id FROM tmdb_titles WHERE state = ?
+		AND title IN (?`+strings.Repeat(", ?", len(titles)-1)+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []string
+	for rows.Next() {
+		var kind string
+		var id int64
+		if err := rows.Scan(&kind, &id); err != nil {
+			return nil, err
+		}
+		result = append(result, titleKey(kind, uint64(id)))
+	}
+	return result, rows.Err()
+}

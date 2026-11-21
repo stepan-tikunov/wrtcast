@@ -31,6 +31,7 @@ const (
 	TitleService_GetTmdbSeason_FullMethodName         = "/title.v1.TitleService/GetTmdbSeason"
 	TitleService_GetTmdbCast_FullMethodName           = "/title.v1.TitleService/GetTmdbCast"
 	TitleService_GetTmdbPerson_FullMethodName         = "/title.v1.TitleService/GetTmdbPerson"
+	TitleService_SearchTmdbPeople_FullMethodName      = "/title.v1.TitleService/SearchTmdbPeople"
 	TitleService_WaitTmdbMatch_FullMethodName         = "/title.v1.TitleService/WaitTmdbMatch"
 	TitleService_LookupTmdbTitle_FullMethodName       = "/title.v1.TitleService/LookupTmdbTitle"
 	TitleService_GetSeriesUpdates_FullMethodName      = "/title.v1.TitleService/GetSeriesUpdates"
@@ -54,6 +55,7 @@ type TitleServiceClient interface {
 	// After GetTmdbDetails, so that the gateway tries it first: its path
 	// would be a details' of media type "person".
 	GetTmdbPerson(ctx context.Context, in *GetTmdbPersonQuery, opts ...grpc.CallOption) (*TmdbPersonDetails, error)
+	SearchTmdbPeople(ctx context.Context, in *SearchTmdbPeopleQuery, opts ...grpc.CallOption) (*TmdbPeople, error)
 	WaitTmdbMatch(ctx context.Context, in *WaitTmdbMatchQuery, opts ...grpc.CallOption) (*TmdbMatch, error)
 	LookupTmdbTitle(ctx context.Context, in *LookupTmdbTitleCommand, opts ...grpc.CallOption) (*TmdbLookup, error)
 	GetSeriesUpdates(ctx context.Context, in *GetSeriesUpdatesQuery, opts ...grpc.CallOption) (*GetSeriesUpdatesQueryResponse, error)
@@ -187,6 +189,16 @@ func (c *titleServiceClient) GetTmdbPerson(ctx context.Context, in *GetTmdbPerso
 	return out, nil
 }
 
+func (c *titleServiceClient) SearchTmdbPeople(ctx context.Context, in *SearchTmdbPeopleQuery, opts ...grpc.CallOption) (*TmdbPeople, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TmdbPeople)
+	err := c.cc.Invoke(ctx, TitleService_SearchTmdbPeople_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *titleServiceClient) WaitTmdbMatch(ctx context.Context, in *WaitTmdbMatchQuery, opts ...grpc.CallOption) (*TmdbMatch, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(TmdbMatch)
@@ -235,6 +247,7 @@ type TitleServiceServer interface {
 	// After GetTmdbDetails, so that the gateway tries it first: its path
 	// would be a details' of media type "person".
 	GetTmdbPerson(context.Context, *GetTmdbPersonQuery) (*TmdbPersonDetails, error)
+	SearchTmdbPeople(context.Context, *SearchTmdbPeopleQuery) (*TmdbPeople, error)
 	WaitTmdbMatch(context.Context, *WaitTmdbMatchQuery) (*TmdbMatch, error)
 	LookupTmdbTitle(context.Context, *LookupTmdbTitleCommand) (*TmdbLookup, error)
 	GetSeriesUpdates(context.Context, *GetSeriesUpdatesQuery) (*GetSeriesUpdatesQueryResponse, error)
@@ -283,6 +296,9 @@ func (UnimplementedTitleServiceServer) GetTmdbCast(context.Context, *GetTmdbDeta
 }
 func (UnimplementedTitleServiceServer) GetTmdbPerson(context.Context, *GetTmdbPersonQuery) (*TmdbPersonDetails, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTmdbPerson not implemented")
+}
+func (UnimplementedTitleServiceServer) SearchTmdbPeople(context.Context, *SearchTmdbPeopleQuery) (*TmdbPeople, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchTmdbPeople not implemented")
 }
 func (UnimplementedTitleServiceServer) WaitTmdbMatch(context.Context, *WaitTmdbMatchQuery) (*TmdbMatch, error) {
 	return nil, status.Error(codes.Unimplemented, "method WaitTmdbMatch not implemented")
@@ -530,6 +546,24 @@ func _TitleService_GetTmdbPerson_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TitleService_SearchTmdbPeople_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchTmdbPeopleQuery)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TitleServiceServer).SearchTmdbPeople(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TitleService_SearchTmdbPeople_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TitleServiceServer).SearchTmdbPeople(ctx, req.(*SearchTmdbPeopleQuery))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _TitleService_WaitTmdbMatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(WaitTmdbMatchQuery)
 	if err := dec(in); err != nil {
@@ -638,6 +672,10 @@ var TitleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTmdbPerson",
 			Handler:    _TitleService_GetTmdbPerson_Handler,
+		},
+		{
+			MethodName: "SearchTmdbPeople",
+			Handler:    _TitleService_SearchTmdbPeople_Handler,
 		},
 		{
 			MethodName: "WaitTmdbMatch",

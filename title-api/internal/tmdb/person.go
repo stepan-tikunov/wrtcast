@@ -224,10 +224,7 @@ func pickPerson(raw rawPerson) PersonDetails {
 	if english := strings.TrimSpace(texts["en"].Data.Name); result.OriginalName == "" && english != result.Name {
 		result.OriginalName = english
 	}
-	result.Profession = professions[raw.KnownFor]
-	if raw.KnownFor == "Acting" && raw.Gender == GenderFemale {
-		result.Profession = "Актриса"
-	}
+	result.Profession = profession(raw.KnownFor, raw.Gender)
 	return result
 }
 

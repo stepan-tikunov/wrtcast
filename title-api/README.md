@@ -196,6 +196,7 @@ curl -X POST 'http://localhost:8080/v1/series/updates' \
 curl 'http://localhost:8080/v1/tmdb/movie/693134'          # GetTmdbDetails
 curl 'http://localhost:8080/v1/tmdb/tv/1405/seasons/1'     # GetTmdbSeason
 curl 'http://localhost:8080/v1/tmdb/person/819'            # GetTmdbPerson
+curl -d '{"query":"Том","watchedTmdb":["movie:550"]}' 'http://localhost:8080/v1/tmdb/people/search'  # SearchTmdbPeople
 curl 'http://localhost:8080/v1/tmdb/images/w780/eZ239CUp1d6OryZEBPnO2n87gMG.jpg' -o backdrop.jpg
 ```
 
@@ -224,6 +225,15 @@ curl 'http://localhost:8080/v1/tmdb/images/w780/eZ239CUp1d6OryZEBPnO2n87gMG.jpg'
   должности (режиссёр, сценарий, продюсер, музыка и т.п.), число серий,
   `title_id`, если сопоставлен. Ток-шоу, новости, реалити и роли «самого
   себя» пропускаются. Хранится 30 дней, сутки — если Wikidata не ответила.
+- `SearchTmdbPeople` (`POST /v1/tmdb/people/search`): люди по имени (в
+  любом из имён, что знает TMDB), страница из 20, самые известные первыми,
+  и сколько их всего. У каждого имя по-русски, фото, кем известен (как у
+  `GetTmdbPerson`) и до трёх самых известных тайтлов с постером — из
+  карточки человека, которая хранится 30 дней (не получилась — имя и
+  профессия как в поиске). В запросе — что зритель смотрел: тайтлы TMDB
+  (`movie:550`, `tv:1405`) и наши (`watchedTitleIds`, считаются
+  сопоставленные); по ним у каждого `watched` — сколько его тайтлов
+  смотрели, и такие люди идут первыми.
 - `GetTmdbSeason`: серии с кадром, описанием (английским, если русского
   нет), датой и длительностью; название пустое, если это только номер
   («Серия 5») или не по-русски; будущие серии — `upcoming`. Сезона нет

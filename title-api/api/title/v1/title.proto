@@ -84,6 +84,13 @@ service TitleService {
     };
   }
 
+  rpc SearchTmdbPeople(SearchTmdbPeopleQuery) returns (TmdbPeople) {
+    option (google.api.http) = {
+      post: "/v1/tmdb/people/search"
+      body: "*"
+    };
+  }
+
   rpc WaitTmdbMatch(WaitTmdbMatchQuery) returns (TmdbMatch) {
     option (google.api.http) = {
       get: "/v1/titles/{title_id}/tmdb"
@@ -468,6 +475,44 @@ message TmdbPersonDetails {
   // The titles they are in or made, the best known first: each title once,
   // with all they were in it; appearances as themselves left out.
   repeated TmdbCredit credits = 12;
+}
+
+// People on TMDB by name, in any of the names TMDB has of them, a page of
+// 20 at a time. FAILED_PRECONDITION with no TMDB key.
+message SearchTmdbPeopleQuery {
+  string query = 1;
+  // From 1, the first if unset; 500 at most.
+  uint32 page = 2;
+  // What the viewer watched, of which the titles of each person found are
+  // counted: titles of TMDB as "movie:550", "tv:1405", and title-api's
+  // titles, those matched with TMDB's; 1000 of each at most.
+  repeated string watched_tmdb = 3;
+  repeated string watched_title_ids = 4;
+}
+
+message TmdbPeople {
+  uint32 page = 1;
+  uint32 total_pages = 2;
+  uint32 total_results = 3;
+  // Those of whom titles were watched first, the most first; the best
+  // known first else.
+  repeated TmdbPersonFound people = 4;
+}
+
+message TmdbPersonFound {
+  uint64 id = 1;
+  // In Russian where TMDB has it so.
+  string name = 2;
+  // Their name in English when it is not the same.
+  string original_name = 3;
+  string profile_path = 4;
+  // What they are known for, in Russian: "Актриса", "Режиссёр".
+  string profession = 5;
+  TmdbGender gender = 6;
+  // How many of their titles were watched, of those the query tells.
+  uint32 watched = 7;
+  // The best known of their titles with a poster, 3 at most.
+  repeated TmdbRelated known_for = 8;
 }
 
 enum TmdbGender {

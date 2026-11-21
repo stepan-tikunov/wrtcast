@@ -1,0 +1,6 @@
+{"page":1,"total_pages":3,"total_results":47,"results":[
+{"id":5,"name":"Edward Furlong","known_for_department":"Acting","gender":2,"profile_path":"/furlong.jpg","adult":false},
+{"id":6,"name":"Edwina Fake","known_for_department":"Acting","gender":1,"profile_path":null,"adult":false},
+{"id":7,"name":"Adult","known_for_department":"Acting","gender":1,"adult":true},
+{"id":819,"name":"Edward Norton","known_for_department":"Acting","gender":2,"profile_path":"/norton.jpg","adult":false}
+]}
