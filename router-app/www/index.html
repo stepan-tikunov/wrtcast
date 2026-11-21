@@ -2773,8 +2773,38 @@ async function loadSeason(m, s) {
   });
   const r = await tmdbSeasons[k];
   if (s.tm !== undefined) return;
-  s.tm = r && matchSeason(s, r.episodes);
+  const tm = r && matchSeason(s, r.episodes) || await throughSeasons(m, s);
+  if (s.tm !== undefined) return;
+  s.tm = tm;
   if (item == m && season == s) keepTop(() => renderEpisodes('again'));
+}
+
+// TMDB's episodes along the provider's numbered through its seasons (its
+// 2nd season of "Смешарики" goes on 104…209 after the 1st's 1…103, both of
+// TMDB's 1st season of 218), each the one of that number counted through
+// TMDB's seasons; null unless the provider's numbering goes on season after
+// season and TMDB has every number of the season.
+async function throughSeasons(m, s) {
+  const x = m.tm, ss = m.seasons.filter(y => y.episodes.length);
+  const first = y => +y.episodes[0].episode, last = y => +y.episodes.at(-1).episode;
+  if (ss.length < 2 || !ss.every((y, i) => !i || first(y) > last(ss[i - 1])) || !s.episodes.length) return null;
+  const tms = (x.seasons ?? []).filter(y => y.season > 0 && y.episodes > 0).sort((a, b) => a.season - b.season);
+  let from = 0;
+  const parts = tms.map(y => ({ season: y.season, from, to: from += y.episodes }))
+    .filter(y => y.from < last(s) && y.to >= first(s));
+  if (!parts.length) return null;
+  const eps = await Promise.all(parts.map(y => {
+    const k = `${x.id}:${y.season}`;
+    tmdbSeasons[k] ??= api(`tmdb/season?id=${x.id}&season=${y.season}`).catch(() => {
+      delete tmdbSeasons[k];
+      return null;
+    });
+    return tmdbSeasons[k];
+  }));
+  if (eps.some(r => !r)) return null;
+  const by = new Map(parts.flatMap((y, i) => eps[i].episodes.map(e => [y.from + +e.episode, e])));
+  const out = s.episodes.map(e => /^\d+$/.test(e.episode) ? by.get(+e.episode) : null);
+  return out.every(Boolean) ? { eps: out, coming: [] } : null;
 }
 
 // TMDB's episodes along the provider's, by number, and those TMDB has
