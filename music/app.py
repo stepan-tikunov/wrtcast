@@ -11,9 +11,12 @@ is sent.
 POST /v1/classify, the body any audio ffmpeg reads (ADTS AAC as the router
 cuts it out of a segment), answers
   {"model": "yamnet", "hop": 0.5, "window": 0.975, "duration": 4.01,
-   "frames": [[t, music, speech, song], …], "ms": 35}
+   "frames": [[t, music, speech, song], …], "features": [[c1, …, c12], …],
+   "ms": 35}
 t the start of each window in seconds from the start of the audio; song is
-the highest of the classes of songs (singing, song, pop, rock, …).
+the highest of the classes of songs (singing, song, pop, rock, …). features
+are each window's 12 MFCCs, its timbre without its loudness, for title-api
+to tell where one song gives way to another (see its internal/music).
 
 POST /v1/recognize, the body up to MAX_SECONDS of audio (8 to 12 s are
 best), answers
@@ -99,11 +102,12 @@ class Yamnet:
         self.output = self.interpreter.get_output_details()[0]
         self.size = int(self.input["shape"][-1])
         self.lock = threading.Lock()
+        self.features = Features()
 
     def frames(self, pcm):
         if len(pcm) < self.size:
             pcm = np.concatenate([pcm, np.zeros(self.size - len(pcm), np.float32)])
-        out = []
+        out, features = [], []
         with self.lock:
             for start in range(0, len(pcm) - self.size + 1, HOP):
                 window = pcm[start:start + self.size].reshape(self.input["shape"])
@@ -112,7 +116,35 @@ class Yamnet:
                 p = self.interpreter.get_tensor(self.output["index"]).reshape(-1)
                 out.append([round(start / RATE, 2), round(float(p[self.music]), 3),
                             round(float(p[self.speech]), 3), round(float(p[self.song].max()), 3)])
-        return out
+                features.append(self.features.of(pcm[start:start + self.size]))
+        return out, features
+
+
+class Features:
+    """What a window sounds like, by numpy: its power spectrum averaged over
+    64 ms frames as 12 MFCCs, of 40 mel bands from 60 Hz to 7.6 kHz, c0 (the
+    loudness, no song's own) left out."""
+
+    N_FFT, STEP, BANDS = 1024, 512, 40
+
+    def __init__(self):
+        freqs = np.fft.rfftfreq(self.N_FFT, 1 / RATE)
+        mel = lambda f: 2595 * np.log10(1 + f / 700)
+        edges = 700 * (10 ** (np.linspace(mel(60), mel(7600), self.BANDS + 2) / 2595) - 1)
+        bank = np.zeros((self.BANDS, len(freqs)), np.float32)
+        for b in range(self.BANDS):
+            lo, mid, hi = edges[b], edges[b + 1], edges[b + 2]
+            bank[b] = np.clip(np.minimum((freqs - lo) / (mid - lo), (hi - freqs) / (hi - mid)), 0, None)
+        self.bank = bank
+        n = np.arange(self.BANDS)
+        self.dct = np.cos(np.pi / self.BANDS * (n + 0.5)[None, :] * np.arange(1, 13)[:, None]).astype(np.float32)
+        self.hann = np.hanning(self.N_FFT).astype(np.float32)
+
+    def of(self, window):
+        count = 1 + (len(window) - self.N_FFT) // self.STEP
+        index = np.arange(self.N_FFT)[None, :] + self.STEP * np.arange(count)[:, None]
+        power = (np.abs(np.fft.rfft(window[index] * self.hann, axis=1)) ** 2).mean(axis=0)
+        return [round(float(x), 2) for x in self.dct @ np.log(self.bank @ power + 1e-10)]
 
 
 class Limited(Exception):
@@ -281,8 +313,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/v1/classify":
                 pcm = decode(data, MAX_CLASSIFY)
+                frames, features = yamnet.frames(pcm)
                 result = {"model": "yamnet", "hop": HOP / RATE, "window": yamnet.size / RATE,
-                          "duration": round(len(pcm) / RATE, 3), "frames": yamnet.frames(pcm)}
+                          "duration": round(len(pcm) / RATE, 3), "frames": frames, "features": features}
             else:
                 result = {"match": recognizer.recognize(decode(data, MAX_SECONDS))}
         except ValueError as e:
