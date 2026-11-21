@@ -107,12 +107,14 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 #cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* Someone's page, over the title's or its cast's. */
 #person{position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
-/* Only the page on top scrolls: the main one (html.paged) and the pages
-   under it (.covered) are held, so a swipe doesn't go on to them, past the
-   top page's end or when it has nothing to scroll, nor (iOS, now and then,
-   with a page just shown) land on them in its place. */
-html.paged,:is(#det,#list,#cast,#person).covered{overflow:hidden}
-#det,#list,#cast,#person{overscroll-behavior-y:contain}
+/* The page on top is in the document's flow and the document scrolls it
+   (see syncPages): iOS scrolls only the document to its top on a tap of the
+   status bar, and Safari's bars fold only as it scrolls. Its width clipped,
+   not scrolled, as a scroller of its own had it. */
+:is(#det,#list,#cast,#person).ontop{position:absolute;bottom:auto;box-sizing:border-box;min-height:100vh;min-height:100lvh;overflow:visible;overflow-x:clip}
+/* The pages under it are held where they were, so a swipe goes to no one
+   but the page on top. */
+:is(#det,#list,#cast,#person).covered{overflow:hidden}
 /* The header names them once their name has scrolled away. */
 #person .lhead b{display:none;overflow:hidden;font-size:17px;font-weight:650;white-space:nowrap;text-overflow:ellipsis;animation:pop .2s ease-out}
 #person.scr .lhead b:not(:empty){display:block}
@@ -1104,12 +1106,53 @@ function openLayer(name, url) {
 }
 
 const PAGES = ['det', 'list', 'cast', 'person']; // the overlays that are pages, not sheets
+
+// The page on top scrolls as the document (.ontop); the main page under it
+// is held where it was, fixed at its place, and the pages under it keep
+// their place as scrollers of their own, held (.covered). A page's scroll is
+// thus the document's while on top, its own else: scrollOf/scrollPage.
+let topPage = null, homeY = 0;
+const scrollOf = id => id == topPage ? scrollY : $(id).scrollTop;
+const scrollPage = (id, y) => id == topPage ? scrollTo(0, y) : $(id).scrollTop = y;
+const HELD = () => [document.querySelector('body>header'), $('home'), $('msg')];
+function holdHome(on) {
+  const es = HELD(), boxes = es.map(e => e.getBoundingClientRect()); // all before any is moved
+  es.forEach((e, i) => Object.assign(e.style, on
+    ? { position: 'fixed', top: boxes[i].top + 'px', left: boxes[i].left + 'px', width: boxes[i].width + 'px' }
+    : { position: '', top: '', left: '', width: '' }));
+}
+function syncPages() {
+  const pages = layers.filter(l => PAGES.includes(l)), next = pages.at(-1) ?? null;
+  for (const p of PAGES) $(p).classList.toggle('covered', pages.includes(p) && p != next);
+  if (next != topPage) {
+    const y = scrollY, at = next ? $(next).scrollTop : homeY; // read while it's still its own scroller
+    if (topPage) {
+      $(topPage).classList.remove('ontop');
+      $(topPage).scrollTop = y;
+    } else {
+      homeY = y;
+      holdHome(true);
+    }
+    topPage = next;
+    if (next) $(next).classList.add('ontop');
+    else holdHome(false);
+    document.documentElement.classList.toggle('paged', !!next);
+    scrollTo(0, at);
+  }
+  for (const p of PAGES) pageScrolled(p);
+}
+// A page's header darkens what scrolls under it once something has (.stuck,
+// see .lhead::after); someone's names them once their name has scrolled away.
+function pageScrolled(p) {
+  const y = scrollOf(p);
+  $(p).classList.toggle('stuck', y > 0);
+  if (p == 'person') $(p).classList.toggle('scr', y > ($('phero').querySelector('h1')?.offsetTop ?? 200));
+}
 function showLayer(name, on) {
   const show = e => {
     e.classList.remove('out');
     e.style.transform = e.style.opacity = ''; // left by a pull (see pullSheet)
     e.hidden = false;
-    e.classList.toggle('stuck', e.scrollTop > 0);
   };
   const page = PAGES.includes(name);
   const e = $(page ? name : 'shade');
@@ -1118,9 +1161,7 @@ function showLayer(name, on) {
   else if (page || !plOpen && !layers.some(l => l in SHEETS)) animateOut(e);
   if (name in SHEETS) on ? show($(SHEETS[name])) : animateOut($(SHEETS[name]));
   $('shade').classList.toggle('top', layers.some(l => l in SHEETS));
-  const pages = layers.filter(l => PAGES.includes(l));
-  for (const p of PAGES) $(p).classList.toggle('covered', pages.includes(p) && p != pages.at(-1));
-  document.documentElement.classList.toggle('paged', pages.length > 0);
+  syncPages();
 }
 
 // Opens the player or folds it into the mini player.
@@ -1776,7 +1817,7 @@ function openList(kind) {
 function showList(kind) {
   listShown = kind;
   $('ltitle').textContent = SECTIONS[kind][2];
-  $('list').scrollTop = 0;
+  scrollPage('list', 0);
   renderList(true);
 }
 
@@ -2070,9 +2111,9 @@ async function awaitMatch(m, t) {
 // Laid out anew, the page is scrolled by the browser to keep what was in
 // view where it was; one not scrolled yet stays at its top.
 function keepTop(draw) {
-  const top = $('det').scrollTop < 8;
+  const top = scrollOf('det') < 8;
   draw();
-  if (top) $('det').scrollTop = 0;
+  if (top) scrollPage('det', 0);
 }
 
 function showTmdb(m, t, x) {
@@ -2189,7 +2230,8 @@ function skeleton(m) {
   $('dinfo').replaceChildren(el('p', { id: 'ddesc' }, ...sklLines(100, 100, 100, 70)),
     el('div', { className: 'facts' }, ...sklLines(45, 35, 85)));
   // The blurred backdrop overflows .top; older engines can still scroll it.
-  $('det').scrollTop = $('det').firstElementChild.scrollTop = 0;
+  scrollPage('det', 0);
+  $('det').firstElementChild.scrollTop = 0;
 }
 
 // The page of a title that failed to load.
@@ -2964,7 +3006,7 @@ function openCast() {
 async function showCast(id) {
   castShown = id;
   const only = /^tmdb:(movie|tv):(\d+)$/.exec(id);
-  $('cast').scrollTop = 0;
+  scrollPage('cast', 0);
   $('ctitle').textContent = (only ? tmdbs[only[1] + only[2]] : titles[id])?.title || '';
   $('clist').replaceChildren();
   if (item && pageKey(item) == id && item.tm) renderCast(item.tm.cast);
@@ -3015,7 +3057,7 @@ function openPerson(c) {
 // drawn until TMDB answers.
 async function showPerson(id, known) {
   personShown = id;
-  $('person').scrollTop = 0;
+  scrollPage('person', 0);
   if (id in people) return renderPerson(people[id]);
   renderPerson(undefined, known);
   try {
@@ -3170,14 +3212,7 @@ function works(p, kind = 'all', all = false) {
   return sec;
 }
 
-// A page's header darkens what scrolls under it, only once something has
-// (.stuck, see .lhead::after).
-for (const id of ['list', 'cast', 'person'])
-  $(id).addEventListener('scroll', () => $(id).classList.toggle('stuck', $(id).scrollTop > 0), { passive: true });
-
-// The header names them once their name has scrolled away.
-$('person').addEventListener('scroll', () =>
-  $('person').classList.toggle('scr', $('person').scrollTop > ($('phero').querySelector('h1')?.offsetTop ?? 200)), { passive: true });
+for (const p of PAGES) $(p).addEventListener('scroll', () => pageScrolled(p), { passive: true });
 
 // A title from someone's page: over the title's page they were opened
 // from, as another title of it (see openRelated), so back leads to them
@@ -4920,7 +4955,11 @@ if ((urlTitle() || urlTmdb() || urlList()) && !history.state) {
   history.replaceState({ depth: 0 }, '', '/');
   history.pushState({ depth: 1 }, '', url);
 }
-addEventListener('scroll', () => document.querySelector('header').classList.toggle('stuck', scrollY > 0), { passive: true });
+// The main page's header, or the page on top's (see syncPages).
+addEventListener('scroll', () => topPage ? pageScrolled(topPage)
+  : document.querySelector('header').classList.toggle('stuck', scrollY > 0), { passive: true });
+// The pages' scroll is put back by syncPages, not by the browser.
+history.scrollRestoration = 'manual';
 route();
 poll();
 loadRecent();
