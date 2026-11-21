@@ -945,6 +945,7 @@ let asking = null;      // the first start of a title, while its sources load
 let item = null;        // movie or series shown on the details page
 let season = null;
 let pollError = '';
+let pollFails = 0;      // status polls failed in a row
 const titles = {};      // /title answers by id
 const tmdbs = {};       // /tmdb/title answers by type and TMDB ID; null where TMDB has none
 const tmdbSeasons = {}; // /tmdb/season answers by TMDB ID and season, as promises
@@ -3016,6 +3017,7 @@ async function poll() {
     const sent = device, at = Date.now();
     const s = await api(withDevice('status'));
     pollError = '';
+    pollFails = 0;
     // A poll answered while a command is on its way may tell the state
     // before it (a volume takes the TV a second).
     if (!pending && !seekTimer && !inflight && sent == device && at > cmdAt) render(s);
@@ -3027,7 +3029,14 @@ async function poll() {
       busy = false;
       return;
     }
-    // Report a lost connection once, not on every poll.
+    // A TV starting a stream drops the channel of the one before now and
+    // then, a second (castctl: device closed the channel): a play under
+    // way, or a single failed poll, isn't a lost connection. It's told
+    // once, not on every poll.
+    if (pending || inflight || ++pollFails < 2) {
+      busy = false;
+      return;
+    }
     if (e.message != pollError) toast('Нет связи с ТВ: ' + e.message);
     pollError = e.message;
   }

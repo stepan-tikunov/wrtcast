@@ -611,6 +611,10 @@ function castctl(dev, ...args) {
 	for (let a in args)
 		cmd += ' ' + shq(a);
 	let r = run('castctl -H ' + shq(host_of(dev)) + cmd);
+	// A TV starting a stream drops the channel of the one before now and
+	// then ("device closed the channel"); a status is asked again at once.
+	if (r.code != 0 && args[0] == 'status')
+		r = run('castctl -H ' + shq(host_of(dev)) + cmd);
 	// A discovered device may have got a new address from DHCP.
 	if (r.code != 0 && dev.id) {
 		let d = pick(discover(), dev.id);
