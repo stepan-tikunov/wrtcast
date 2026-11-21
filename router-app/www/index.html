@@ -1197,7 +1197,13 @@ function showLayer(name, on) {
   // The shade is shared by the player and the sheets.
   if (on) show(e);
   else if (page || !plOpen && !layers.some(l => l in SHEETS)) animateOut(e);
-  if (name in SHEETS) on ? show($(SHEETS[name])) : animateOut($(SHEETS[name]));
+  // A sheet opened over another (Музыка from the settings) is over it: the
+  // sheets stand at one z-index, the later in the page over the earlier.
+  const sheet = name in SHEETS && $(SHEETS[name]);
+  if (sheet && on) {
+    sheet.parentNode.append(sheet);
+    show(sheet);
+  } else if (sheet) animateOut(sheet);
   $('shade').classList.toggle('top', layers.some(l => l in SHEETS));
   syncPages();
 }
