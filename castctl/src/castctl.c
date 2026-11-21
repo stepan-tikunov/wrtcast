@@ -1061,6 +1061,9 @@ static void usage(void)
 "                                      -s: add a WebVTT subtitle track (off\n"
 "                                      until chosen with \"subs\"); -y:\n"
 "                                      subtitle style as in substyle\n"
+"  launch                              start the Default Media Receiver if\n"
+"                                      another app or none is on, as play\n"
+"                                      would, and print the status\n"
 "  pause | resume                      pause / resume playback\n"
 "  stop                                stop media\n"
 "  quit                                close the app on the device\n"
@@ -1516,6 +1519,10 @@ int main(int argc, char **argv)
 
 	if (!strcmp(cmd, "play")) {
 		cmd_play(argc, argv);
+	} else if (!strcmp(cmd, "launch")) {
+		if (!receiver_status(&a) || strcmp(a.app_id, DEFAULT_MEDIA_RECEIVER))
+			launch_media_receiver(&a);
+		print_status(&a, NULL);
 	} else if (!strcmp(cmd, "status")) {
 		if (receiver_status(&a)) {
 			virtual_connect(a.transport_id);
