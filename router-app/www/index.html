@@ -3034,45 +3034,23 @@ async function poll() {
 
 // ---- music ----------------------------------------------------------------
 //
-// What plays in the video on the TV, told by title-api as the router sends
-// it the audio (/music): asked as the video starts and every 15 s while
-// the TV plays it, every 5 s while the sheet is open. A pill over the
-// player names the track playing now; it, and the button "Музыка" in the
-// settings, open the sheet of all the tracks told so far.
-let musicKey = null;    // the video asked of: title, episode, source
-let mz = null;          // the router's last answer of it
-let musicAt = 0;        // when it was asked
-let musicBusy = false;
+// What plays in the video on the TV, told by title-api from the segments it
+// passes on and loads ahead, about a minute and a half before they play:
+// the status carries it (now.music). A pill over the player names the track
+// playing now; it, and the button "Музыка" in the settings, open the sheet
+// of all the tracks told so far.
+let mz = null;          // the music of what plays, as the status told it
 
 const MUSIC_WHY = {
-  no_cache: 'Звук берётся из кэша роутера: нужен прокси и качество не «Авто»',
   not_fmp4: 'У этого источника музыка пока не распознаётся',
   off: 'Распознавание музыки не настроено',
-  error: 'Не получилось спросить роутер',
 };
 
 function watchMusic(s) {
-  const n = s.now, m = s.media;
-  const key = n && m ? `${n.id}|${n.season ?? ''}|${n.episode ?? ''}|${n.source ?? ''}` : null;
-  if (key != musicKey) {
-    musicKey = key;
-    mz = null;
-    musicAt = 0;
-    renderMusic();
-  }
-  if (!key || musicBusy || !['PLAYING', 'PAUSED', 'BUFFERING'].includes(m.state)) return;
-  const every = layers.at(-1) == 'music' ? 5000 : m.state == 'PAUSED' && mz ? 60000 : 15000;
-  if (Date.now() - musicAt < every) return;
-  musicAt = Date.now();
-  musicBusy = true;
-  api(withDevice('music')).then(r => {
-    if (key == musicKey) mz = r;
-  }, () => {
-    if (key == musicKey && !mz) mz = { reason: 'error' };
-  }).finally(() => {
-    musicBusy = false;
-    renderMusic();
-  });
+  const music = s.now?.music ?? null;
+  if (JSON.stringify(music) == JSON.stringify(mz)) return;
+  mz = music;
+  renderMusic();
 }
 
 // The track playing at t seconds of the video, if one was told.
@@ -3106,9 +3084,7 @@ $('mcollapse').onclick = () => closeTop();
 
 function openMusic() {
   openLayer('music');
-  musicAt = 0;
   renderMusic();
-  if (st) watchMusic(st);
 }
 
 function renderMusic() {
@@ -3125,7 +3101,7 @@ function renderMusic() {
   $('mnote').textContent = mz?.pending ? 'узнаю…' : tracks.length ? `узнано ${tracks.length}` : '';
   if (!tracks.length) {
     const why = mz?.reason ? MUSIC_WHY[mz.reason] || '' : !mz ? 'Спрашиваю роутер…'
-      : mz.received ? 'Слушаю. Как заиграет музыка, она появится здесь'
+      : mz.received ? 'Музыки пока не нашлось'
       : 'Звук этого видео ещё не дошёл до сервера';
     $('mlist').replaceChildren(el('p', { id: 'mempty' }, why));
     return;

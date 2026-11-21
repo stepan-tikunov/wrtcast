@@ -61,10 +61,8 @@ const FFMPEG = conf('ffmpeg', '/usr/bin/wrtcast-ffmpeg');
 // MiB of segments kept in /tmp, which is the router's memory (see "segment
 // cache"); 0 keeps none.
 const CACHE_MB = +conf('cache_mb', 40);
-// The audio of the segments goes to title-api, which tells their music
-// (see "music").
+// The music of what plays, which title-api tells (see "music").
 const MUSIC = conf('music', '1') == '1';
-const MUSIC_DIR = '/tmp/wrtcast.music/';    // audio waiting to go, see "music"
 
 function reply(code, body) {
 	printf('Status: %d %s\r\nContent-Type: application/json\r\n' +
@@ -1042,313 +1040,56 @@ function cache_mark(c, starts) {
 
 // ---- music -----------------------------------------------------------------
 //
-// What plays in a video: the router sends title-api the audio of each
-// segment of the alternative player's videos (fMP4, video and audio in one
-// segment) that passes the media proxy or is loaded into the cache, and
-// title-api tells where its music is and asks Shazam what it is (/music).
-// The proxy cuts the audio out as the segment streams to the TV (see
-// aac_cutter), some 150 KB of a 3 MB segment, whether the segment is kept
-// or not (with less than 32 MiB free it isn't, see cache_room), and leaves
-// it in MUSIC_DIR as <segment key>.aac; a process per TV sends the files
-// there while it plays (see music_run), left by the status or the tick
-// (see music_ensure). The query of a video's audio (mq:<c> in kv) is set
-// with its c (see prepare).
-
-// Seconds a sender's beat holds its TV's lock, and audio waiting to go is
-// kept at most.
-const MUSIC_BEAT = 30;
-const MUSIC_KEEP = 600;
-
-const be32 = (s, i) => (ord(s, i) << 24) | (ord(s, i + 1) << 16) | (ord(s, i + 2) << 8) | ord(s, i + 3);
-
-// The boxes of an MP4 s within [from, to): [{ type, at (its payload), end }].
-function mp4_boxes(s, from, to) {
-	let out = [];
-	for (let i = from; i + 8 <= to; ) {
-		let size = be32(s, i), at = i + 8;
-		if (size == 1) {
-			size = be32(s, i + 12);   // a 64-bit size, its high word 0
-			at = i + 16;
-		} else if (size == 0)
-			size = to - i;
-		if (size < 8 || i + size > to)
-			break;
-		push(out, { type: substr(s, i + 4, 4), at, end: i + size });
-		i += size;
-	}
-	return out;
-}
-
-const mp4_all = (s, b, type) => filter(mp4_boxes(s, b.at, b.end), x => x.type == type);
-const mp4_child = (s, b, type) => mp4_all(s, b, type)[0];
-
-// The audio track of an fMP4 init segment: { track, asc: [object type,
-// frequency index, channels] } of its AAC; null without one.
-function mp4_audio(init) {
-	let moov = filter(mp4_boxes(init, 0, length(init)), b => b.type == 'moov')[0];
-	for (let trak in moov ? mp4_all(init, moov, 'trak') : []) {
-		let tkhd = mp4_child(init, trak, 'tkhd'), mdia = mp4_child(init, trak, 'mdia');
-		let hdlr = mdia ? mp4_child(init, mdia, 'hdlr') : null;
-		if (!tkhd || !hdlr || substr(init, hdlr.at + 8, 4) != 'soun')
-			continue;
-		let track = be32(init, tkhd.at + (ord(init, tkhd.at) == 1 ? 20 : 12));
-		let minf = mp4_child(init, mdia, 'minf'), stbl = minf ? mp4_child(init, minf, 'stbl') : null;
-		let stsd = stbl ? mp4_child(init, stbl, 'stsd') : null;
-		let mp4a = stsd ? filter(mp4_boxes(init, stsd.at + 8, stsd.end), b => b.type == 'mp4a')[0] : null;
-		let esds = mp4a ? filter(mp4_boxes(init, mp4a.at + 28, mp4a.end), b => b.type == 'esds')[0] : null;
-		if (!esds)
-			return null;
-		// The ES descriptor's DecoderConfig's DecoderSpecificInfo (0x05),
-		// AAC's AudioSpecificConfig.
-		for (let i = esds.at + 4; i < esds.end; ) {
-			let tag = ord(init, i++), len = 0;
-			for (let c = 0x80; c & 0x80; ) {
-				c = ord(init, i++);
-				len = (len << 7) | (c & 0x7f);
-			}
-			if (tag == 0x03)
-				i += 3;        // ES_ID and flags, none set
-			else if (tag == 0x04)
-				i += 13;       // the DecoderConfig's own fields
-			else if (tag == 0x05) {
-				let a = ord(init, i), b = ord(init, i + 1);
-				return { track, asc: [a >> 3, ((a & 7) << 1) | (b >> 7), (b >> 3) & 15] };
-			} else
-				i += len;
-		}
-	}
-	return null;
-}
-
-// The samples of audio track a a moof tells of: [[offset, size]] in the
-// segment, the moof's box (its header included) being moof at offset at.
-function moof_samples(a, moof, at) {
-	let out = [], box = { at: 8, end: length(moof) };
-	for (let traf in mp4_all(moof, box, 'traf')) {
-		let tfhd = mp4_child(moof, traf, 'tfhd');
-		if (!tfhd || be32(moof, tfhd.at + 4) != a.track)
-			continue;
-		let fl = be32(moof, tfhd.at) & 0xffffff, j = tfhd.at + 8;
-		// Offsets are from the moof, unless the tfhd names a base.
-		let base = at, size0 = 0;
-		if (fl & 0x1) {
-			base = be32(moof, j + 4);
-			j += 8;
-		}
-		if (fl & 0x2)
-			j += 4;
-		if (fl & 0x8)
-			j += 4;
-		if (fl & 0x10)
-			size0 = be32(moof, j);
-		let pos = null;
-		for (let trun in mp4_all(moof, traf, 'trun')) {
-			let tf = be32(moof, trun.at) & 0xffffff, n = be32(moof, trun.at + 4), k = trun.at + 8;
-			if (tf & 0x1) {
-				let d = be32(moof, k);
-				pos = base + (d >= 0x80000000 ? d - 0x100000000 : d);
-				k += 4;
-			} else if (pos == null)
-				pos = base;
-			if (tf & 0x4)
-				k += 4;
-			for (let i = 0; i < n; i++) {
-				if (tf & 0x100)
-					k += 4;
-				let size = size0;
-				if (tf & 0x200) {
-					size = be32(moof, k);
-					k += 4;
-				}
-				if (tf & 0x400)
-					k += 4;
-				if (tf & 0x800)
-					k += 4;
-				push(out, [pos, size]);
-				pos += size;
-			}
-		}
-	}
-	return sort(out, (x, y) => x[0] - y[0]);
-}
-
-// ADTS's header of an AAC frame of n bytes of audio track a, which makes
-// the frames readable with no container.
-function adts(a, n) {
-	let obj = a.asc[0], fi = a.asc[1], ch = a.asc[2], len = n + 7;
-	return chr(0xff, 0xf1, ((obj - 1) << 6) | (fi << 2) | (ch >> 2),
-		((ch & 3) << 6) | (len >> 11), (len >> 3) & 0xff, ((len & 7) << 5) | 0x1f, 0xfc);
-}
-
-// Cuts the audio (track a) out of an fMP4 segment as it streams, chunk by
-// chunk (feed): the moofs are gathered and read, the rest only passes,
-// its audio samples kept. done() is the audio as ADTS frames, '' for
-// none; null when the segment wasn't what it seemed.
-function aac_cutter(a) {
-	let pos = 0, head = '', box_end = 0, moof_at = null, bad = false;
-	let samples = [], si = 0, part = '', out = [];
-	let take = (chunk, from) => {
-		// The samples within [from, from + length(chunk)), in order.
-		let end = from + length(chunk);
-		while (si < length(samples) && samples[si][0] < end) {
-			let s = samples[si], start = s[0] + length(part);
-			if (start < from) {
-				// Passed while a moof was gathered: not where samples are.
-				bad = true;
-				return;
-			}
-			let n = min(s[0] + s[1], end) - start;
-			part += substr(chunk, start - from, n);
-			if (length(part) < s[1])
-				return;
-			push(out, adts(a, s[1]), part);
-			part = '';
-			si++;
-		}
-	};
-	return {
-		feed: chunk => {
-			for (let i = 0; i < length(chunk) && !bad; ) {
-				if (pos + i >= box_end && moof_at == null) {
-					// A box's header, perhaps across chunks.
-					let n = min(8 - length(head), length(chunk) - i);
-					head += substr(chunk, i, n);
-					i += n;
-					if (length(head) < 8)
-						break;
-					let size = be32(head, 0), type = substr(head, 4, 4);
-					if (size < 8) {
-						bad = true;
-						break;
-					}
-					box_end = pos + i - 8 + size;
-					if (type == 'moof')
-						moof_at = box_end - size;
-					else
-						head = '';
-					continue;
-				}
-				let n = min(box_end - (pos + i), length(chunk) - i);
-				if (moof_at != null) {
-					head += substr(chunk, i, n);
-					if (length(head) == box_end - moof_at) {
-						samples = moof_samples(a, head, moof_at);
-						si = 0;
-						moof_at = null;
-						head = '';
-					}
-				} else
-					take(substr(chunk, i, n), pos + i);
-				i += n;
-			}
-			pos += length(chunk);
-		},
-		done: () => bad || si < length(samples) ? null : join('', out),
-	};
-}
-
-// The audio track of video c's init segment, from the cache; null when
-// it isn't there or has none.
-function music_track(k) {
-	let init = readfile(CACHE + replace(k, /-[0-9]+-[0-9]+$/, '-i'));
-	return init ? mp4_audio(init) : null;
-}
-
-// Leaves the audio of segment k (ADTS) to go to title-api.
-function music_leave(k, aac) {
-	if (!length(aac))
-		return;
-	mkdir(MUSIC_DIR);
-	let f = MUSIC_DIR + k + '.aac', tmp = f + '.' + clock()[1];
-	if (writefile(tmp, aac) != length(aac) || !rename(tmp, f))
-		unlink(tmp);
-}
-
-// The same of segment k kept in file f, as prefetch loads one.
-function music_leave_file(k, f) {
-	let a = MUSIC ? music_track(k) : null, seg = a ? readfile(f) : null;
-	if (!seg)
-		return;
-	let cut = aac_cutter(a);
-	cut.feed(seg);
-	music_leave(k, cut.done());
-}
+// What plays in a video: title-api tells the music of the alternative
+// player's videos (fMP4) from the segments its relay passes on to the TV
+// and loads a minute and a half ahead of it, so a track is known before it
+// plays. The status carries it (see music_of): title-api is asked again
+// at most every MUSIC_EVERY seconds by a process of its own, the status
+// never waiting for it.
+const MUSIC_EVERY = 10;
 
 // The query of title-api's music of a video: the source is the stream's
-// name (a dub, which may be cut otherwise), hashed.
+// name (a dub, which may be cut otherwise), hashed (FNV-1a), as title-api
+// hashes it.
 const music_query = (id, season, episode, source) => sprintf('title_id=%s&season=%d&episode=%d&source=%s',
 	urlenc(id), +(season ?? 0), +(match(`${episode ?? ''}`, /^[0-9]+/)?.[0] ?? 0), hash(source ?? ''));
 
-// A POST of file to title-api: { status, out } as api_post has them.
-function music_post(path, file) {
-	let f = ERR + clock()[1];
-	system(`uclient-fetch -T 30 -O ${shq(f)} --header='Content-Type: application/octet-stream' ` +
-		`--post-file=${shq(file)} ${shq(API + path)} 2>${shq(f + '.e')}`);
-	let m = match(readfile(f + '.e') ?? '', /HTTP error ([0-9]+)/), out = trim(readfile(f) ?? '');
-	unlink(f);
-	unlink(f + '.e');
-	return { status: m ? +m[1] : out == '' ? 0 : 200, out };
+// title-api's music of what now plays: { tracks, pending, received } (see
+// GET /music), or { reason }; null for none.
+function music_ask(now) {
+	if (!MUSIC)
+		return { reason: 'off' };
+	if (!now.fmp4)
+		return { reason: 'not_fmp4' };
+	let r = api('/v1/music?' + music_query(now.id, now.season, now.episode, now.source), [503]);
+	if (!r)
+		return { reason: 'off' };
+	return { tracks: r.tracks ?? [], pending: +(r.pending ?? 0), received: +(r.received ?? 0) };
 }
 
-// Leaves a process to send the audio of what the TV of key plays, unless
-// one is at it (its beat within MUSIC_BEAT).
-function music_ensure(key, now) {
-	if (!MUSIC || !PROXY || !now?.c || !now.fmp4)
-		return;
-	let t = time();
-	if (sql_do('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE ' +
-	           'SET value = excluded.value WHERE CAST(value AS INTEGER) < ?', 'music:' + key, t, t - MUSIC_BEAT))
+// The music of what the TV of key plays (now) as last told (see music_ask),
+// null before; told again in the background once MUSIC_EVERY old, by one
+// process at a time (its lock mzl:<key> in kv, held 30 s at most).
+function music_of(key, now) {
+	if (!MUSIC || !now.fmp4)
+		return music_ask(now);
+	let q = music_query(now.id, now.season, now.episode, now.source), x = kv_get('mz:' + key), t = time();
+	if ((x?.q != q || t - x.t >= MUSIC_EVERY) &&
+	    sql_do('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE ' +
+	           'SET value = excluded.value WHERE CAST(value AS INTEGER) < ?', 'mzl:' + key, t, t - 30))
 		system(`${shq(sourcepath())} music ${shq(key)} </dev/null >/dev/null 2>&1 &`);
+	return x?.q == q ? x.r : null;
 }
 
-// The process music_ensure left: while the TV of key plays (seen within
-// three minutes), sends title-api the audio in MUSIC_DIR, of the video it
-// plays first, each in order; audio of a video with no query, or older
-// than MUSIC_KEEP, goes. A title-api without music (503) or out of reach
-// holds it a while. A new wrtcast ends it, for the status or the tick
-// to leave its own.
-function music_run(key) {
-	let lock = 'music:' + key, script = stat(sourcepath())?.mtime;
-	for (;;) {
-		let now = now_get(key), seen = tv_get(key, 'seen');
-		if (!MUSIC || !now?.c || seen?.url != now.url || time() - seen.t > 180 ||
-		    stat(sourcepath())?.mtime != script)
-			break;
-		kv_set(lock, time());
-		let files = [], queries = {};
-		for (let name in lsdir(MUSIC_DIR) ?? []) {
-			let x = match(name, /^(([0-9a-f]{8})-[0-9a-f]{8}-([0-9]+)-([0-9]+))\.aac$/);
-			if (!x)
-				continue;
-			let st = stat(MUSIC_DIR + name);
-			queries[x[2]] ??= kv_get('mq:' + x[2]);
-			if (!st || st.mtime < time() - MUSIC_KEEP || !queries[x[2]]) {
-				unlink(MUSIC_DIR + name);
-				continue;
-			}
-			push(files, { name, c: x[2], start: +x[3] / 1000.0, stop: +x[4] / 1000.0 });
-		}
-		files = sort(files, (x, y) => (x.c == now.c ? 0 : 1) - (y.c == now.c ? 0 : 1) ||
-		                              (x.c < y.c ? -1 : x.c > y.c ? 1 : 0) || x.start - y.start);
-		let hold = length(files) ? 0 : 2;
-		for (let f in files) {
-			let x = music_post(sprintf('/v1/music/audio?%s&start=%.3f&stop=%.3f', queries[f.c], f.start, f.stop),
-			                   MUSIC_DIR + f.name);
-			if (x.status == 200 || x.status >= 400 && x.status < 500) {
-				unlink(MUSIC_DIR + f.name);
-				kv_set(lock, time());
-				continue;
-			}
-			hold = x.status == 503 ? 300 : 10;
-			break;
-		}
-		if (hold) {
-			// Held for long, the lock is held as long.
-			kv_set(lock, time() + max(hold - MUSIC_BEAT, 0));
-			sleep(hold * 1000);
-		}
+// The process music_of left: asks title-api for the music of what the TV
+// of key plays.
+function music_fetch(key) {
+	let now = now_get(key);
+	if (now?.id) {
+		let q = music_query(now.id, now.season, now.episode, now.source);
+		kv_set('mz:' + key, { q, t: time(), r: music_ask(now) });
 	}
-	kv_set(lock, 0);
+	kv_set('mzl:' + key, 0);
 }
 
 // ---- watch progress --------------------------------------------------------
@@ -1686,7 +1427,6 @@ function watch_end(now, st) {
 			                        +st.volume, time() - (now.started ?? 0), vol));
 			castctl_try({ host: now.host }, 'volume', sprintf('%.0f', vol * 100));
 		}
-		music_ensure(key, now);
 		let d = plan(key, now, m);
 		// The episode after this one is prepared ahead, from AHEAD before
 		// the credits or the end it starts at.
@@ -1732,7 +1472,7 @@ function cache_trim() {
 			for (let y in sql_rows('SELECT key FROM cache WHERE c = ?', r.c))
 				cache_drop(y.key);
 	}
-	for (let r in sql_rows("SELECT key FROM kv WHERE key LIKE 'c:%' OR key LIKE 'mq:%'"))
+	for (let r in sql_rows("SELECT key FROM kv WHERE key LIKE 'c:%'"))
 		if (!sql_row('SELECT 1 AS x FROM cache WHERE c = ?', replace(r.key, /^[a-z]+:/, '')))
 			sql_do('DELETE FROM kv WHERE key = ?', r.key);
 	for (let name in lsdir(CACHE) ?? []) {
@@ -1741,10 +1481,6 @@ function cache_trim() {
 		    !sql_row('SELECT 1 AS x FROM cache WHERE key = ?', name))
 			unlink(CACHE + name);
 	}
-	// Audio no sender took (see "music").
-	for (let name in lsdir(MUSIC_DIR) ?? [])
-		if ((stat(MUSIC_DIR + name)?.mtime ?? 0) < t - MUSIC_KEEP)
-			unlink(MUSIC_DIR + name);
 }
 
 // Run by cron every minute: records the progress of what /play started
@@ -1994,6 +1730,8 @@ function with_now(st, dev) {
 		autoskip: !!now.autoskip,
 		sections: sections_of(now, +(st.media.duration ?? 0)),
 		skipped: skipped(key, now),
+		// The music of the video, as last told (see music_of).
+		music: music_of(key, now),
 	};
 	for (let t in st.media.tracks ?? []) {
 		t.label = now.labels?.[t.name] ?? t.name;
@@ -2358,23 +2096,15 @@ function proxy(name, u, q, h, drc, m, pv, c, k) {
 	media_head(200, MIME[e] ?? 'application/octet-stream');
 	let part = CACHE + k + '.' + clock()[1];
 	let tee = k && !pv && cache_room() ? open(part, 'w') : null;
-	// The audio of the alternative player's segments goes to title-api
-	// (see "music"), kept or not.
-	let a = k && !pv && MUSIC && match(k, CACHE_KEY)?.[3] ? music_track(k) : null;
-	let cut = a ? aac_cutter(a) : null;
 	let n = 0;
 	while (chunk != null && chunk != '') {
 		stdout.write(chunk);
 		if (tee)
 			tee.write(chunk);
-		if (cut)
-			cut.feed(chunk);
 		n += length(chunk);
 		chunk = pipe.read(65536);
 	}
 	let ok = pipe.close() == 0;
-	if (cut && ok)
-		music_leave(k, cut.done());
 	if (tee) {
 		tee.close();
 		if (ok)
@@ -2559,10 +2289,8 @@ function prepare(dev, p, keep) {
 	// The video's segments are cached (see "segment cache"), of a known
 	// variant: with auto quality the TV picks.
 	let c = PROXY && width ? cache_id(id, season, episode, s.name, width) : null;
-	if (c) {
+	if (c)
 		kv_set('c:' + c, { id, season, episode });
-		kv_set('mq:' + c, music_query(id, season, episode, s.name));
-	}
 	let url = PROXY ? purl(s.url, public_base(), null, h, m) +
 		(width ? `&q=${width}` : '') + (drc ? '&drc=1' : '') + (c ? `&c=${c}` : '') : s.url;
 	// Subtitles are separate WebVTT files, not part of the HLS manifest,
@@ -2733,8 +2461,6 @@ function prefetch(r, starts) {
 			unlink(f);
 			break;
 		}
-		if (x[2] != 'i')
-			music_leave_file(k, f);
 		cache_put(k, f, size, r.m, true);
 		if (x[2] != 'i')
 			count_bytes(r.m, size, t0);
@@ -3556,22 +3282,12 @@ const routes = {
 	// start, stop (seconds of the video), offset (seconds into the track
 	// at start), title, artist, cover, url (Shazam's), apple_url, spotify,
 	// duration }], pending (asks of Shazam yet to be made), received
-	// (seconds of audio sent); or, with none, why (reason): no_play,
-	// no_cache, not_fmp4, off (no music on the router or title-api).
+	// (seconds of audio title-api has); or, with none, why (reason):
+	// no_play, not_fmp4, off (no music on the router or title-api). The
+	// status carries the same, as last told (see music_of).
 	'GET /music': p => {
 		let now = now_get(state_key(device(p)));
-		if (!now?.id)
-			return { reason: 'no_play' };
-		if (!MUSIC)
-			return { reason: 'off' };
-		if (!now.c)
-			return { reason: 'no_cache' };
-		if (!now.fmp4)
-			return { reason: 'not_fmp4' };
-		let r = api('/v1/music?' + music_query(now.id, now.season, now.episode, now.source), [503]);
-		if (!r)
-			return { reason: 'off' };
-		return { tracks: r.tracks ?? [], pending: +(r.pending ?? 0), received: +(r.received ?? 0) };
+		return now?.id ? music_ask(now) : { reason: 'no_play' };
 	},
 
 	// A pause /faces told of (id its pause): its faces, told by the cast's
@@ -3647,7 +3363,7 @@ if (ARGV[0] == 'mark' && match(ARGV[1] ?? '', /^[0-9A-Za-z]{1,64}$/)) {
 	exit(0);
 }
 if (ARGV[0] == 'music' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
-	music_run(ARGV[1]);
+	music_fetch(ARGV[1]);
 	exit(0);
 }
 if (ARGV[0] == 'due' && match(ARGV[1] ?? '', /^[0-9A-Za-z._]+$/)) {
