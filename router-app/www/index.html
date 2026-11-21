@@ -554,10 +554,10 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 #wseasons::-webkit-scrollbar{display:none}
 #wlist .dev.done b{color:var(--mu)}
 #wlist .dev.on b{color:var(--ac)}
-/* Under the episodes: all of them watched, or none. */
-#wfoot{display:flex;flex:none;justify-content:center;gap:8px;margin-top:8px}
+/* Under the heading: all of the episodes watched, or none. */
+#wfoot{display:flex;flex:none;gap:4px;margin:0 0 2px -2px}
 #wfoot:not(:has(button:not([hidden]))){display:none}
-#wall,#wclear{padding:10px 16px;border:0;background:none;font-size:15px}
+#wall,#wclear{padding:8px 2px;margin-right:14px;border:0;background:none;font-size:15px}
 #wall{color:var(--ac);font-weight:600}
 #wclear{color:var(--err)}
 #stop,#mkdel,#tmdel{display:block;margin:4px auto 0;padding:10px 16px;border:0;background:none;color:var(--err);font-size:15px}
@@ -945,9 +945,9 @@ svg.spring{animation:spring .3s ease-out}
 <section id="wsheet" class="sheet" hidden>
   <div class="handle"></div>
   <h2><span>Смотрели до серии</span><button class="ib" id="wcollapse" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button></h2>
+  <div id="wfoot"><button id="wall" hidden>Полностью</button><button id="wclear" hidden>Не смотрели</button></div>
   <div id="wseasons"></div>
   <div id="wlist"></div>
-  <div id="wfoot"><button id="wall" hidden>Полностью</button><button id="wclear" hidden>Не смотрели</button></div>
 </section>
 <section id="sty" class="sheet" hidden>
   <div class="handle"></div>
