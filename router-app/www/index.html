@@ -61,6 +61,7 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 .card .up span{padding:3px 7px;line-height:1.2;border-radius:6px;background:#000c;color:#ddd;font-size:11px;font-weight:600}
 .card .up .new{background:var(--ac);color:#111}
 .card:has(.badge.on) .up{display:none}
+.card:has(.ws) .up{max-width:calc(100% - 90px)}
 /* Saves the title to watch, over a poster's corner and next to a title's
    play button; lit while saved. */
 .sv,.ws{position:absolute;top:6px;right:6px;z-index:1;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#000c;color:#fff;transition:transform .12s}
@@ -96,7 +97,7 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 .sec svg{display:none;width:20px;height:20px;color:var(--mu)}
 .sec.more{cursor:pointer}
 .sec.more svg{display:block}
-#stitle{padding-top:24px}
+#stitle,#wtitle{padding-top:24px}
 .card .all{color:var(--mu)}
 .card .all svg{width:36px;height:36px}
 .card .all+span{display:block;margin-top:7px}
@@ -151,8 +152,6 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 .wtile .st>b{color:#55555c;font-size:28px}
 .wtile>b{display:block;margin-top:8px;font-weight:600}
 .wtile>span{display:block;margin-top:2px;color:var(--mu);font-size:13px}
-.done{position:absolute;left:8px;top:8px;z-index:1;display:flex;align-items:center;gap:4px;padding:3px 8px 3px 5px;border-radius:8px;background:#000b;font-size:12px;font-weight:600}
-.done svg{width:14px;height:14px;color:var(--ac)}
 #pbody .tile.tall>span+span{margin-top:0;color:#6b6b72}
 /* All they are in or made, by year, the latest first. */
 .seg{display:flex;gap:6px;margin:0 0 6px}
@@ -160,14 +159,18 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 .seg button.on{background:var(--tx);color:#111}
 .seg em{margin-left:4px;font-style:normal;opacity:.55}
 .yg>.y{margin:16px 0 2px;color:var(--mu);font-size:13px;font-weight:700;letter-spacing:.04em}
-.work{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:12px;width:100%;padding:8px 0;border:0;border-bottom:1px solid #ffffff0d;background:none;color:var(--tx);text-align:left}
+.work{display:grid;grid-template-columns:34px 1fr auto auto auto;cursor:pointer;align-items:center;gap:12px;width:100%;padding:8px 0;border:0;border-bottom:1px solid #ffffff0d;background:none;color:var(--tx);text-align:left}
 .work .th{width:34px;aspect-ratio:2/3;border-radius:5px;background:var(--s2) center/cover}
 .work .th.none{background:repeating-linear-gradient(135deg,var(--s2) 0 6px,var(--s1) 6px 12px)}
 .work>div{min-width:0}
 .work b{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600}
-.work b svg{flex:none;width:16px;height:16px;color:var(--ac)}
 .work span{display:block;overflow:hidden;color:var(--mu);font-size:13px;white-space:nowrap;text-overflow:ellipsis}
 .work small{color:#6b6b72;font-size:12px;white-space:nowrap}
+/* Its buttons, watched and saved, in the row, not over a picture. */
+.work :is(.ws,.sv){position:relative;top:auto;right:auto;background:none;color:var(--mu)}
+.work :is(.ws,.sv).on{color:var(--ac)}
+.work :is(.ws,.sv)::before{inset:-8px -4px}
+.work :is(.ws,.sv).busy::after{border-color:var(--mu);border-top-color:transparent}
 .soon{margin-right:6px;padding:2px 6px;border-radius:6px;background:#ffb02024;color:var(--ac);font-weight:600}
 .pall{display:block;width:100%;margin-top:14px;padding:11px;border:0;border-radius:12px;background:var(--s2);font-size:14px;font-weight:600}
 #pattr{margin:32px 16px 0;padding-top:12px;border-top:1px solid var(--s2)}
@@ -667,7 +670,7 @@ svg.spring{animation:spring .3s ease-out}
   .grid{grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:28px 22px;padding:8px var(--gut) 0}
   #home,#list{padding-bottom:140px}
   .sec{padding:8px var(--gut) 14px;font-size:20px}
-  #stitle{padding-top:32px}
+  #stitle,#wtitle{padding-top:32px}
   .lhead{padding:20px var(--gut) 12px calc(var(--gut) - 12px)}
   .lhead h1{font-size:24px}
   .card b{font-size:15px}
@@ -750,7 +753,7 @@ svg.spring{animation:spring .3s ease-out}
   .seg{margin-bottom:10px}
   .yg{display:grid;grid-template-columns:64px 1fr;border-top:1px solid #ffffff1f}
   .yg>.y{margin:0;padding-top:17px;font-size:15px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums}
-  .work{grid-template-columns:40px 1fr auto;gap:16px;padding:9px 0}
+  .work{grid-template-columns:40px 1fr auto auto auto;gap:16px;padding:9px 0}
   .work .th{width:40px}
   .work small{font-size:13px}
   .work:hover b{color:var(--ac)}
@@ -781,8 +784,8 @@ svg.spring{animation:spring .3s ease-out}
   .card img{transition:opacity .35s,filter .2s}
   .card:hover img{filter:brightness(1.12)}
   .card :is(.pf,.bar,.ov,.up,.badge){transition:translate .2s}
-  .card .sv{transition:transform .12s,translate .2s}
-  .card:hover :is(.pf,.bar,.sv,.ov,.up,.badge){translate:0 -3px}
+  .card :is(.sv,.ws){transition:transform .12s,translate .2s}
+  .card:hover :is(.pf,.bar,.sv,.ws,.ov,.up,.badge){translate:0 -3px}
   .card .cp:not(.busy){opacity:0}
   .card:hover .cp:not(:disabled),.cp:focus-visible{opacity:1}
   .card:hover .cp:disabled{opacity:.5}
@@ -825,10 +828,12 @@ svg.spring{animation:spring .3s ease-out}
 
 <header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib wait" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg><i class="x"><svg><use href="#i-close"/></svg></i><i class="w"></i></button><button class="ib" id="mkbtn" aria-label="Настройки"><svg><use href="#i-gear"/></svg></button></header>
 <main id="home">
-  <h2 class="sec" id="rtitle" hidden>Недавно смотрели<svg><use href="#i-more"/></svg></h2>
+  <h2 class="sec" id="rtitle" hidden>Продолжить просмотр<svg><use href="#i-more"/></svg></h2>
   <div class="grid" id="grid"></div>
   <h2 class="sec" id="stitle" hidden>Сохранённые<svg><use href="#i-more"/></svg></h2>
   <div class="grid" id="sgrid" hidden></div>
+  <h2 class="sec" id="wtitle" hidden>Просмотренные<svg><use href="#i-more"/></svg></h2>
+  <div class="grid" id="wgrid" hidden></div>
 </main>
 <p class="note" id="msg"><svg><use href="#i-tv"/></svg><span>Найдите фильм или сериал и запустите его на ТВ</span></p>
 
@@ -989,7 +994,7 @@ localStorage.removeItem('subStyle'); // older format with colors
 const SHEETS = { opt: 'opts', dev: 'devs', sty: 'sty', src: 'srcs', mk: 'mk', faces: 'fsheet', music: 'msheet', seen: 'wsheet' }; // layer name -> bottom sheet
 let recent = [];        // /progress list: recently watched titles, latest first
 let saved = [];         // and the titles saved to watch, latest saved first
-let listShown = null;   // the list on a page of its own (see openList): 'recent', 'saved' or null
+let listShown = null;   // the list on a page of its own (see openList): 'recent', 'saved', 'watched' or null
 let listsLoaded = false; // /progress has answered once
 let updates = {};       // /updates: what is new of the series watched and saved, by id
 let searching = 0;      // number of the search shown; 0 = the recent titles are
@@ -1394,7 +1399,7 @@ const urlCast = () => /^\/(title\/[^/]+|tmdb\/(movie|tv)\/[0-9]+)\/cast$/.test(b
 // What is over a title's page in its address (its cast's, someone's), kept
 // as the page turns to another title.
 const overPage = () => /^\/(title\/[^/]+|tmdb\/(movie|tv)\/[0-9]+)(\/.+)$/.exec(location.pathname)?.[3] ?? '';
-const urlList = () => /^\/(recent|saved)$/.exec(location.pathname)?.[1];
+const urlList = () => /^\/(recent|saved|watched)$/.exec(location.pathname)?.[1];
 const urlQuery = () => location.pathname == '/search' && new URLSearchParams(location.search).get('q') || '';
 
 // Brings the page in line with the address and the history entry: after
@@ -1459,7 +1464,7 @@ function renderResults(results) {
   $('msg').hidden = results.length > 0;
   note('Ничего не найдено');
   $('grid').classList.remove('still');
-  $('grid').replaceChildren(...results.map((m, i) => card(m, i, m.year)));
+  $('grid').replaceChildren(...results.map((m, i) => card(m, i, m.year, null, true)));
   markPlaying();
 }
 
@@ -1496,15 +1501,16 @@ const svgIcon = name => {
 
 // A title's card: its poster, with how far it was watched (part, 0..1) if
 // given, its name and a line under it; it opens the title's page, the
-// button over the poster's top corner saves it (see saveButton), and the
-// one over its bottom corner starts it (see playButton).
-function card(m, i, under, part) {
+// button over the poster's top corner saves it (see saveButton), with
+// seen the one left of it marks it watched (see cardSeen), and the one
+// over its bottom corner starts it (see playButton).
+function card(m, i, under, part, seen) {
   const p = poster(m);
   const open = el('button', { className: 'open' },
     part != null ? el('div', { className: 'pw' }, p, el('div', { className: 'bar' }, el('div', { style: `width:${100 * part}%` }))) : p,
     el('b', {}, m.title || ''), el('span', {}, under || ''));
   open.onclick = () => openDetails({ id: m.id, title: m.title, poster: m.poster, year: m.year });
-  const c = el('div', { className: 'card' }, open, saveButton(m), el('div', { className: 'ov' }, playButton(m)));
+  const c = el('div', { className: 'card' }, open, ...seen ? [cardSeen(m)] : [], saveButton(m), el('div', { className: 'ov' }, playButton(m)));
   c.style.setProperty('--i', i);
   c.dataset.id = m.id;
   markUpdate(c);
@@ -1689,6 +1695,7 @@ function renderRecent(anim = true) {
   note('Найдите фильм или сериал и запустите его на ТВ');
   renderSection('recent', anim);
   renderSection('saved', anim);
+  renderSection('watched', anim);
   markPlaying();
 }
 
@@ -1699,15 +1706,24 @@ let shownColumns = 0;
 // A section of the main page: two rows of cards at most. When more don't
 // fit, the last of them leads to the page of them all (see openList), and
 // so does the heading, which shows an arrow.
-const SECTIONS = { recent: ['rtitle', 'grid', 'Недавно смотрели'], saved: ['stitle', 'sgrid', 'Сохранённые'] };
+// The history is split: what is left to watch, and what is watched (see
+// rowSeen) under the saved titles.
+const SECTIONS = {
+  recent: ['rtitle', 'grid', 'Продолжить просмотр'], saved: ['stitle', 'sgrid', 'Сохранённые'],
+  watched: ['wtitle', 'wgrid', 'Просмотренные'],
+};
+const sectionList = kind => kind == 'recent' ? recent.filter(r => !rowSeen(r)) :
+  kind == 'watched' ? recent.filter(rowSeen) : saved;
+// A card of a section: of a title watched, without how far.
+const sectionCard = kind => kind == 'watched' ? (r, i) => card(r, i, recentNote(r)) : rowCard;
 function renderSection(kind, anim) {
-  const [head, id] = SECTIONS[kind], g = $(id), list = kind == 'recent' ? recent : saved;
+  const [head, id] = SECTIONS[kind], g = $(id), list = sectionList(kind);
   $(head).hidden = g.hidden = !list.length;
   if (!list.length) return g.replaceChildren();
   const fit = 2 * (shownColumns = columns(g)), more = list.length > fit;
   $(head).classList.toggle('more', more);
   g.classList.toggle('still', !anim);
-  const cards = (more ? list.slice(0, fit - 1) : list).map(rowCard);
+  const cards = (more ? list.slice(0, fit - 1) : list).map(sectionCard(kind));
   if (more) {
     const b = el('button', { className: 'open', ariaLabel: 'Все' },
       el('i', { className: 'all' }, svgIcon('more')), el('span', {}, 'ещё ' + (list.length - fit + 1)));
@@ -1724,7 +1740,7 @@ for (const kind in SECTIONS) {
 }
 // Two rows hold more or fewer cards as the window changes.
 addEventListener('resize', () => {
-  const g = [$('grid'), $('sgrid')].find(g => !g.hidden);
+  const g = [$('grid'), $('sgrid'), $('wgrid')].find(g => !g.hidden);
   if (!searching && g && columns(g) != shownColumns) renderRecent(false);
 });
 
@@ -1743,9 +1759,9 @@ function showList(kind) {
 
 function renderList(anim) {
   if (!listShown) return;
-  const list = listShown == 'recent' ? recent : saved;
+  const list = sectionList(listShown);
   $('lgrid').classList.toggle('still', !anim);
-  $('lgrid').replaceChildren(...list.map(rowCard));
+  $('lgrid').replaceChildren(...list.map(sectionCard(listShown)));
   $('lmsg').hidden = list.length > 0 || !listsLoaded;
   markPlaying();
 }
@@ -1779,7 +1795,7 @@ function markPlaying() {
 async function search(q) {
   const n = searching = Date.now();
   query = q;
-  $('msg').hidden = $('rtitle').hidden = $('stitle').hidden = $('sgrid').hidden = true;
+  $('msg').hidden = $('rtitle').hidden = $('stitle').hidden = $('sgrid').hidden = $('wtitle').hidden = $('wgrid').hidden = true;
   $('grid').hidden = false;
   $('grid').replaceChildren(...Array.from({ length: 9 }, () =>
     el('div', {}, el('span', { className: 'sk' }), el('span', { className: 'skl' }), el('span', { className: 'skl' }))));
@@ -2514,12 +2530,15 @@ function seenMark(m) {
   return mk;
 }
 
-// Whether a title is watched, as the recently watched list tells it: a
-// movie to its end, a series to its last episode (none known after it).
+// Whether a row of the history is of a title watched: a movie to its end,
+// a series to its last episode (the provider having none after it).
+const rowSeen = r => !!r.done && (r.season == null || r.upnext === false);
+
+// Whether a title is watched, as the history tells it.
 function isSeen(id) {
   if (id && id in want) return want[id];
   const r = id && recent.find(e => e.id == id);
-  return !!r && !!r.done && (r.season == null || !r.upnext);
+  return !!r && rowSeen(r);
 }
 
 // Whether a title of TMDB (r: its type, id and title_id if known) is.
@@ -2555,12 +2574,48 @@ function showSeen() {
   b.setAttribute('aria-label', series ? 'Отметить, до какой серии смотрели' : on ? 'Отметить непросмотренным' : 'Отметить просмотренным');
 }
 
-// The button over a frame, lit while its title is watched.
+// The button over a frame or a card, lit while its title is watched.
 function showSeenTile(b) {
-  const on = tileSeen(b.r);
+  const on = b.r ? tileSeen(b.r) : isSeen(b.dataset.id);
   b.classList.toggle('on', on);
-  b.setAttribute('aria-label', b.r.type == 'tv' ? 'Отметить, до какой серии смотрели' :
+  b.setAttribute('aria-label', b.r?.type == 'tv' ? 'Отметить, до какой серии смотрели' :
     on ? 'Отметить непросмотренным' : 'Отметить просмотренным');
+}
+
+// Whether a title of the provider's is a series, as far as known without
+// asking: its page's answer, or the history; undefined if not known.
+function knownSeries(id) {
+  const t = titles[id], r = recent.find(e => e.id == id) ?? saved.find(e => e.id == id && e.season != null);
+  return t ? t.type == 'series' : r ? r.season != null : undefined;
+}
+
+// The button over a search's card. Of a title not known to be a movie or a
+// series, a tap is shown as a movie's at once; a series' sheet opens once
+// its page's answer tells it is one.
+function cardSeen(m) {
+  const b = el('button', { className: 'ws' }, svgIcon('check'));
+  b.dataset.id = m.id;
+  b.onclick = async e => {
+    e.stopPropagation();
+    const series = knownSeries(m.id), on = !isSeen(m.id);
+    if (series) return openSeenSheet({ id: m.id });
+    if (series === false) return markMovie(m.id, on);
+    want[m.id] = on;
+    refreshSeen();
+    let t;
+    try {
+      t = await title(m.id);
+    } catch (err) {
+      toast(err);
+    }
+    if (!seenQ[m.id]) delete want[m.id];
+    refreshSeen();
+    if (!t) return;
+    if (t.type == 'series') return openSeenSheet({ id: m.id });
+    markMovie(m.id, on);
+  };
+  showSeenTile(b);
+  return b;
 }
 
 function refreshSeen() {
@@ -2999,8 +3054,7 @@ function renderPerson(p, known) {
       seen.length && stat(seen.length, 'вы смотрели'),
     ].filter(Boolean)),
     row('Вы смотрели', seen.map(c => {
-      const done = recent.some(e => e.id == c.title_id && e.done), pic = still(c.backdrop || c.poster, (c.title || '?')[0]);
-      if (done) pic.append(el('span', { className: 'done' }, svgIcon('check'), 'Просмотрено'));
+      const pic = still(c.backdrop || c.poster, (c.title || '?')[0]);
       pic.append(...tileButtons(c));
       const b = el('div', { className: 'wtile', role: 'button', tabIndex: 0 }, pic, el('b', {}, c.title || ''),
         el('span', {}, [c.character || c.jobs[0], c.episodes ? episodes(c.episodes) : c.year].filter(Boolean).join(' · ')));
@@ -3039,11 +3093,13 @@ function works(p, kind = 'all', all = false) {
     ...(movies && series ? [el('div', { className: 'seg' }, chip('all', 'Все', p.credits.length), chip('movie', 'Фильмы', movies), chip('tv', 'Сериалы', series))] : []),
     ...groups.map(g => el('div', { className: 'yg' }, el('div', { className: 'y' }, g.y), el('div', {}, ...g.list.map(c => {
       const note = [creditNote(c), c.episodes && episodes(c.episodes)].filter(Boolean).join(' · ');
-      const b = el('button', { className: 'work' },
+      const b = el('div', { className: 'work', role: 'button', tabIndex: 0 },
         el('i', { className: 'th' + (c.poster ? '' : ' none'), style: c.poster ? `background-image:url("${c.poster}")` : '' }),
-        el('div', {}, el('b', {}, c.title || '', ...(c.seen ? [svgIcon('check')] : [])), el('span', {}, note || '—')),
-        el('small', {}, ...(g.y == 'Скоро' ? [el('span', { className: 'soon' }, 'Скоро')] : []), c.type == 'tv' ? 'Сериал' : 'Фильм'));
+        el('div', {}, el('b', {}, c.title || ''), el('span', {}, note || '—')),
+        el('small', {}, ...(g.y == 'Скоро' ? [el('span', { className: 'soon' }, 'Скоро')] : []), c.type == 'tv' ? 'Сериал' : 'Фильм'),
+        ...tileButtons(c));
       b.onclick = () => openCredit(c);
+      b.onkeydown = e => e.target == b && e.key == 'Enter' && openCredit(c);
       return b;
     })))),
     ...(list.length > shown.length ? [el('button', { className: 'pall', onclick: () => redraw(kind, true) }, `Показать все ${list.length}`)] : []));

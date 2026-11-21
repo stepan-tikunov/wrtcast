@@ -3101,6 +3101,17 @@ function mark_watched(id, on, season, episode) {
 				upto = i;
 		if (upto < 0)
 			fail(404, 'no such episode');
+		// The provider's episodes, as /updates keeps them: the lists tell
+		// at once whether one comes after it (see up_next), not once the
+		// series is asked of title-api.
+		let u = kept_updates(), ss = [];
+		for (let e in all) {
+			if (!length(ss) || ss[length(ss) - 1][0] != e.season)
+				push(ss, [e.season, []]);
+			push(ss[length(ss) - 1][1], e.episode);
+		}
+		u[id] = { ...(u[id]?.movie ? {} : u[id] ?? { t: 0 }), seasons: ss };
+		kv_set('updates', sprintf('%J', u));
 	}
 	sql_exec('BEGIN IMMEDIATE');
 	if (!on) {
