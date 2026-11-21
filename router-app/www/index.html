@@ -159,13 +159,14 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 .seg button.on{background:var(--tx);color:#111}
 .seg em{margin-left:4px;font-style:normal;opacity:.55}
 .yg>.y{margin:16px 0 2px;color:var(--mu);font-size:13px;font-weight:700;letter-spacing:.04em}
-.work{display:grid;grid-template-columns:34px 1fr auto auto auto;cursor:pointer;align-items:center;gap:12px;width:100%;padding:8px 0;border:0;border-bottom:1px solid #ffffff0d;background:none;color:var(--tx);text-align:left}
+.work{display:grid;grid-template-columns:34px 1fr auto auto 56px;cursor:pointer;align-items:center;gap:12px;width:100%;padding:8px 0;border:0;border-bottom:1px solid #ffffff0d;background:none;color:var(--tx);text-align:left}
 .work .th{width:34px;aspect-ratio:2/3;border-radius:5px;background:var(--s2) center/cover}
 .work .th.none{background:repeating-linear-gradient(135deg,var(--s2) 0 6px,var(--s1) 6px 12px)}
 .work>div{min-width:0}
 .work b{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600}
 .work span{display:block;overflow:hidden;color:var(--mu);font-size:13px;white-space:nowrap;text-overflow:ellipsis}
-.work small{color:#6b6b72;font-size:12px;white-space:nowrap}
+.work small{display:flex;flex-direction:column;align-items:flex-end;gap:3px;color:#6b6b72;font-size:12px;white-space:nowrap}
+.work small .soon{margin:0}
 /* Its buttons, watched and saved, in the row, not over a picture. */
 .work :is(.ws,.sv){position:relative;top:auto;right:auto;background:none;color:var(--mu)}
 .work :is(.ws,.sv).on{color:var(--ac)}
@@ -758,7 +759,7 @@ svg.spring{animation:spring .3s ease-out}
   .seg{margin-bottom:10px}
   .yg{display:grid;grid-template-columns:64px 1fr;border-top:1px solid #ffffff1f}
   .yg>.y{margin:0;padding-top:17px;font-size:15px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums}
-  .work{grid-template-columns:40px 1fr auto auto auto;gap:16px;padding:9px 0}
+  .work{grid-template-columns:40px 1fr auto auto 64px;gap:16px;padding:9px 0}
   .work .th{width:40px}
   .work small{font-size:13px}
   .work:hover b{color:var(--ac)}
@@ -3099,8 +3100,8 @@ function works(p, kind = 'all', all = false) {
       const b = el('div', { className: 'work', role: 'button', tabIndex: 0 },
         el('i', { className: 'th' + (c.poster ? '' : ' none'), style: c.poster ? `background-image:url("${c.poster}")` : '' }),
         el('div', {}, el('b', {}, c.title || ''), el('span', {}, note || '—')),
-        el('small', {}, ...(g.y == 'Скоро' ? [el('span', { className: 'soon' }, 'Скоро')] : []), c.type == 'tv' ? 'Сериал' : 'Фильм'),
-        ...tileButtons(c));
+        ...tileButtons(c),
+        el('small', {}, ...(g.y == 'Скоро' ? [el('span', { className: 'soon' }, 'Скоро')] : []), c.type == 'tv' ? 'Сериал' : 'Фильм'));
       b.onclick = () => openCredit(c);
       b.onkeydown = e => e.target == b && e.key == 'Enter' && openCredit(c);
       return b;
