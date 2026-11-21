@@ -2,6 +2,7 @@ package tmdb
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -57,7 +58,10 @@ func (c *client) candidates(ctx context.Context, t Title) ([]Candidate, error) {
 }
 
 // exact is the one candidate that is the title by its name and year, if
-// there is just one.
+// there is just one; else, when none has its name and year, the one that
+// has its name and a year next to it: the provider's year is often the year
+// a title was made, TMDB's the year it came out ("Смешарики" are 2003 on
+// the provider, 2004 on TMDB).
 func exact(t Title, candidates []Candidate) (Candidate, bool) {
 	names := map[string]bool{}
 	for _, name := range []string{t.Title, t.OriginalTitle} {
@@ -65,20 +69,30 @@ func exact(t Title, candidates []Candidate) (Candidate, bool) {
 			names[key] = true
 		}
 	}
-	year := yearOf(t.Year)
-	var found []Candidate
-	for _, x := range candidates {
-		if year == "" || x.Year() != year || t.Kind != "" && x.Kind != t.Kind {
-			continue
-		}
-		if names[normalize(x.Title)] || names[normalize(x.OriginalTitle)] {
-			found = append(found, x)
-		}
-	}
-	if len(found) != 1 {
+	year, err := strconv.Atoi(yearOf(t.Year))
+	if err != nil {
 		return Candidate{}, false
 	}
-	return found[0], true
+	var same, next []Candidate
+	for _, x := range candidates {
+		if t.Kind != "" && x.Kind != t.Kind || !names[normalize(x.Title)] && !names[normalize(x.OriginalTitle)] {
+			continue
+		}
+		switch y, err := strconv.Atoi(x.Year()); {
+		case err != nil:
+		case y == year:
+			same = append(same, x)
+		case y == year-1 || y == year+1:
+			next = append(next, x)
+		}
+	}
+	switch {
+	case len(same) == 1:
+		return same[0], true
+	case len(same) == 0 && len(next) == 1:
+		return next[0], true
+	}
+	return Candidate{}, false
 }
 
 // normalize is a name as names are compared: letters and digits alone, in

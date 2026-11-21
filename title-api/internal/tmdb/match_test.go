@@ -20,6 +20,11 @@ func TestExact(t *testing.T) {
 	hateful := []Candidate{
 		{ID: 273248, Kind: KindMovie, Title: "Омерзительная восьмёрка", OriginalTitle: "The Hateful Eight", Date: "2015-12-25"},
 	}
+	kikoriki := []Candidate{
+		{ID: 6589, Kind: KindTV, Title: "Смешарики", OriginalTitle: "Смешарики", Date: "2004-03-21"},
+		{ID: 156541, Kind: KindTV, Title: "Смешарики: Новый сезон", OriginalTitle: "Смешарики: Новый сезон", Date: "2020-01-01"},
+	}
+	office2 := append([]Candidate{{ID: 1, Kind: KindTV, Title: "Офис", Date: "2004-01-01"}, {ID: 2, Kind: KindTV, Title: "Офис", Date: "2002-01-01"}}, office...)
 	for _, test := range []struct {
 		name       string
 		title      Title
@@ -30,7 +35,11 @@ func TestExact(t *testing.T) {
 		{"no year", Title{Title: "Офис", Kind: KindTV}, office, 0},
 		{"ё as е", Title{Title: "Омерзительная восьмерка", Year: "2015", Kind: KindMovie}, hateful, 273248},
 		{"original name", Title{Title: "Мерзкая восьмёрка", OriginalTitle: "The Hateful Eight", Year: "2015"}, hateful, 273248},
-		{"another year", Title{Title: "Омерзительная восьмерка", Year: "2016"}, hateful, 0},
+		{"a year off", Title{Title: "Омерзительная восьмерка", Year: "2016"}, hateful, 273248},
+		{"another year", Title{Title: "Омерзительная восьмерка", Year: "2017"}, hateful, 0},
+		{"made a year before", Title{Title: "Смешарики", Year: "2003", Kind: KindTV}, kikoriki, 6589},
+		{"a year off either way", Title{Title: "Офис", Year: "2003", Kind: KindTV}, office2, 0},
+		{"the same year first", Title{Title: "Офис", Year: "2005", Kind: KindTV}, office2, 2316},
 		{"another kind", Title{Title: "Омерзительная восьмерка", Year: "2015", Kind: KindTV}, hateful, 0},
 		{"years", Title{Title: "Офис", Year: "2001-2003", Kind: KindTV}, office, 2996},
 	} {
