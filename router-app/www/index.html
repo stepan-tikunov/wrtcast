@@ -3037,9 +3037,11 @@ async function poll() {
     }
     // A TV starting a stream drops the channel of the one before now and
     // then, a second (castctl: device closed the channel): a play under
-    // way, or a single failed poll, isn't a lost connection. It's told
-    // once, not on every poll.
-    if (pending || inflight || ++pollFails < 2) {
+    // way, or a single failed poll, isn't a lost connection, unless the TV
+    // can't be reached at all (switched off). It's told once, not on every
+    // poll.
+    const off = /cannot connect/.test(e.message);
+    if (!off && (pending || inflight || ++pollFails < 2)) {
       busy = false;
       return;
     }
