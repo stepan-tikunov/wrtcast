@@ -120,6 +120,9 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 /* The pages under it are held where they were, so a swipe goes to no one
    but the page on top. */
 :is(#det,#list,#cast,#person).covered{overflow:hidden}
+/* And unseen once the page on top has come in (html.settled): pulled past
+   its end or its top, a page shows what's under it, held in place. */
+html.settled :is(body>header,#home,#msg,.covered){visibility:hidden}
 /* The header names them once their name has scrolled away. */
 #person .lhead b{display:none;overflow:hidden;font-size:17px;font-weight:650;white-space:nowrap;text-overflow:ellipsis;animation:pop .2s ease-out}
 #person.scr .lhead b:not(:empty){display:block}
@@ -1130,6 +1133,7 @@ function syncPages() {
   const pages = layers.filter(l => PAGES.includes(l)), next = pages.at(-1) ?? null;
   for (const p of PAGES) $(p).classList.toggle('covered', pages.includes(p) && p != next);
   if (next != topPage) {
+    document.documentElement.classList.remove('settled');
     const y = scrollY, at = next ? $(next).scrollTop : homeY; // read while it's still its own scroller
     if (topPage) {
       $(topPage).classList.remove('ontop');
@@ -1143,6 +1147,8 @@ function syncPages() {
     else holdHome(false);
     document.documentElement.classList.toggle('paged', !!next);
     scrollTo(0, at);
+    if (next) Promise.all($(next).getAnimations().map(a => a.finished.catch(() => {})))
+      .then(() => topPage == next && document.documentElement.classList.add('settled'));
   }
   for (const p of PAGES) pageScrolled(p);
 }
