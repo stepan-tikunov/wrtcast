@@ -1073,7 +1073,7 @@ function music_ask(now) {
 function music_of(key, now) {
 	if (!MUSIC || !now.fmp4)
 		return music_ask(now);
-	let q = music_query(now.id, now.season, now.episode, now.source), x = kv_get('mz:' + key), t = time();
+	let q = music_query(now.id, now.season, now.episode, now.source), x = json(kv_get('mz:' + key) ?? 'null'), t = time();
 	if ((x?.q != q || t - x.t >= MUSIC_EVERY) &&
 	    sql_do('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE ' +
 	           'SET value = excluded.value WHERE CAST(value AS INTEGER) < ?', 'mzl:' + key, t, t - 30))
