@@ -3575,6 +3575,37 @@ const routes = {
 		};
 	},
 
+	// People of TMDB by name, a page of 20 (page from 1): those of whom
+	// titles were watched here first, with how many (seen).
+	'GET /people': p => {
+		let q = trim(p.q ?? '');
+		if (ulength(q) < 3)
+			fail(400, 'query must be at least 3 characters');
+		let page = p.page ?? '1';
+		if (!match(page, /^[1-9][0-9]{0,2}$/) || +page > 500)
+			fail(400, 'invalid page');
+		let r = api_post('/v1/tmdb/people/search', {
+			query: q, page: +page,
+			watchedTmdb: keys(tmdb_rows()),
+			watchedTitleIds: map(sql_rows('SELECT id FROM titles'), t => t.id),
+		});
+		// No TMDB key: no people, the titles found all the same.
+		if (r.status == 400 || r.status == 501)
+			return { total: 0, page: 1, pages: 0, people: [] };
+		let j = r.status == 200 ? json(r.out) : null;
+		if (type(j) != 'object')
+			fail(502, 'title-api request failed' + (r.status ? ` (HTTP ${r.status})` : ''));
+		return {
+			total: +(j.totalResults ?? 0), page: +(j.page ?? 1), pages: +(j.totalPages ?? 0),
+			people: map(j.people ?? [], x => ({
+				id: +x.id, name: x.name, original: x.originalName || null,
+				photo: tmdb_img(x.profilePath, 'w185'), profession: x.profession || null,
+				seen: +(x.watched ?? 0),
+				known: map(x.knownFor ?? [], k => tmdb_img(k.posterPath, 'w185')),
+			})),
+		};
+	},
+
 	'GET /streams': p => {
 		let season = null, episode = null;
 		if (p.season != null) {

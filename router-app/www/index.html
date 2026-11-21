@@ -47,7 +47,7 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 #home{padding-bottom:120px}
 /* The pills over the mini player (music, skip, faces) reach higher than it:
    the pages end above them. */
-:root:has(#pl:not([hidden],.pending) :is(#mpill,#skipb,#fpill):not([hidden])) :is(#home,#det,#list,#cast,#person){padding-bottom:calc(176px + env(safe-area-inset-bottom))}
+:root:has(#pl:not([hidden],.pending) :is(#mpill,#skipb,#fpill):not([hidden])) :is(#home,#det,#list,#cast,#people,#person){padding-bottom:calc(176px + env(safe-area-inset-bottom))}
 .card{position:relative;align-self:start}
 .card .open{display:block;width:100%;padding:0;border:0;background:none;text-align:left}
 .card img,.card i{display:block;width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:12px;background:var(--s2)}
@@ -108,13 +108,15 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 #list{position:fixed;inset:0;z-index:3;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* The page of a title's cast, over the title's. */
 #cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+/* All the people a search found, over it. */
+#people{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* Someone's page, over the title's or its cast's. */
 #person{position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* The page on top is in the document's flow and the document scrolls it
    (see syncPages): iOS scrolls only the document to its top on a tap of the
    status bar, and Safari's bars fold only as it scrolls. Its width clipped,
    not scrolled, as a scroller of its own had it. */
-:is(#det,#list,#cast,#person).ontop{position:absolute;bottom:auto;box-sizing:border-box;min-height:100vh;min-height:100lvh;overflow:visible;overflow-x:clip}
+:is(#det,#list,#cast,#people,#person).ontop{position:absolute;bottom:auto;box-sizing:border-box;min-height:100vh;min-height:100lvh;overflow:visible;overflow-x:clip}
 /* Its header fixed, not sticky: iOS jerks a sticky one in a page that the
    document scrolls, a fixed one it moves smoothly; a spacer as high as it
    (--lhh, see the ResizeObserver by syncPages) keeps its place. */
@@ -122,7 +124,7 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 .ontop:has(>.lhead)::before{content:'';display:block;height:var(--lhh,60px)}
 /* The pages under it are held where they were, so a swipe goes to no one
    but the page on top. */
-:is(#det,#list,#cast,#person).covered{overflow:hidden}
+:is(#det,#list,#cast,#people,#person).covered{overflow:hidden}
 /* And unseen once the page on top has come in (html.settled): pulled past
    its end or its top, a page shows what's under it, held in place. */
 html.settled :is(body>header,#home,#msg,.covered){visibility:hidden}
@@ -205,6 +207,55 @@ html.settled :is(body>header,#home,#msg,.covered){visibility:hidden}
 .person div{min-width:0;overflow-wrap:anywhere}
 .person b{display:block;font-weight:550}
 .person span{color:var(--mu);font-size:14px}
+/* People a search found, over the titles: a row of them that scrolls
+   aside, the next one cut at the edge, or one alone as a card; with more
+   than the row has, its heading and its last tile lead to all of them. */
+#ppl .sec em{margin-left:6px;color:var(--mu);font-size:15px;font-style:normal;font-weight:500}
+.pstrip{display:flex;align-items:flex-start;gap:4px;overflow-x:auto;padding:4px 12px 6px;scrollbar-width:none}
+.pstrip::-webkit-scrollbar{display:none}
+.pp{flex:none;width:74px;padding:0;border:0;background:none;color:var(--tx);font-size:12px;line-height:1.25;text-align:center;animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 25ms);transition:transform .12s}
+.pp:active{transform:scale(.96)}
+.pp .aw,.pp>.sk{width:64px;height:64px;margin:0 auto 7px}
+.pp>.sk{border-radius:50%}
+.pp>.skl{width:56px;height:10px;margin:0 auto 5px}
+.pp>.skl+.skl{width:38px}
+.pp b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:550;overflow-wrap:anywhere}
+.pp>span{display:block;margin-top:2px;overflow:hidden;color:var(--mu);white-space:nowrap;text-overflow:ellipsis}
+.pp.all b{color:var(--mu);font-weight:500}
+.pp.all .nop{color:var(--tx)}
+.pp.all .nop svg{width:28px;height:28px}
+/* A photo, and how many titles of theirs were watched in a badge over its
+   lower right corner. */
+.aw{position:relative;display:block;flex:none}
+.aw>.nop{width:100%;height:100%;margin:0;border-radius:50%;background:var(--s2)}
+.aw .ey{position:absolute;right:-5px;bottom:-1px;display:flex;align-items:center;gap:2px;height:20px;padding:0 6px 0 4px;border-radius:10px;background:var(--ac);color:#111;font-size:11.5px;font-weight:750;line-height:1;box-shadow:0 0 0 2px var(--bg)}
+.aw .ey svg{width:13px;height:13px}
+.pone{display:flex;align-items:center;gap:14px;width:calc(100% - 24px);margin:2px 12px 0;padding:12px;border:0;border-radius:16px;background:var(--s1);box-shadow:inset 0 0 0 1px #ffffff0d;color:var(--tx);text-align:left;animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;transition:transform .12s}
+.pone:active{transform:scale(.98)}
+.pone .aw{width:64px;height:64px}
+.pone .aw .ey{box-shadow:0 0 0 2px var(--s1)}
+.pone>div{flex:1;min-width:0}
+.pone small{display:block;color:var(--ac);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.pone b{display:block;margin-top:2px;font-size:17px;font-weight:650;overflow-wrap:anywhere}
+.pone>div>span{display:block;color:var(--mu);font-size:13px}
+.pone>svg{color:var(--mu)}
+/* The posters of what they are known for. */
+.th{display:flex;flex:none}
+.th i{width:24px;aspect-ratio:2/3;border-radius:4px;background:var(--s2) center/cover;box-shadow:0 0 0 2px var(--bg)}
+.th i+i{margin-left:-9px}
+.pone .th{gap:5px;margin-top:8px}
+.pone .th i{width:30px;box-shadow:none}
+.pone .th i+i{margin-left:0}
+.psep{height:1px;margin:14px 12px 16px;background:#ffffff0f}
+#people .seg{padding:2px 16px 8px;margin:0;overflow-x:auto;scrollbar-width:none}
+#people .seg::-webkit-scrollbar{display:none}
+#people .seg button{flex:none}
+.person .aw{width:56px;height:56px}
+.prow>div{flex:1}
+.prow>.th{flex:none}
+.prow b.hl{color:#c8c8cc;font-weight:500}
+.prow b.hl mark{background:none;color:var(--tx);font-weight:700}
+#pmore{height:1px}
 .lhead{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:4px;padding:max(8px,env(safe-area-inset-top)) 12px 8px 4px}
 /* No bar: what scrolls under the header darkens towards the top, across a
    wide gradient, so the white of the header reads over a photo too. */
@@ -667,8 +718,8 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 .skl{display:block;height:12px;margin-top:9px;border-radius:6px}
 .skl+.skl{width:40%}
 .badge.on{animation:bounce .35s ease-out}
-#det,#list,#cast,#person{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
-#det.out,#list.out,#cast.out,#person.out{animation:slideout .2s ease-in forwards}
+#det,#list,#cast,#people,#person{animation:slidein .25s cubic-bezier(.2,.8,.2,1)}
+#det.out,#list.out,#cast.out,#people.out,#person.out{animation:slideout .2s ease-in forwards}
 #phero .pmain>*,#pbody>*{animation:pop .35s cubic-bezier(.2,.8,.2,1) backwards}
 #person .still,#person .still *{animation:none}
 #dposter{animation:pop .4s .05s cubic-bezier(.2,.8,.2,1) backwards}
@@ -760,6 +811,12 @@ svg.spring{animation:spring .3s ease-out}
   .cast,.strip{--fade:linear-gradient(90deg,#0000 calc(var(--dgut) - 40px),#000 var(--dgut),#000 calc(100% - var(--dgut)),#0000 calc(100% - var(--dgut) + 40px));-webkit-mask-image:var(--fade);mask-image:var(--fade)}
   .tile{width:220px;font-size:14px}
   .tile.tall{width:140px}
+  .pstrip{gap:12px;padding:4px var(--gut) 6px;--fade:linear-gradient(90deg,#0000 calc(var(--gut) - 40px),#000 var(--gut),#000 calc(100% - var(--gut)),#0000 calc(100% - var(--gut) + 40px));-webkit-mask-image:var(--fade);mask-image:var(--fade)}
+  .pp{width:96px;font-size:13px}
+  .pp .aw,.pp>.sk{width:80px;height:80px}
+  .pone{width:min(480px,calc(100% - 2 * var(--gut)));margin:2px var(--gut) 0}
+  .psep{margin:20px var(--gut) 22px}
+  #people .seg{padding:2px var(--gut) 12px}
   .cast div{width:96px;font-size:13px}
   .cast img,.cast .nop{width:80px;height:80px}
   .cast button{width:96px;font-size:13px}
@@ -800,7 +857,7 @@ svg.spring{animation:spring .3s ease-out}
   .yg .work:last-child{border-bottom:0}
   .pall{display:inline-block;width:auto;padding:10px 18px}
   #pattr{margin:40px var(--gut) 0}
-  #clist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));padding:0 calc(var(--gut) - 16px)}
+  #clist,#plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));padding:0 calc(var(--gut) - 16px)}
   #ddesc{max-width:760px;-webkit-line-clamp:6;font-size:16px}
   #seasons{flex-wrap:wrap;padding:20px var(--dgut) 10px}
   #eps{padding:0 var(--dgut)}
@@ -862,12 +919,14 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></symbol>
   <symbol id="i-music" viewBox="0 0 24 24"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></symbol>
   <symbol id="i-spark" viewBox="0 0 24 24"><path d="M10 2l1.9 5.6 5.6 1.9-5.6 1.9L10 17l-1.9-5.6-5.6-1.9 5.6-1.9zm8.5 11 .95 2.55L22 16.5l-2.55.95L18.5 20l-.95-2.55L15 16.5l2.55-.95z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></symbol>
   <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
 
-<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм или сериал" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib wait" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg><i class="x"><svg><use href="#i-close"/></svg></i><i class="w"></i></button><button class="ib" id="mkbtn" aria-label="Настройки"><svg><use href="#i-gear"/></svg></button></header>
+<header><form id="f"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Фильм, сериал или человек" enterkeyhint="search" autocomplete="off"><button type="button" class="ib" id="qx" aria-label="Очистить" hidden><svg><use href="#i-close"/></svg></button></form><button class="ib wait" id="devbtn" aria-label="Устройство"><svg><use href="#i-tv"/></svg><i class="x"><svg><use href="#i-close"/></svg></i><i class="w"></i></button><button class="ib" id="mkbtn" aria-label="Настройки"><svg><use href="#i-gear"/></svg></button></header>
 <main id="home">
+  <div id="ppl" hidden><h2 class="sec" id="ptitle">Люди<em id="pcount"></em><svg><use href="#i-more"/></svg></h2><div id="pstrip"></div><div class="psep"></div><h2 class="sec">Фильмы и сериалы</h2></div>
   <h2 class="sec" id="rtitle" hidden>Продолжить просмотр<svg><use href="#i-more"/></svg></h2>
   <div class="grid" id="grid"></div>
   <h2 class="sec" id="stitle" hidden>Сохранённые<svg><use href="#i-more"/></svg></h2>
@@ -903,6 +962,13 @@ svg.spring{animation:spring .3s ease-out}
   <div id="phero"></div>
   <div id="pbody"></div>
   <p class="attr" id="pattr" hidden><b>TMDB</b>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+</section>
+
+<section id="people" hidden>
+  <div class="lhead"><button class="ib" id="pplback" aria-label="Назад"><svg><use href="#i-back"/></svg></button><h1>Люди<small id="pplsub"></small></h1></div>
+  <div class="seg" id="pseg" hidden></div>
+  <div id="plist"></div>
+  <div id="pmore"></div>
 </section>
 
 <section id="list" hidden>
@@ -1136,7 +1202,7 @@ function openLayer(name, url) {
   showLayer(name, true);
 }
 
-const PAGES = ['det', 'list', 'cast', 'person']; // the overlays that are pages, not sheets
+const PAGES = ['det', 'list', 'cast', 'people', 'person']; // the overlays that are pages, not sheets
 
 // The page on top scrolls as the document (.ontop); the main page under it
 // is held where it was, fixed at its place, and the pages under it keep
@@ -1479,6 +1545,7 @@ function closeLayer() {
   }
   if (name == 'list') listShown = null;
   if (name == 'cast') castShown = null;
+  if (name == 'people') peopleShown = null;
   if (name == 'person') {
     personShown = null;
     const back = facesBack;
@@ -1489,7 +1556,8 @@ function closeLayer() {
 
 // ---- addresses ----------------------------------------------------------
 //
-// / is the watch history, /search?q=<query> a search, /recent and /saved
+// / is the watch history, /search?q=<query> a search, /search/people?q=<query>
+// the page of all the people it found (see openPeople), /recent and /saved
 // the page of all the titles of a section of the main page (see openList),
 // /title/<id> a title's page over any of them, /tmdb/<movie|tv>/<id> the
 // page of a title of TMDB alone (see openTmdb), <either>/cast the page of
@@ -1508,7 +1576,8 @@ const urlCast = () => /^\/(title\/[^/]+|tmdb\/(movie|tv)\/[0-9]+)\/cast$/.test(b
 // as the page turns to another title.
 const overPage = () => /^\/(title\/[^/]+|tmdb\/(movie|tv)\/[0-9]+)(\/.+)$/.exec(location.pathname)?.[3] ?? '';
 const urlList = () => /^\/(recent|saved|watched)$/.exec(location.pathname)?.[1];
-const urlQuery = () => location.pathname == '/search' && new URLSearchParams(location.search).get('q') || '';
+const urlQuery = () => /^\/search(\/people)?$/.test(basePath()) && new URLSearchParams(location.search).get('q') || '';
+const urlPeople = () => basePath() == '/search/people';
 
 // Brings the page in line with the address and the history entry: after
 // back and forward, and on load.
@@ -1538,7 +1607,16 @@ function route() {
     showLayer('cast', true);
   }
   if (cast && castShown != key) showCast(key);
-  // Someone's page over the title's, or over its cast.
+  // The people a search found, over it.
+  const ppl = urlPeople();
+  if (!ppl) while (layers.includes('people')) closeLayer();
+  if (ppl && !layers.includes('people')) {
+    while (layers.length) closeLayer();
+    layers.push('people');
+    showLayer('people', true);
+  }
+  if (ppl && peopleShown != urlQuery()) showPeople(urlQuery());
+  // Someone's page over the title's, over its cast, or over a search.
   const person = urlPerson();
   if (!person) while (layers.includes('person')) closeLayer();
   if (person && !layers.includes('person')) {
@@ -1888,6 +1966,7 @@ function showRecent() {
   $('grid').hidden = false; // the results' grid, laid out to count its columns
   searching = 0;
   query = '';
+  $('ppl').hidden = true;
   $('q').value = '';
   $('qx').hidden = true;
   renderRecent();
@@ -1912,6 +1991,8 @@ function markPlaying() {
 async function search(q) {
   const n = searching = Date.now();
   query = q;
+  peopleOf(q);
+  renderFound();
   $('msg').hidden = $('rtitle').hidden = $('stitle').hidden = $('sgrid').hidden = $('wtitle').hidden = $('wgrid').hidden = true;
   $('grid').hidden = false;
   $('grid').replaceChildren(...Array.from({ length: 9 }, () =>
@@ -1927,6 +2008,174 @@ async function search(q) {
     toast(e);
   }
 }
+
+// ---- people found --------------------------------------------------------
+//
+// A search looks for people of TMDB too: those found are over the titles
+// found, a row of them (see renderFound), and all of them on a page of its
+// own, as they come, 20 at a time (see openPeople). Those of whom titles
+// were watched here come first, with how many.
+
+let found = null;       // { q, people, page, pages, total, loading, failed } of the last query
+let peopleShown = null; // the query whose people's page is open
+let peopleJob = null;   // the profession its people are narrowed to
+const STRIP = 10;       // people in the row; with more, the last tile leads to them all
+
+// The people found by a query, those found so far; asked for if they are
+// not of it.
+function peopleOf(q) {
+  if (found?.q == q && !found.failed) return found;
+  found = { q, people: [], page: 0, pages: 1, total: 0, loading: false, failed: false };
+  morePeople();
+  return found;
+}
+
+// The next 20 people of the query.
+async function morePeople() {
+  const f = found;
+  if (!f || f.loading || f.failed || f.page >= Math.min(f.pages, 500)) return;
+  f.loading = true;
+  try {
+    const r = await api(`people?q=${encodeURIComponent(f.q)}&page=${f.page + 1}`);
+    const have = new Set(f.people.map(x => x.id));
+    f.people.push(...r.people.filter(x => !have.has(x.id)));
+    Object.assign(f, { page: f.page + 1, pages: r.pages, total: Math.max(r.total, f.people.length) });
+  } catch (e) {
+    f.failed = true;
+    if (peopleShown == f.q) toast(e); // the row just isn't there
+  }
+  f.loading = false;
+  if (found != f) return;
+  renderFound();
+  if (peopleShown == f.q) renderPeople();
+}
+
+const count = n => n.toLocaleString('ru-RU');
+
+// A photo with the badge of how many titles of theirs were watched.
+const avatar = x => el('span', { className: 'aw' }, photo(x.photo),
+  ...(x.seen ? [el('span', { className: 'ey', ariaLabel: `Смотрели: ${x.seen}` }, svgIcon('eye'), String(x.seen))] : []));
+
+// The posters of what they are known for.
+const knownPosters = x => el('div', { className: 'th' },
+  ...x.known.filter(Boolean).map(src => el('i', { style: `background-image:url("${src}")` })));
+
+// The row of the people found over the titles, while they are of the query
+// shown: placeholders as they come, none if none are found.
+function renderFound() {
+  const f = found, box = $('ppl'), strip = $('pstrip');
+  if (!searching || f?.q != query || f.failed || !f.loading && !f.people.length) return box.hidden = true;
+  box.hidden = false;
+  if (!f.people.length) {
+    $('ptitle').hidden = false;
+    $('pcount').textContent = '';
+    $('ptitle').classList.remove('more');
+    strip.className = 'pstrip';
+    return strip.replaceChildren(...Array.from({ length: 5 }, () =>
+      el('div', { className: 'pp' }, el('span', { className: 'sk' }), el('span', { className: 'skl' }), el('span', { className: 'skl' }))));
+  }
+  const shown = f.people.slice(0, STRIP), more = f.total > shown.length;
+  $('ptitle').hidden = f.total == 1; // the card names them so
+  $('pcount').textContent = f.total > 1 ? count(f.total) : '';
+  $('ptitle').classList.toggle('more', more);
+  // Someone alone, likely the one looked for, as a card.
+  if (f.total == 1) {
+    const x = f.people[0], card = el('button', { className: 'pone' }, avatar(x),
+      el('div', {}, el('small', {}, 'Человек'), el('b', {}, x.name), ...(x.profession ? [el('span', {}, x.profession)] : []),
+        ...(x.known.length ? [knownPosters(x)] : [])),
+      svgIcon('more'));
+    card.onclick = () => openPerson(x);
+    strip.className = '';
+    return strip.replaceChildren(card);
+  }
+  const tiles = shown.map((x, i) => {
+    const b = el('button', { className: 'pp' }, avatar(x), el('b', {}, x.name), el('span', {}, x.profession || ''));
+    b.style.setProperty('--i', i);
+    b.onclick = () => openPerson(x);
+    return b;
+  });
+  if (more) {
+    const b = el('button', { className: 'pp all' }, el('span', { className: 'aw' }, el('i', { className: 'nop' }, svgIcon('more'))),
+      el('b', {}, 'Все ' + count(f.total)));
+    b.style.setProperty('--i', tiles.length);
+    b.onclick = openPeople;
+    tiles.push(b);
+  }
+  strip.className = 'pstrip';
+  strip.replaceChildren(...tiles);
+  strip.scrollLeft = 0;
+}
+$('ptitle').onclick = () => $('ptitle').classList.contains('more') && openPeople();
+
+// All the people a search found, on a page over it.
+function openPeople() {
+  showPeople(query);
+  openLayer('people', '/search/people?q=' + encodeURIComponent(query));
+}
+
+function showPeople(q) {
+  peopleShown = q;
+  peopleJob = null;
+  scrollPage('people', 0);
+  $('plist').replaceChildren();
+  peopleOf(q);
+  renderPeople();
+}
+
+// The people of a profession, as the chips name them.
+const JOBS = { Актёр: 'Актёры', Актриса: 'Актёры', Режиссёр: 'Режиссёры', Сценарист: 'Сценаристы', Продюсер: 'Продюсеры',
+  Композитор: 'Композиторы', Оператор: 'Операторы', Монтажёр: 'Монтажёры', Художник: 'Художники', Создатель: 'Создатели' };
+const jobOf = x => JOBS[x.profession] ?? x.profession;
+
+// Their name with what was looked for in it marked, if it is.
+function marked(name, q) {
+  const fold = s => s.toLowerCase().replaceAll('ё', 'е'), i = fold(name).indexOf(fold(q.trim()));
+  if (i < 0 || fold(name).length != name.length) return el('b', {}, name);
+  const n = q.trim().length;
+  return el('b', { className: 'hl' }, name.slice(0, i), el('mark', {}, name.slice(i, i + n)), name.slice(i + n));
+}
+
+function renderPeople() {
+  const f = found?.q == peopleShown ? found : null;
+  if (!f) return;
+  $('pplsub').textContent = `«${f.q}»` + (f.total ? ' · ' + count(f.total) : '');
+  // The professions among them, the most common first, to narrow them to.
+  const jobs = {};
+  for (const x of f.people) if (x.profession) jobs[jobOf(x)] = (jobs[jobOf(x)] || 0) + 1;
+  const list = Object.keys(jobs).sort((a, b) => jobs[b] - jobs[a]);
+  if (!list.includes(peopleJob)) peopleJob = null;
+  $('pseg').hidden = list.length < 2;
+  $('pseg').replaceChildren(...[null, ...list].map(j => {
+    const b = el('button', { className: j == peopleJob ? 'on' : '' }, j ?? 'Все');
+    b.onclick = () => {
+      peopleJob = j;
+      scrollPage('people', 0);
+      renderPeople();
+      morePeople(); // fewer of them may leave the end in sight
+    };
+    return b;
+  }));
+  const shown = $('plist').querySelectorAll('.prow').length;
+  const rows = f.people.filter(x => !peopleJob || jobOf(x) == peopleJob).map((x, i) => {
+    const row = personButton(el('div', { className: 'person prow' + (i < shown ? ' still' : '') }, avatar(x),
+      el('div', {}, marked(x.name, f.q), ...(x.profession ? [el('span', {}, x.profession)] : [])),
+      ...(x.known.length ? [knownPosters(x)] : [])), x);
+    row.style.setProperty('--i', Math.max(0, Math.min(i - shown, 20)));
+    return row;
+  });
+  if (f.loading) rows.push(...Array.from({ length: f.people.length ? 2 : 8 }, () => el('div', { className: 'person' },
+    el('i', { className: 'nop ph' }), el('div', {}, el('span', { className: 'skl', style: 'width:140px;margin:0' }), el('span', { className: 'skl', style: 'width:70px' })))));
+  else if (!rows.length) rows.push(el('p', { className: 'note' }, f.failed ? 'Не удалось найти людей' : 'Никого не нашлось'));
+  $('plist').replaceChildren(...rows);
+  if (!f.loading) nearEnd();
+}
+$('pplback').onclick = closeTop;
+
+// The next of them once the end of the page comes near.
+function nearEnd() {
+  if (peopleShown && $('pmore').getBoundingClientRect().top < innerHeight + 800) morePeople();
+}
+new IntersectionObserver(es => es.some(e => e.isIntersecting) && nearEnd(), { rootMargin: '800px' }).observe($('pmore'));
 
 // ---- details page -------------------------------------------------------
 
@@ -3106,7 +3355,7 @@ function personButton(e, c) {
 // Someone of a title's page or of its cast, over it.
 function openPerson(c) {
   showPerson(c.id, c);
-  openLayer('person', basePath().replace(/\/$/, '') + '/person/' + c.id);
+  openLayer('person', basePath().replace(/\/$/, '') + '/person/' + c.id + location.search);
 }
 
 // known: what the page they were opened from has of them (name, photo),
@@ -5036,6 +5285,16 @@ if ((urlTitle() || urlTmdb() || urlList()) && !history.state) {
   const url = location.href;
   history.replaceState({ depth: 0 }, '', '/');
   history.pushState({ depth: 1 }, '', url);
+}
+// Opened by the address of the people of a search, or of someone over it,
+// back leads through the pages under it to the search, and from it to the
+// history.
+if (urlQuery() && (urlPeople() || urlPerson()) && !history.state) {
+  const url = location.href, q = urlQuery(), over = urlPeople() && urlPerson();
+  history.replaceState({ depth: 0 }, '', '/');
+  history.pushState({ depth: 0, search: 1 }, '', searchUrl(q));
+  if (over) history.pushState({ depth: 1 }, '', '/search/people?q=' + encodeURIComponent(q));
+  history.pushState({ depth: over ? 2 : 1 }, '', url);
 }
 // The main page's header, or the page on top's (see syncPages).
 addEventListener('scroll', () => topPage ? pageScrolled(topPage)
