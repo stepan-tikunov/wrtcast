@@ -38,6 +38,10 @@ type Config struct {
 	AlignmentStore   AlignmentStore
 	// The sections title-api marks itself, if it does.
 	Marks Marks
+	// The provider's user to sign in as for the titles it shows to
+	// signed-in users only (see account); empty, there is none.
+	Login    string
+	Password string
 }
 
 type session struct {
@@ -88,6 +92,9 @@ type Client struct {
 	aheadPausedUntil time.Time
 
 	marks Marks
+
+	// The provider's user, if there is one (see account).
+	account *account
 
 	// The segments the relay keeps and loads ahead (see segments.go), and
 	// the video each alternative source (by its media id) is of.
@@ -145,6 +152,7 @@ func NewClient(config Config) (*Client, error) {
 		fingerprintStore: config.FingerprintStore,
 		alignmentStore:   config.AlignmentStore,
 		marks:            config.Marks,
+		account:          newAccount(config.Login, config.Password),
 		alignments:       map[string]*videoAlignment{},
 		series:           map[string]seriesEntry{},
 		primaries:        map[string]*primaryVideo{},
@@ -259,6 +267,9 @@ func (c *Client) refreshLocked(ctx context.Context) error {
 			refreshErrors = append(refreshErrors, fmt.Errorf("%s: %w", candidateURL, err))
 			continue
 		}
+
+		// The session made anew stays signed in.
+		c.account.carry(candidate, resolvedURL.Host)
 
 		c.mu.Lock()
 		c.nextGeneration++

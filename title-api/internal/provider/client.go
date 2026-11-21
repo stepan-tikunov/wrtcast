@@ -266,12 +266,19 @@ var ErrRegistrationRequired = errors.New("title is available to registered provi
 // The provider answers such titles with 403 and this notice.
 var registeredOnlyNotice = []byte("доступен только зарегистрированным пользователям")
 
+// moviePage is the title's page; one shown to signed-in users only is asked
+// for again once the session is signed in (see account).
 func (c *Client) moviePage(ctx context.Context, current *session, siteMovieID string) ([]byte, error) {
 	target := c.providerURL().ResolveReference(&url.URL{Path: "/index.php", RawQuery: "newsid=" + siteMovieID})
 	body, _, err := c.get(ctx, current, target.String(), "")
-	var refused *statusError
-	if errors.As(err, &refused) && refused.code == http.StatusForbidden &&
-		bytes.Contains(refused.body, registeredOnlyNotice) {
+	if registeredOnly(err) && c.account != nil {
+		if signErr := c.signIn(ctx, current); signErr != nil {
+			return nil, fmt.Errorf("%w (%v)", ErrRegistrationRequired, signErr)
+		}
+		c.account.carry(current, target.Host)
+		body, _, err = c.get(ctx, current, target.String(), "")
+	}
+	if registeredOnly(err) {
 		return nil, ErrRegistrationRequired
 	}
 	if err != nil {
@@ -281,6 +288,12 @@ func (c *Client) moviePage(ctx context.Context, current *session, siteMovieID st
 		return nil, errAntiBotChallenge
 	}
 	return body, nil
+}
+
+func registeredOnly(err error) bool {
+	var refused *statusError
+	return errors.As(err, &refused) && refused.code == http.StatusForbidden &&
+		bytes.Contains(refused.body, registeredOnlyNotice)
 }
 
 func (c *Client) parseExternalTitleID(movieID string) (string, error) {

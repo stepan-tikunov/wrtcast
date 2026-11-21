@@ -29,6 +29,11 @@ services:
       # The faces service (faces/ in the repository) that tells who is on
       # the screen on a pause; empty, there is none.
       FACES_URL: ${FACES_URL:-}
+      # The provider's user title-api signs in as for the titles it shows
+      # to signed-in users only; empty, those stay unavailable. Keep them in
+      # .env beside this file, never in the repository.
+      MOVIE_PROVIDER_LOGIN: ${MOVIE_PROVIDER_LOGIN:-}
+      MOVIE_PROVIDER_PASSWORD: ${MOVIE_PROVIDER_PASSWORD:-}
     volumes:
       - title-api-state:/var/lib/title-api
 

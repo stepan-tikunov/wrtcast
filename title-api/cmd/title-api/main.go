@@ -83,6 +83,8 @@ func run() error {
 		FingerprintStore: urlStore,
 		AlignmentStore:   urlStore,
 		Marks:            marks,
+		Login:            os.Getenv("MOVIE_PROVIDER_LOGIN"),
+		Password:         os.Getenv("MOVIE_PROVIDER_PASSWORD"),
 	})
 	if err != nil {
 		return err
