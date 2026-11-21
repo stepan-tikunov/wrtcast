@@ -3519,6 +3519,26 @@ function works(p, kind = 'all', all = false) {
 
 for (const p of PAGES) $(p).addEventListener('scroll', () => pageScrolled(p), { passive: true });
 
+// While a sheet or the player is open, a swipe on it doesn't scroll the
+// page under it: the page is the document's scroll, and a list in a sheet
+// that has nothing to scroll, or is at its end, hands the swipe on to it.
+// A list that can still move that way keeps it, a slider its drag.
+let touchAt = null;
+document.addEventListener('touchstart', e => { touchAt = e.touches[0]; }, { passive: true });
+document.addEventListener('touchmove', e => {
+  const t = e.touches[0], from = touchAt;
+  touchAt = t;
+  if (!e.cancelable || e.touches.length > 1 || !from || !plOpen && !layers.some(l => l in SHEETS)
+    || e.target.closest?.('input, textarea, select')) return;
+  const dx = t.clientX - from.clientX, dy = t.clientY - from.clientY, across = Math.abs(dx) > Math.abs(dy);
+  for (let n = e.target; n instanceof Element && n != document.body; n = n.parentElement) {
+    const s = getComputedStyle(n);
+    if (across ? /auto|scroll/.test(s.overflowX) && (dx > 0 ? n.scrollLeft > 0 : n.scrollLeft + n.clientWidth < n.scrollWidth - 1)
+      : /auto|scroll/.test(s.overflowY) && (dy > 0 ? n.scrollTop > 0 : n.scrollTop + n.clientHeight < n.scrollHeight - 1)) return;
+  }
+  e.preventDefault();
+}, { passive: false });
+
 // A title from someone's page: over the title's page they were opened
 // from, as another title of it (see openRelated), so back leads to them
 // again; that title itself, back to it.
