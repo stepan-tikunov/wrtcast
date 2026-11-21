@@ -1418,9 +1418,12 @@ function watch_end(now, st) {
 			});
 		// Set from the TV's remote or another app, past the start of a
 		// playback, which volume_back sees to; within its first minute a
-		// box that went back to its own volume gets the kept one again.
-		let vol = volume_get(key);
-		if (st.volume != null && time() - (now.started ?? 0) > 60)
+		// box that went back to its own volume gets the kept one again,
+		// unless the page has set one since the start (volset:<key>, see
+		// /cmd): its command takes a second, and a status meanwhile put the
+		// volume back and forth between the old and the new one.
+		let vol = volume_get(key), set = +(kv_get('volset:' + key) ?? 0) >= +(now.started ?? 0);
+		if (st.volume != null && (time() - (now.started ?? 0) > 60 || set))
 			volume_keep(key, +st.volume);
 		else if (st.volume != null && vol != null && abs(+st.volume - vol) >= 0.01) {
 			pause_note(key, sprintf('volume %.2f %d s after the start, put back to %.2f',
@@ -3332,6 +3335,11 @@ const routes = {
 			kv_set('pause:' + state_key(dev), time());
 			pause_note(state_key(dev), sprintf('pause from the %s, %s, %s', src,
 			           getenv('REMOTE_ADDR') ?? '?', substr(getenv('HTTP_USER_AGENT') ?? '?', 0, 160)));
+		}
+		// The volume set here is the one kept, not put back (see watch_end).
+		if (c == 'volume') {
+			kv_set('volset:' + state_key(dev), time());
+			volume_keep(state_key(dev), min(+arg / 100, 1));
 		}
 		let st = with_now(kind == null ? castctl(dev, c) : castctl(dev, c, arg), dev);
 		if (c == 'volume' && st.volume != null)

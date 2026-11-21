@@ -3016,7 +3016,9 @@ async function poll() {
     const sent = device, at = Date.now();
     const s = await api(withDevice('status'));
     pollError = '';
-    if (!pending && !seekTimer && sent == device && at > cmdAt) render(s);
+    // A poll answered while a command is on its way may tell the state
+    // before it (a volume takes the TV a second).
+    if (!pending && !seekTimer && !inflight && sent == device && at > cmdAt) render(s);
   } catch (e) {
     if (e.message == 'device not found' && device) {
       // The saved TV is gone; fall back to the default one.
