@@ -3145,7 +3145,7 @@ function mark_watched(id, on, season, episode) {
 
 // A title of TMDB ("movie:<id>" or "tv:<id>") is marked watched at once,
 // whether or not the provider is known to have it: a movie, or a series up
-// to an episode by TMDB's numbers (done: its last). title-api looks for it
+// to an episode by TMDB's numbers (done: its last; a movie always is). title-api looks for it
 // on the provider meanwhile (wrtcast seen), and once found the mark is the
 // provider's title's (see mark_watched), the row left to tell it by.
 const TMDB_SEEN_MAX = 500;
@@ -3172,7 +3172,7 @@ function mark_tmdb(key, on, season, episode, done) {
 	sql_do(`INSERT INTO tmdb_seen (${TMDB_SEEN_COLS}) VALUES (?, NULL, ?, ?, ?, ?)
 		ON CONFLICT (key) DO UPDATE SET title_id = NULL, season = excluded.season,
 		episode = excluded.episode, done = excluded.done, t = excluded.t`,
-		key, season, season != null ? episode : null, !!done, time());
+		key, season, season != null ? episode : null, season == null || !!done, time());
 	sql_do('DELETE FROM tmdb_seen WHERE key NOT IN (SELECT key FROM tmdb_seen ORDER BY t DESC LIMIT ?)',
 	       TMDB_SEEN_MAX);
 	changed(true);
