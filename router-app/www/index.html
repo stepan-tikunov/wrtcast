@@ -107,6 +107,13 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 #cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* Someone's page, over the title's or its cast's. */
 #person{position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
+/* A page over the main one doesn't bounce pulled past its top (or end):
+   iOS rubber-bands a scroller by moving all it holds, the header (sticky,
+   held at the top only once scrolled) and its gradient with it, so they
+   came off the window's top, a bare band over them, and settled back late;
+   nor does the pull go on to the main page under it. */
+#det,#list,#cast,#person{overscroll-behavior-y:none}
+:root:has(:is(#det,#list,#cast,#person):not([hidden])){overscroll-behavior-y:none}
 /* The header names them once their name has scrolled away. */
 #person .lhead b{display:none;overflow:hidden;font-size:17px;font-weight:650;white-space:nowrap;text-overflow:ellipsis;animation:pop .2s ease-out}
 #person.scr .lhead b:not(:empty){display:block}
@@ -237,6 +244,9 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 /* A logo is as high as --lh unless that makes it wider than 72 %. */
 #dlogo{--lh:84px;display:block;width:min(72%,calc(var(--lh) * var(--a,3)));aspect-ratio:var(--a,3);margin:0 auto 12px;object-fit:contain;filter:drop-shadow(0 2px 12px #0009)}
 #det:not(.bd) #dlogo{--lh:52px;margin:0 0 8px;width:min(100%,calc(var(--lh) * var(--a,3)))}
+/* A logo drawn dark (see logoDark) on a light glow, a tight one that
+   outlines it and a wide one under it, not on the shadow. */
+#dlogo.dark{filter:drop-shadow(0 0 1px #ffffffb3) drop-shadow(0 0 10px #ffffff80)}
 .rt{display:flex;gap:6px;margin-top:8px}
 .rt span{padding:3px 8px;border-radius:7px;background:#ffffff1f;font-size:12px;font-weight:600}
 .rt b{color:var(--ac)}
@@ -1926,6 +1936,7 @@ function renderArt(t, x) {
   }
   if (x.logo) {
     logo.style.setProperty('--a', x.logo.aspect || 3);
+    logo.classList.toggle('dark', !!x.logo.dark);
     logo.alt = t.title;
     logo.src = x.logo.url;
     logo.hidden = false;
@@ -1946,6 +1957,7 @@ function clearArt() {
   for (const a of ['srcset', 'src']) $('dbd').firstChild.removeAttribute(a);
   $('dlogo').hidden = true;
   $('dlogo').removeAttribute('src');
+  $('dlogo').classList.remove('dark');
   $('dtitle').classList.remove('vh');
   $('dattr').hidden = $('dtrailer').hidden = true;
 }
@@ -1964,18 +1976,59 @@ async function tmdbOf(t) {
   const x = tmdbs[k];
   if (!x) return null;
   const [bd, logo] = await Promise.all([x.backdrop && preload(x.backdrop.w780, bdSet(x)), x.logo && preload(x.logo.url)]);
-  return { ...x, backdrop: bd ? x.backdrop : null, logo: logo ? x.logo : null };
+  return { ...x, backdrop: bd ? x.backdrop : null, logo: logo ? { ...x.logo, dark: logoDark(x.logo.url, logo) } : null };
+}
+
+// Whether a logo is drawn dark, a black wordmark that the page's dark
+// would swallow: a third of what it covers (by opacity) darker than a
+// contrast of 2 to the page's dark. Such a logo gets a light glow
+// (#dlogo.dark); the others show as they are. Measured on a small canvas
+// once it has preloaded, so it shows lit from the first; kept by URL, here
+// and across visits. A logo the canvas can't read (another origin, no
+// CORS) shows as it is.
+const LOGO_DARK = 'logoDark', logoDarks = new Map();
+try {
+  for (const [u, d] of Object.entries(JSON.parse(localStorage[LOGO_DARK] || '{}'))) logoDarks.set(u, d);
+} catch {}
+const linear = Array.from({ length: 256 }, (_, i) => (i /= 255) <= .04045 ? i / 12.92 : ((i + .055) / 1.055) ** 2.4);
+function logoDark(url, img) {
+  if (logoDarks.has(url)) return logoDarks.get(url);
+  let dark;
+  try {
+    const k = Math.min(1, 96 / Math.max(img.naturalWidth, img.naturalHeight, 1));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * k));
+    c.height = Math.max(1, Math.round(img.naturalHeight * k));
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(img, 0, 0, c.width, c.height);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    let all = 0, low = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i + 3];
+      if (a < 32) continue;
+      all += a;
+      if (.2126 * linear[d[i]] + .7152 * linear[d[i + 1]] + .0722 * linear[d[i + 2]] < .07) low += a;
+    }
+    dark = all > 0 && low / all > .3;
+  } catch {
+    return false; // not readable; asked again next time
+  }
+  logoDarks.set(url, dark);
+  try {
+    localStorage[LOGO_DARK] = JSON.stringify(Object.fromEntries([...logoDarks].slice(-300)));
+  } catch {}
+  return dark;
 }
 
 const BD_SIZES = '(min-width:900px) 1280px, 100vw';
 const bdSet = x => `${x.backdrop.w780} 780w, ${x.backdrop.w1280} 1280w`;
 
-// Whether a picture loads; as the page's own (the same candidate of the
-// srcset) it then comes from the cache.
+// Whether a picture loads (the picture, loaded, or false); as the page's
+// own (the same candidate of the srcset) it then comes from the cache.
 const preload = (src, srcset) => new Promise(done => {
   const i = new Image();
   if (srcset) Object.assign(i, { sizes: BD_SIZES, srcset });
-  i.onload = () => done(true);
+  i.onload = () => done(i);
   i.onerror = () => done(false);
   i.src = src;
 });
