@@ -63,11 +63,18 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 .card:has(.badge.on) .up{display:none}
 /* Saves the title to watch, over a poster's corner and next to a title's
    play button; lit while saved. */
-.sv{position:absolute;top:6px;right:6px;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#000c;color:#fff;transition:transform .12s}
-.sv::before{content:'';position:absolute;inset:-6px}
-.sv svg{width:18px;height:18px}
-.sv.on{color:var(--ac)}
-.sv:active{transform:scale(.88)}
+.sv,.ws{position:absolute;top:6px;right:6px;z-index:1;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#000c;color:#fff;transition:transform .12s}
+.sv::before,.ws::before{content:'';position:absolute;inset:-6px}
+.sv svg,.ws svg{width:18px;height:18px}
+.sv.on,.ws.on{color:var(--ac)}
+.sv:active,.ws:active{transform:scale(.88)}
+/* Marks a title of TMDB's watched, left of the button that saves it; both
+   spin while the title is looked for on the provider. */
+.ws{right:46px}
+.ws::before{right:-2px}
+:is(.sv,.ws).busy svg{display:none}
+:is(.tile,.wtile) .st :is(.sv,.ws) svg{width:18px;height:18px;color:inherit}
+:is(.sv,.ws).busy::after{content:'';width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
 /* Starts a title on the TV from its poster, as its page's play button
    would (see playButton): over the poster's lower right corner, which .ov,
    of the poster's size, places it by. Grey while the title is on; others
@@ -139,7 +146,7 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 /* What of theirs was watched here: wide frames, unlike the posters of what
    they are known for. */
 .wtile{flex:none;width:260px;padding:0;border:0;background:none;color:var(--tx);font-size:14px;text-align:left;transition:transform .12s}
-.wtile:active{transform:scale(.97)}
+.wtile:active:not(:has(button:active)){transform:scale(.97)}
 .wtile .st{border-radius:12px;box-shadow:0 0 0 1px #ffffff12}
 .wtile .st>b{color:#55555c;font-size:28px}
 .wtile>b{display:block;margin-top:8px;font-weight:600}
@@ -268,7 +275,7 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 .strip{display:flex;align-items:flex-start;gap:10px;overflow-x:auto;margin:0 -16px;padding:0 16px 4px;scrollbar-width:none}
 .strip::-webkit-scrollbar{display:none}
 .tile{flex:none;width:150px;padding:0;border:0;background:none;color:var(--tx);font-size:13px;line-height:1.3;text-align:left;text-decoration:none;cursor:pointer;transition:transform .12s}
-.tile:active{transform:scale(.96)}
+.tile:active:not(:has(button:active)){transform:scale(.96)}
 .tile.tall{width:108px}
 .tile .st{margin-bottom:6px;border-radius:8px}
 .tile.tall .st{aspect-ratio:2/3}
@@ -1596,6 +1603,7 @@ async function loadRecent() {
 // The lists as /progress (or /watched) tells them.
 function gotLists(r) {
   recent = r.recent;
+  document.querySelectorAll('.ws').forEach(showSeenTile);
   saved = r.saved || [];
   listsLoaded = true;
   if (!searching) renderRecent();
@@ -2087,9 +2095,11 @@ function skeleton(m) {
   clearArt();
   m.tm = null;
   $('dsave').dataset.id = m.id;
-  $('dsave').hidden = true; // until the title is known; never one of TMDB's alone
+  // Before the title has loaded too; never on one of TMDB's alone.
+  $('dsave').hidden = $('dseen').hidden = !!m.tmdbOnly;
   showSaved($('dsave'));
-  $('dfrom0').hidden = $('dseen').hidden = true;
+  showSeen();
+  $('dfrom0').hidden = true;
   $('seasons').replaceChildren();
   $('eps').replaceChildren();
   $('dmore').replaceChildren();
@@ -2213,12 +2223,15 @@ function renderMore(x) {
 const when = r => r.date > today() ? 'Выйдет ' + day(r.date) : r.year || '';
 
 // A tile of a title the page lists: a frame wide (its backdrop) or tall (its poster).
+// Over its frame, but the page's own, the buttons that mark it watched and
+// save it (see tileButtons).
 function related(r, here, under, seen, tall, open = openRelated) {
   const pic = still(tall ? r.poster : r.backdrop || r.poster, (r.title || '?')[0]);
-  if (seen) pic.append(el('i', { className: 'ok' }, svgIcon('check')));
-  const b = el('button', { className: 'tile' + (tall ? ' tall' : '') + (here ? ' here' : '') }, pic,
+  if (!here) pic.append(...tileButtons(r));
+  const b = el('div', { className: 'tile' + (tall ? ' tall' : '') + (here ? ' here' : ''), role: 'button', tabIndex: 0 }, pic,
     el('b', {}, r.title || ''), ...(under ? [el('span', {}, under)] : []));
   b.onclick = () => open(r);
+  b.onkeydown = e => e.target == b && e.key == 'Enter' && open(r);
   return b;
 }
 
@@ -2473,9 +2486,12 @@ $('dsave').onclick = () => item && toggleSave(item);
 //
 // A movie is marked watched, or no longer, by a tap; of a series the
 // episode it was watched up to is picked in a sheet, the router taking
-// those before it as watched too (see /watched).
+// those before it as watched too (see /watched). The button is next to a
+// title's play button, there before the title has loaded, and over the
+// frames of TMDB's titles, left of the one that saves them.
 
-let seenBusy = null; // the title a /watched is under way of
+let seenBusy = false; // a tap is under way: the title loads or /watched answers
+let seenFor = null;   // the title the sheet is of
 
 // The latest episode of a series watched to the end, in the provider's
 // order; null if none is.
@@ -2489,39 +2505,85 @@ function seenMark(m) {
   return mk;
 }
 
+// Whether a title is watched, as the recently watched list tells it: a
+// movie to its end, a series to its last episode (none known after it).
+function isSeen(id) {
+  const r = id && recent.find(e => e.id == id);
+  return !!r && !!r.done && (r.season == null || !r.upnext);
+}
+
 function showSeen() {
   const b = $('dseen'), m = item, series = m.type == 'series';
-  b.hidden = series && !m.seasons?.some(s => s.episodes.length);
+  b.hidden = !!m.tmdbOnly || series && !m.seasons?.some(s => s.episodes.length);
   // A series shows the episode it was watched up to, lit once that is
   // its last.
   const mk = series ? seenMark(m) : null, last = m.seasons?.findLast(s => s.episodes.length);
-  const on = series ? !!mk && mk.season == last.season && mk.episode == last.episodes.at(-1).episode : !!m.progress?.done;
+  const on = series ? !!mk && mk.season == last.season && mk.episode == last.episodes.at(-1).episode :
+    m.type ? !!m.progress?.done : isSeen(m.id);
   b.classList.toggle('on', on);
-  b.disabled = seenBusy == m;
   b.querySelector('span').textContent = on ? 'Просмотрен' : mk ? 'До ' + epShort(mk) : 'Просмотрено';
   b.setAttribute('aria-label', series ? 'Отметить, до какой серии смотрели' : on ? 'Отметить непросмотренным' : 'Отметить просмотренным');
 }
 
-$('dseen').onclick = () => {
-  const m = item;
-  if (!m?.type || seenBusy) return;
-  if (m.type != 'series') return markSeen(m, !m.progress?.done);
-  const mk = seenMark(m);
-  showSeenSeason(m.seasons.find(s => s.season == (mk?.season ?? season?.season)) || m.seasons[0]);
+// The button over a frame, lit while its title is watched.
+function showSeenTile(b) {
+  const on = isSeen(b.dataset.id);
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-label', on ? 'Отметить непросмотренным' : 'Отметить просмотренным');
+}
+
+// The buttons of the title id: busy while a tap of it is under way.
+function seenBusyOf(id, on) {
+  document.querySelectorAll('.ws').forEach(b => b.dataset.id == id && b.classList.toggle('busy', on));
+  if (item?.id == id) $('dseen').disabled = on;
+}
+
+// m: { id, title, poster } of a title; loads it, unless it is the page's
+// and has loaded, then marks a movie or opens the sheet of a series. b:
+// the button tapped, busy meanwhile; look: how the title is found first
+// (see providerOf).
+async function seenTap(m, b, look) {
+  if (seenBusy) return;
+  seenBusy = true;
+  b.classList.add('busy');
+  b.disabled = true;
+  let x = null;
+  try {
+    if (look) m = await look();
+    if (!m) throw new Error('Нет у провайдера');
+    if (item?.id == m.id && item.type && item.progress !== undefined) x = item;
+    else {
+      const [t, p] = await Promise.all([title(m.id), api('progress?id=' + encodeURIComponent(m.id))]);
+      x = { id: m.id, title: t.title, poster: t.poster, type: t.type, seasons: t.seasons, progress: p.progress ?? null };
+    }
+  } catch (e) {
+    toast(e);
+  }
+  b.classList.remove('busy');
+  b.disabled = false;
+  seenBusy = false;
+  if (!x) return;
+  if (x.type != 'series') return markSeen(x, !x.progress?.done);
+  if (!x.seasons?.some(s => s.episodes.length)) return toast('Серий нет');
+  seenFor = x;
+  const mk = seenMark(x), shown = x == item ? season?.season : null;
+  showSeenSeason(x.seasons.find(s => s.season == (mk?.season ?? shown) && s.episodes.length) || x.seasons.find(s => s.episodes.length));
   openLayer('seen');
   const on = $('wlist').querySelector('.on');
   if (on) on.scrollIntoView({ block: 'center' });
   else $('wlist').scrollTop = 0;
-};
+}
+
+$('dseen').onclick = () => item && !item.tmdbOnly && seenTap(item, $('dseen'));
 $('wcollapse').onclick = closeTop;
 $('wclear').onclick = async () => {
   await closeTop();
-  if (item) markSeen(item, false);
+  if (seenFor) markSeen(seenFor, false);
 };
 
 // The episodes of season s to pick the one watched up to.
 function showSeenSeason(s) {
-  const m = item, mk = seenMark(m);
+  const m = seenFor, mk = seenMark(m);
   $('wseasons').replaceChildren(...m.seasons.filter(x => x.episodes.length).map(x => {
     const c = el('button', { className: 'chip' + (x == s ? ' on' : '') }, `${x.season} сезон`);
     c.onclick = () => {
@@ -2551,23 +2613,78 @@ function showSeenSeason(s) {
 async function markSeen(m, on) {
   const req = { id: m.id, on: on ? '1' : '0' };
   if (on && on !== true) Object.assign(req, { season: String(on.season), episode: String(on.episode) });
-  seenBusy = m;
-  if (item == m) showSeen();
+  seenBusy = true;
+  seenBusyOf(m.id, true);
   try {
     const r = await api('watched', req);
     m.progress = r.progress;
     m.prefs = r.prefs;
+    if (item?.id == m.id && item != m) Object.assign(item, { progress: r.progress, prefs: r.prefs });
     gotLists(r);
   } catch (e) {
     toast(e);
   }
-  seenBusy = null;
-  if (item != m) return;
+  seenBusy = false;
+  seenBusyOf(m.id, false);
+  if (item?.id != m.id || !item.type) return;
   renderDetails();
   // The page goes to the season it goes on with.
-  const c = m.type == 'series' && continueAt(m), s = c && m.seasons.find(x => x.season == c.season);
+  const c = item.type == 'series' && continueAt(item), s = c && item.seasons.find(x => x.season == c.season);
   if (s && s != season) showSeason(s);
   else renderEpisodes();
+}
+
+// The provider's { id, title, poster, year } of a title of TMDB's (r: its
+// type and id, title_id once known), looked up on the provider as its page
+// does (see lookUp); null if it isn't there.
+async function providerOf(r) {
+  for (let i = 0; i < 4 && !r.title_id; i++) {
+    const x = await api(`tmdb/lookup?type=${r.type}&id=${r.id}`, {});
+    if (x.state == 'found' && x.title_id) {
+      r.title_id = x.title_id;
+      const k = tmdbs[r.type + r.id];
+      if (k) k.title_id = x.title_id;
+    } else if (x.state != 'pending') break;
+  }
+  if (!r.title_id) return null;
+  const t = await title(r.title_id);
+  return { id: r.title_id, title: t.title, poster: t.poster, year: t.year };
+}
+
+// The buttons over a frame of a title of TMDB's: watched, and saved.
+function tileButtons(r) {
+  const sw = el('button', { className: 'ws' }, svgIcon('check'));
+  const sv = el('button', { className: 'sv' }, svgIcon('mark'));
+  sw.dataset.id = sv.dataset.id = r.title_id || '';
+  sw.onclick = e => {
+    e.stopPropagation();
+    seenTap({ id: r.title_id }, sw, r.title_id ? null : async () => {
+      const m = await providerOf(r);
+      if (m) sw.dataset.id = sv.dataset.id = m.id;
+      return m;
+    });
+  };
+  sv.onclick = async e => {
+    e.stopPropagation();
+    if (sv.disabled) return;
+    let m = null;
+    sv.disabled = true;
+    sv.classList.add('busy');
+    try {
+      m = await providerOf(r);
+      if (!m) toast('Нет у провайдера');
+    } catch (err) {
+      toast(err);
+    }
+    sv.disabled = false;
+    sv.classList.remove('busy');
+    if (!m) return;
+    sw.dataset.id = sv.dataset.id = m.id;
+    toggleSave(m);
+  };
+  showSeenTile(sw);
+  showSaved(sv);
+  return [sw, sv];
 }
 
 // ---- cast ---------------------------------------------------------------
@@ -2743,9 +2860,11 @@ function renderPerson(p, known) {
     row('Вы смотрели', seen.map(c => {
       const done = recent.some(e => e.id == c.title_id && e.done), pic = still(c.backdrop || c.poster, (c.title || '?')[0]);
       if (done) pic.append(el('span', { className: 'done' }, svgIcon('check'), 'Просмотрено'));
-      const b = el('button', { className: 'wtile' }, pic, el('b', {}, c.title || ''),
+      pic.append(...tileButtons(c));
+      const b = el('div', { className: 'wtile', role: 'button', tabIndex: 0 }, pic, el('b', {}, c.title || ''),
         el('span', {}, [c.character || c.jobs[0], c.episodes ? episodes(c.episodes) : c.year].filter(Boolean).join(' · ')));
       b.onclick = () => openCredit(c);
+      b.onkeydown = e => e.target == b && e.key == 'Enter' && openCredit(c);
       return b;
     })),
     row(she ? 'Известна по' : 'Известен по', top.filter(c => !c.seen).slice(0, 12).map(c => {
