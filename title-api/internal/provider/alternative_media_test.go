@@ -32,9 +32,18 @@ func TestMediaRelay(t *testing.T) {
 	if _, err := client.MediaHeaders(ctx, id, PlaybackReport{Resolution: "720"}); err != nil {
 		t.Fatal(err)
 	}
+	// The playlist names its fragments by title-api's short links, each
+	// of which stands for its CDN link.
 	playlist, err := client.QualityPlaylist(ctx, id, "720")
-	if err != nil || !strings.Contains(string(playlist), fake.cdn.URL+"/seg-0.ts") {
+	short := "https://api.example.com/v1/media/" + id + "/quality/720/part/0/seg-0.ts"
+	if err != nil || !strings.Contains(string(playlist), "\n"+short+"\n") || strings.Contains(string(playlist), fake.cdn.URL) {
 		t.Fatalf("playlist %q, %v", playlist, err)
+	}
+	if link, err := client.QualityPart(id, "720", false, 0); err != nil || link != fake.cdn.URL+"/seg-0.ts" {
+		t.Fatalf("part 0: %q, %v", link, err)
+	}
+	if _, err := client.QualityPart(id, "720", false, 99); !errors.Is(err, ErrMasterNotFound) {
+		t.Fatalf("part 99: %v", err)
 	}
 	response, err := client.FetchMedia(ctx, id, fake.cdn.URL+"/seg-0.ts", false)
 	if err != nil || response.StatusCode != http.StatusOK {

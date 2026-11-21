@@ -170,6 +170,8 @@ func run() error {
 		{http.MethodGet, "/v1/media/{id}/headers", mediaHeadersHandler(client)},
 		{http.MethodGet, "/v1/media/{id}/quality/{quality}/playlist.m3u8", qualityPlaylistHandler(client)},
 		{http.MethodGet, "/v1/media/{id}/cdn", mediaRelayHandler(client)},
+		{http.MethodGet, "/v1/media/{id}/quality/{quality}/part/{index}/{name}", mediaPartHandler(client, false)},
+		{http.MethodGet, "/v1/media/{id}/quality/{quality}/init/{index}/{name}", mediaPartHandler(client, true)},
 		{http.MethodDelete, "/v1/media/{id}/session", mediaSessionHandler(client)},
 		// The same for clients that can only GET and POST, like the router's
 		// uclient-fetch.
@@ -298,52 +300,83 @@ type mediaRelaySource interface {
 	RelayMedia(ctx context.Context, id, rawURL string, preview bool) (*http.Response, error)
 }
 
+type mediaPartSource interface {
+	mediaRelaySource
+	QualityPart(id, quality string, init bool, index int) (string, error)
+}
+
+// mediaPartHandler serves GET
+// /v1/media/{id}/quality/{quality}/part/{index}/{name}[?pv=1] and
+// .../init/{index}/{name}: the fragment or the init segment a quality's
+// media playlist names by its short link, relayed as /cdn relays its CDN
+// link.
+func mediaPartHandler(source mediaPartSource, init bool) runtime.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
+		index, err := strconv.Atoi(pathParams["index"])
+		if err != nil || !resolutionPattern.MatchString(pathParams["quality"]) {
+			http.Error(response, "invalid part", http.StatusBadRequest)
+			return
+		}
+		link, err := source.QualityPart(pathParams["id"], pathParams["quality"], init, index)
+		if mediaError(response, err) {
+			return
+		}
+		relay(response, request, source, pathParams["id"], link)
+	}
+}
+
 // mediaRelayHandler serves GET /v1/media/{id}/cdn?u=<CDN URL>[&pv=1]: the
 // URL fetched for the router as the media's player page fetches it, the
 // status, the type and X-VD passed on, the body streamed as it comes. pv=1
 // marks a seek preview's fetch, which the player's view doesn't count.
 func mediaRelayHandler(source mediaRelaySource) runtime.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request, pathParams map[string]string) {
-		upstream, err := source.RelayMedia(request.Context(), pathParams["id"], request.URL.Query().Get("u"),
-			request.URL.Query().Get("pv") == "1")
-		if err != nil && request.Context().Err() == nil {
-			log.Printf("media relay %s: %v", pathParams["id"], err)
+		relay(response, request, source, pathParams["id"], request.URL.Query().Get("u"))
+	}
+}
+
+// relay answers a request with rawURL of media id, relayed (see
+// mediaRelayHandler).
+func relay(response http.ResponseWriter, request *http.Request, source mediaRelaySource, id, rawURL string) {
+	upstream, err := source.RelayMedia(request.Context(), id, rawURL,
+		request.URL.Query().Get("pv") == "1")
+	if err != nil && request.Context().Err() == nil {
+		log.Printf("media relay %s: %v", id, err)
+	}
+	if mediaError(response, err) {
+		return
+	}
+	defer upstream.Body.Close()
+	if upstream.StatusCode >= http.StatusBadRequest {
+		log.Printf("media relay %s: CDN answered %d (X-VD: %q)", id, upstream.StatusCode, upstream.Header.Get("X-VD"))
+	}
+	for _, name := range []string{"Content-Type", "X-VD", "Last-Modified", "ETag"} {
+		if value := upstream.Header.Get(name); value != "" {
+			response.Header().Set(name, value)
 		}
-		if mediaError(response, err) {
-			return
-		}
-		defer upstream.Body.Close()
-		if upstream.StatusCode >= http.StatusBadRequest {
-			log.Printf("media relay %s: CDN answered %d (X-VD: %q)", pathParams["id"], upstream.StatusCode, upstream.Header.Get("X-VD"))
-		}
-		for _, name := range []string{"Content-Type", "X-VD", "Last-Modified", "ETag"} {
-			if value := upstream.Header.Get(name); value != "" {
-				response.Header().Set(name, value)
-			}
-		}
-		if upstream.ContentLength >= 0 && upstream.Header.Get("Content-Encoding") == "" {
-			response.Header().Set("Content-Length", strconv.FormatInt(upstream.ContentLength, 10))
-		}
-		response.Header().Set("Cache-Control", "no-store")
-		response.WriteHeader(upstream.StatusCode)
-		flusher, _ := response.(http.Flusher)
-		buffer := make([]byte, 64<<10)
-		for {
-			n, err := upstream.Body.Read(buffer)
-			if n > 0 {
-				if _, writeErr := response.Write(buffer[:n]); writeErr != nil {
-					return
-				}
-				if flusher != nil {
-					flusher.Flush()
-				}
-			}
-			if err != nil {
-				if err != io.EOF {
-					log.Printf("media relay %s: %v", pathParams["id"], err)
-				}
+	}
+	if upstream.ContentLength >= 0 && upstream.Header.Get("Content-Encoding") == "" {
+		response.Header().Set("Content-Length", strconv.FormatInt(upstream.ContentLength, 10))
+	}
+	response.Header().Set("Cache-Control", "no-store")
+	response.WriteHeader(upstream.StatusCode)
+	flusher, _ := response.(http.Flusher)
+	buffer := make([]byte, 64<<10)
+	for {
+		n, err := upstream.Body.Read(buffer)
+		if n > 0 {
+			if _, writeErr := response.Write(buffer[:n]); writeErr != nil {
 				return
 			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if err != nil {
+			if err != io.EOF {
+				log.Printf("media relay %s: %v", id, err)
+			}
+			return
 		}
 	}
 }

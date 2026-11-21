@@ -157,15 +157,20 @@ func TestAlternativePlaybackStreams(t *testing.T) {
 		!strings.Contains(string(master), "https://api.example.com/v1/media/"+id[len(id)-1]+"/quality/720/playlist.m3u8") {
 		t.Fatalf("unexpected synthetic master after %d requests: %q", requests, master)
 	}
-	// The quality's media playlist, its URIs absolute; again within a few
-	// seconds without asking the CDN.
+	// The quality's media playlist, its URIs title-api's short links of
+	// the CDN's (see QualityPart); again within a few seconds without
+	// asking the CDN.
+	prefix := "https://api.example.com/v1/media/" + id[len(id)-1] + "/quality/720/"
 	for range 2 {
 		playlist, err := client.QualityPlaylist(context.Background(), id[len(id)-1], "720")
 		if err != nil || requests != 2 || preflights != 2 ||
-			!strings.Contains(string(playlist), `#EXT-X-MAP:URI="`+server.URL+`/720/init.mp4"`) ||
-			!strings.Contains(string(playlist), "\n"+server.URL+"/720/seg-1.m4s\n") {
+			!strings.Contains(string(playlist), `#EXT-X-MAP:URI="`+prefix+`init/0/init.mp4"`) ||
+			!strings.Contains(string(playlist), "\n"+prefix+"part/0/seg-1.m4s\n") {
 			t.Fatalf("playlist after %d requests: %q, %v", requests, playlist, err)
 		}
+	}
+	if link, err := client.QualityPart(id[len(id)-1], "720", true, 0); err != nil || link != server.URL+"/720/init.mp4" {
+		t.Fatalf("init 0: %q, %v", link, err)
 	}
 	// Only the media's hosts go through the relay.
 	if _, err := client.FetchMedia(context.Background(), id[len(id)-1], "https://elsewhere.example/seg.m4s", false); !errors.Is(err, ErrMediaURL) {

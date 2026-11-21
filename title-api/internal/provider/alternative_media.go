@@ -88,6 +88,9 @@ type qualityLevel struct {
 	servedAt  time.Time
 	fragments []string
 	duration  float64
+	// The CDN links of its init segments, in the order the short links
+	// number them (see shortPlaylist).
+	inits []string
 }
 
 // cdnHeaders are the player's, with the edge_hash once the socket has one.
@@ -528,7 +531,9 @@ func (source *alternativeSource) levelPlaylist(ctx context.Context, quality stri
 		return nil, source.mediaErr(err)
 	}
 	playlist, fragments, duration := source.media.absorbPlaylist(level.url, body)
-	level.playlist, level.servedAt, level.fragments, level.duration = playlist, time.Now(), fragments, duration
+	playlist, inits := shortPlaylist(playlist, fragments,
+		source.client.mediaBaseURL+"/v1/media/"+source.id+"/quality/"+quality+"/")
+	level.playlist, level.servedAt, level.fragments, level.duration, level.inits = playlist, time.Now(), fragments, duration, inits
 	return playlist, nil
 }
 
