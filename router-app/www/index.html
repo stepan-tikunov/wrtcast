@@ -112,6 +112,11 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
    status bar, and Safari's bars fold only as it scrolls. Its width clipped,
    not scrolled, as a scroller of its own had it. */
 :is(#det,#list,#cast,#person).ontop{position:absolute;bottom:auto;box-sizing:border-box;min-height:100vh;min-height:100lvh;overflow:visible;overflow-x:clip}
+/* Its header fixed, not sticky: iOS jerks a sticky one in a page that the
+   document scrolls, a fixed one it moves smoothly; a spacer as high as it
+   (--lhh, see the ResizeObserver by syncPages) keeps its place. */
+.ontop>.lhead{position:fixed;left:0;right:0}
+.ontop:has(>.lhead)::before{content:'';display:block;height:var(--lhh,60px)}
 /* The pages under it are held where they were, so a swipe goes to no one
    but the page on top. */
 :is(#det,#list,#cast,#person).covered{overflow:hidden}
@@ -1141,6 +1146,10 @@ function syncPages() {
   }
   for (const p of PAGES) pageScrolled(p);
 }
+// The height of a page's header, for its spacer while it is fixed (.ontop).
+const lheads = new ResizeObserver(es => es.forEach(e =>
+  e.target.parentNode.style.setProperty('--lhh', e.target.offsetHeight + 'px')));
+for (const p of PAGES) { const h = $(p).querySelector(':scope>.lhead'); if (h) lheads.observe(h); }
 // A page's header darkens what scrolls under it once something has (.stuck,
 // see .lhead::after); someone's names them once their name has scrolled away.
 function pageScrolled(p) {
