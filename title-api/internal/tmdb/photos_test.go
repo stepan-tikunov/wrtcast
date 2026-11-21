@@ -33,19 +33,19 @@ func TestPhotos(t *testing.T) {
 	}
 }
 
-func TestGuests(t *testing.T) {
+func TestEpisodeCast(t *testing.T) {
 	fake := newFakeTMDB(t)
 	service, _ := newServingService(t, fake, "key")
 	ctx := context.Background()
-	guests, err := service.Guests(ctx, 1405, 1, 2)
+	people, err := service.EpisodeCast(ctx, 1405, 1, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Person{{ID: 555, Name: "Гость", Character: "Сосед", Profile: "guest.jpg"}, {ID: 556, Name: "Без фото"}}
-	if !reflect.DeepEqual(guests, want) {
-		t.Errorf("guests %+v, want %+v", guests, want)
+	want := []Person{{ID: 17414, Name: "Майкл Си. Холл", Character: "Dexter Morgan", Profile: "hall.jpg"}, {ID: 555, Name: "Гость", Character: "Сосед", Profile: "guest.jpg"}, {ID: 556, Name: "Без фото"}}
+	if !reflect.DeepEqual(people, want) {
+		t.Errorf("people %+v, want %+v", people, want)
 	}
-	if guests, err := service.Guests(ctx, 1405, 1, 3); err != nil || len(guests) != 0 {
-		t.Errorf("an episode TMDB doesn't have: %v %v", guests, err)
+	if people, err := service.EpisodeCast(ctx, 1405, 1, 3); err != nil || len(people) != 0 {
+		t.Errorf("an episode TMDB doesn't have: %v %v", people, err)
 	}
 }

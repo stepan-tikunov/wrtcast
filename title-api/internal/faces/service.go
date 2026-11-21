@@ -17,11 +17,13 @@ import (
 	"title-api/internal/tmdb"
 )
 
-// Of a title on TMDB, the people its pauses are told by: the cast as
-// billed, of a series all its seasons', and an episode's guest stars.
+// Of the people of an episode played, references are made of them all,
+// those in the episode first (see people); a pause is told Preparing while
+// the first of them are yet to be made of: the episode's, else the first
+// billed of the title, at most leadLimit.
 const (
-	castLimit  = 20
-	guestLimit = 10
+	castLead  = 20
+	leadLimit = 40
 )
 
 // A paused frame's faces told, the largest, and the smallest of them.
@@ -39,7 +41,7 @@ var (
 type TMDB interface {
 	Match(ctx context.Context, title string) (tmdb.Match, bool)
 	Cast(ctx context.Context, kind string, id uint64) ([]tmdb.Person, error)
-	Guests(ctx context.Context, id uint64, season, episode int32) ([]tmdb.Person, error)
+	EpisodeCast(ctx context.Context, id uint64, season, episode int32) ([]tmdb.Person, error)
 	Photos(ctx context.Context, id uint64) (tmdb.Photos, error)
 }
 
@@ -147,34 +149,47 @@ type Alternative struct {
 
 func scopeOf(m tmdb.Match) string { return m.Kind + ":" + strconv.FormatUint(m.ID, 10) }
 
-// people are the people of an episode of a title on TMDB, as billed, the
-// guest stars last.
-func (s *Service) people(ctx context.Context, m tmdb.Match, season, episode int32) ([]tmdb.Person, error) {
+// people are the people of an episode of a title on TMDB, all of them:
+// those TMDB tells are in the episode first, as billed in it (the series'
+// cast, then its guest stars), then the rest of the title's cast, as
+// billed, of a series all its seasons'. lead is how many of them first a
+// pause waits for the references of.
+func (s *Service) people(ctx context.Context, m tmdb.Match, season, episode int32) (people []tmdb.Person, lead int, err error) {
 	cast, err := s.tmdb.Cast(ctx, m.Kind, m.ID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	var result []tmdb.Person
+	var inEpisode []tmdb.Person
+	if m.Kind == tmdb.KindTV && season > 0 && episode > 0 {
+		if inEpisode, err = s.tmdb.EpisodeCast(ctx, m.ID, season, episode); err != nil {
+			log.Printf("faces %s s%de%d: %v", scopeOf(m), season, episode, err)
+		}
+	}
+	// Someone of the cast is told as the cast tells them, in the episode
+	// too.
+	billed := map[uint64]tmdb.Person{}
+	for _, p := range cast {
+		billed[p.ID] = p
+	}
 	seen := map[uint64]bool{}
-	add := func(list []tmdb.Person, limit int) {
-		n := 0
+	add := func(list []tmdb.Person) {
 		for _, p := range list {
-			if p.ID != 0 && !seen[p.ID] && n < limit {
+			if p.ID != 0 && !seen[p.ID] {
 				seen[p.ID] = true
-				result = append(result, p)
-				n++
+				if b, ok := billed[p.ID]; ok {
+					p = b
+				}
+				people = append(people, p)
 			}
 		}
 	}
-	add(cast, castLimit)
-	if m.Kind == tmdb.KindTV && season > 0 && episode > 0 {
-		guests, err := s.tmdb.Guests(ctx, m.ID, season, episode)
-		if err != nil {
-			log.Printf("faces %s s%de%d: %v", scopeOf(m), season, episode, err)
-		}
-		add(guests, guestLimit)
+	add(inEpisode)
+	lead = len(people)
+	if lead == 0 {
+		lead = castLead
 	}
-	return result, nil
+	add(cast)
+	return people, min(lead, leadLimit, len(people)), nil
 }
 
 func ids(people []tmdb.Person) []uint64 {
@@ -192,28 +207,31 @@ func (s *Service) Prepare(ctx context.Context, title string, season, episode int
 	if !ok {
 		return false, ErrNotMatched
 	}
-	people, err := s.people(ctx, m, season, episode)
+	people, lead, err := s.people(ctx, m, season, episode)
 	if err != nil {
 		return false, err
 	}
-	return s.enqueue(ctx, ids(people))
+	return s.enqueue(ctx, ids(people), lead)
 }
 
 // enqueue puts the people with no references first in the queue, in
-// their order: whether there are any.
-func (s *Service) enqueue(ctx context.Context, people []uint64) (bool, error) {
+// their order: whether any of the first lead of them are yet to have them.
+func (s *Service) enqueue(ctx context.Context, people []uint64, lead int) (bool, error) {
 	done, err := s.store.prepared(ctx, preparedKey, people)
 	if err != nil {
 		return false, err
 	}
 	var missing []uint64
+	preparing := false
 	s.mu.Lock()
-	for _, p := range people {
-		if _, ok := done[p]; !ok && p != s.current {
-			missing = append(missing, p)
+	for i, p := range people {
+		if _, ok := done[p]; !ok {
+			preparing = preparing || i < lead
+			if p != s.current {
+				missing = append(missing, p)
+			}
 		}
 	}
-	preparing := len(missing) > 0 || s.current != 0 && contains(people, s.current)
 	if len(missing) == 0 {
 		s.mu.Unlock()
 		return preparing, nil
@@ -314,11 +332,11 @@ func (s *Service) Recognize(ctx context.Context, r Request) (Result, error) {
 	if !ok {
 		return Result{}, ErrNotMatched
 	}
-	people, err := s.people(ctx, m, r.Season, r.Episode)
+	people, lead, err := s.people(ctx, m, r.Season, r.Episode)
 	if err != nil {
 		return Result{}, err
 	}
-	preparing, err := s.enqueue(ctx, ids(people))
+	preparing, err := s.enqueue(ctx, ids(people), lead)
 	if err != nil {
 		return Result{}, err
 	}
@@ -445,11 +463,11 @@ func (s *Service) Again(ctx context.Context, id int64) (Result, error) {
 	if !ok || scopeOf(m) != p.scope {
 		return Result{}, ErrNotMatched
 	}
-	people, err := s.people(ctx, m, p.season, p.episode)
+	people, lead, err := s.people(ctx, m, p.season, p.episode)
 	if err != nil {
 		return Result{}, err
 	}
-	preparing, err := s.enqueue(ctx, ids(people))
+	preparing, err := s.enqueue(ctx, ids(people), lead)
 	if err != nil {
 		return Result{}, err
 	}

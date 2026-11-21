@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -107,37 +108,45 @@ func (s *Service) Photos(ctx context.Context, id uint64) (Photos, error) {
 	return photos, err
 }
 
-// Guests are the guest stars of an episode on TMDB, of those billed first.
-type Guests struct {
+// EpisodeCast are the people of an episode on TMDB: of the series' cast
+// those in it, then its guest stars, each as billed.
+type EpisodeCast struct {
 	People []Person `json:"people,omitempty"`
 }
 
-func (Guests) ttl(time.Time) time.Duration { return 7 * 24 * time.Hour }
+func (EpisodeCast) ttl(time.Time) time.Duration { return 7 * 24 * time.Hour }
 
-// Guests are the people TMDB tells are in an episode of a series besides
-// its cast, as cached; an episode TMDB doesn't have has none.
-func (s *Service) Guests(ctx context.Context, id uint64, season, episode int32) ([]Person, error) {
+// EpisodeCast are the people TMDB tells are in an episode of a series, as
+// cached: those of its cast first, then its guest stars; an episode TMDB
+// doesn't have has none.
+func (s *Service) EpisodeCast(ctx context.Context, id uint64, season, episode int32) ([]Person, error) {
 	tmdb, err := s.keyed(ctx)
 	if err != nil {
 		return nil, err
 	}
-	guests, err := cached(ctx, s.cache, fmt.Sprintf("%s:%d:s%d:e%d:guests", KindTV, id, season, episode), Guests.ttl,
-		func(ctx context.Context) (Guests, error) {
+	people, err := cached(ctx, s.cache, fmt.Sprintf("%s:%d:s%d:e%d:cast", KindTV, id, season, episode), EpisodeCast.ttl,
+		func(ctx context.Context) (EpisodeCast, error) {
 			var raw struct {
+				Cast       []castMember `json:"cast"`
 				GuestStars []castMember `json:"guest_stars"`
 			}
 			err := tmdb.get(ctx, fmt.Sprintf("/tv/%d/season/%d/episode/%d/credits", id, season, episode),
 				url.Values{"language": {"ru-RU"}}, &raw)
 			if errors.Is(err, errNotFound) {
-				return Guests{}, nil
+				return EpisodeCast{}, nil
 			}
-			var result Guests
-			for _, member := range raw.GuestStars {
+			var result EpisodeCast
+			seen := map[uint64]bool{}
+			for _, member := range append(raw.Cast, raw.GuestStars...) {
+				if member.ID == 0 || seen[member.ID] {
+					continue
+				}
+				seen[member.ID] = true
 				result.People = append(result.People, Person{
-					ID: member.ID, Name: member.Name, Character: member.Character, Profile: file(member.ProfilePath),
+					ID: member.ID, Name: member.Name, Character: strings.TrimSpace(member.Character), Profile: file(member.ProfilePath),
 				})
 			}
 			return result, err
 		})
-	return guests.People, err
+	return people.People, err
 }

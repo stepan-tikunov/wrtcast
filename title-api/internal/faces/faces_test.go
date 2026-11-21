@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -217,7 +218,7 @@ func (fakeTMDB) Cast(context.Context, string, uint64) ([]tmdb.Person, error) {
 	return []tmdb.Person{{ID: 1, Name: "Alice", Character: "A", Profile: "a.jpg"}, {ID: 2, Name: "Bob"}}, nil
 }
 
-func (fakeTMDB) Guests(context.Context, uint64, int32, int32) ([]tmdb.Person, error) {
+func (fakeTMDB) EpisodeCast(context.Context, uint64, int32, int32) ([]tmdb.Person, error) {
 	return []tmdb.Person{{ID: 3, Name: "Carol"}, {ID: 1, Name: "Alice"}}, nil
 }
 
@@ -308,6 +309,17 @@ func TestRecognize(t *testing.T) {
 	}
 	if first.Width != 320 || first.Height != 180 || first.Faces[0].Box != [4]float64{100, 50, 200, 170} {
 		t.Fatalf("frame %dx%d, box %v", first.Width, first.Height, first.Faces[0].Box)
+	}
+	// Those of the episode first, then the rest of the cast.
+	if want := []uint64{3, 1, 2}; !slices.Equal(s.queue, want) {
+		t.Fatalf("queue %v, want %v", s.queue, want)
+	}
+	// The episode's alone are waited for.
+	s.prepare(ctx, 3)
+	s.prepare(ctx, 1)
+	s.queue = nil
+	if preparing, err := s.enqueue(ctx, []uint64{3, 1, 2}, 2); err != nil || preparing {
+		t.Errorf("the episode's people prepared: preparing %v, %v", preparing, err)
 	}
 	for _, person := range s.queue {
 		s.prepare(ctx, person)
