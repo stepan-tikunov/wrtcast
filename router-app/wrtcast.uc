@@ -1654,6 +1654,11 @@ function fetch_cmd(url, h, err, m, pv) {
 		for (let l in dyn ?? [])
 			own[name(l)] = true;
 		lines = [...filter(lines, l => !own[name(l)]), ...(dyn ?? [])];
+	} else if (valid_media(m) && pv) {
+		// title-api's own links of the media's parts (see QualityPart in
+		// title-api) are relayed as the CDN's: a seek preview's doesn't
+		// count either.
+		url += (index(url, '?') >= 0 ? '&' : '?') + 'pv=1';
 	}
 	cmd += ` -U ${shq(USER_AGENT)}`;
 	for (let x in (type(HEADERS) == 'array' ? HEADERS : [HEADERS]))
@@ -2252,8 +2257,13 @@ function warm_segments(body, url, a, start, first) {
 		let f = CACHE + k + '.' + clock()[1];
 		// Niced: the playlists being rewritten meanwhile are wanted
 		// first, and their TLS handshakes took the CPU from them.
-		push(jobs, { k, f, m: a.m, init: x[2] == 'i', t0: clock(),
-			pipe: popen(`nice -n 15 ${fetch_cmd(u, a.h, null, a.m)} >${shq(f)}`) });
+		// The alternative player's parts go through title-api's relay
+		// to its CDN one at a time, as its hls.js asks for them: they
+		// are started by warm_finish.
+		let cmd = `nice -n 15 ${fetch_cmd(u, a.h, null, a.m)} >${shq(f)}`;
+		let one = substr(u, 0, length(API) + 1) == API + '/';
+		push(jobs, { k, f, m: a.m, init: x[2] == 'i', t0: clock(), cmd,
+			pipe: one ? null : popen(cmd) });
 	}
 	return jobs;
 }
@@ -2263,6 +2273,10 @@ function warm_segments(body, url, a, start, first) {
 function warm_finish(jobs) {
 	let n = 0;
 	for (let j in jobs) {
+		if (!j.pipe) {
+			j.t0 = clock();
+			j.pipe = popen(j.cmd);
+		}
 		let ok = j.pipe && j.pipe.close() == 0, size = ok ? stat(j.f)?.size : 0;
 		if (size > 0 && cache_room()) {
 			cache_put(j.k, j.f, size, j.m, false);
@@ -2583,9 +2597,10 @@ function prepare(dev, p, keep) {
 			body = fetch_text(s.url, h, m);
 		}
 		// title-api forgets its masters when it restarts, so one of
-		// the streams of an earlier play may be gone: the provider is
-		// asked for them again.
-		if (qualities(body) == null && m && list == last?.streams) {
+		// the streams of an earlier play, or of a list kept (see
+		// title_streams), may be gone: the provider is asked for them
+		// again.
+		if (qualities(body) == null && m && time() - fetched > 5) {
 			let c = title_streams(dev, id, season, episode, true);
 			list = c.streams;
 			fetched = c.fetched;
