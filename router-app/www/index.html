@@ -107,13 +107,6 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 #cast{position:fixed;inset:0;z-index:4;overflow-y:auto;background:var(--bg);padding-bottom:120px}
 /* Someone's page, over the title's or its cast's. */
 #person{position:fixed;inset:0;z-index:5;overflow-y:auto;background:var(--bg);padding-bottom:120px}
-/* A page over the main one doesn't bounce pulled past its top (or end):
-   iOS rubber-bands a scroller by moving all it holds, the header (sticky,
-   held at the top only once scrolled) and its gradient with it, so they
-   came off the window's top, a bare band over them, and settled back late;
-   nor does the pull go on to the main page under it. */
-#det,#list,#cast,#person{overscroll-behavior-y:none}
-:root:has(:is(#det,#list,#cast,#person):not([hidden])){overscroll-behavior-y:none}
 /* The header names them once their name has scrolled away. */
 #person .lhead b{display:none;overflow:hidden;font-size:17px;font-weight:650;white-space:nowrap;text-overflow:ellipsis;animation:pop .2s ease-out}
 #person.scr .lhead b:not(:empty){display:block}
@@ -196,7 +189,10 @@ header.stuck::before{border-bottom:1px solid #ffffff1f}
 .lhead{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:4px;padding:max(8px,env(safe-area-inset-top)) 12px 8px 4px}
 /* No bar: what scrolls under the header darkens towards the top, across a
    wide gradient, so the white of the header reads over a photo too. */
-.lhead::after{content:'';position:absolute;z-index:-1;left:0;right:0;top:0;height:calc(100% + 56px);background:linear-gradient(#0e0e10f2,#0e0e10e0 35%,#0e0e10a0 60%,#0e0e1040 82%,#0e0e1000);pointer-events:none}
+.lhead::after{content:'';position:absolute;z-index:-1;left:0;right:0;top:0;height:calc(100% + 56px);background:linear-gradient(#0e0e10f2,#0e0e10e0 35%,#0e0e10a0 60%,#0e0e1040 82%,#0e0e1000);pointer-events:none;opacity:0;transition:opacity .2s}
+/* Only once something has scrolled under it (.stuck): at the page's top
+   (or pulled past it) the header lies on the page's own dark. */
+.stuck>.lhead::after{opacity:1}
 .lhead h1{text-shadow:0 1px 10px #0009}
 .lhead h1{margin:0;font-size:20px}
 .pw{position:relative}
@@ -1106,6 +1102,7 @@ function showLayer(name, on) {
     e.classList.remove('out');
     e.style.transform = e.style.opacity = ''; // left by a pull (see pullSheet)
     e.hidden = false;
+    e.classList.toggle('stuck', e.scrollTop > 0);
   };
   const page = name == 'det' || name == 'list' || name == 'cast' || name == 'person';
   const e = $(page ? name : 'shade');
@@ -3162,6 +3159,11 @@ function works(p, kind = 'all', all = false) {
     ...(list.length > shown.length ? [el('button', { className: 'pall', onclick: () => redraw(kind, true) }, `Показать все ${list.length}`)] : []));
   return sec;
 }
+
+// A page's header darkens what scrolls under it, only once something has
+// (.stuck, see .lhead::after).
+for (const id of ['list', 'cast', 'person'])
+  $(id).addEventListener('scroll', () => $(id).classList.toggle('stuck', $(id).scrollTop > 0), { passive: true });
 
 // The header names them once their name has scrolled away.
 $('person').addEventListener('scroll', () =>
