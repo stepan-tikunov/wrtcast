@@ -451,15 +451,16 @@ static int next_request_id = 1;
 
 /*
  * Sends a request carrying a fresh requestId and waits for the reply with
- * the same requestId. "body" is the JSON object contents without braces.
- * Returns the reply payload (valid until the next receive).
+ * the same requestId, up to secs seconds. "body" is the JSON object
+ * contents without braces. Returns the reply payload (valid until the next
+ * receive).
  */
-static const char *request(const char *dst, const char *ns, const char *body)
+static const char *request_within(const char *dst, const char *ns, const char *body, int secs)
 {
 	static char buf[MAX_MSG];
 	struct cast_msg m;
 	int id = next_request_id++;
-	time_t deadline = time(NULL) + TIMEOUT_MS / 1000;
+	time_t deadline = time(NULL) + secs;
 
 	snprintf(buf, sizeof(buf), "{\"requestId\":%d,%s}", id, body);
 	cast_send(dst, ns, buf);
@@ -478,6 +479,11 @@ static const char *request(const char *dst, const char *ns, const char *body)
 	}
 	die("timeout waiting for reply");
 	return NULL;
+}
+
+static const char *request(const char *dst, const char *ns, const char *body)
+{
+	return request_within(dst, ns, body, TIMEOUT_MS / 1000);
 }
 
 static void virtual_connect(const char *dst)
@@ -1368,7 +1374,10 @@ static void cmd_play(int argc, char **argv)
 		n += snprintf(body + n, sizeof(body) - n, ",\"textTrackStyle\":%s", st);
 	}
 	snprintf(body + n, sizeof(body) - n, "}");
-	r = request(a.transport_id, NS_MEDIA, body);
+	/* The receiver answers a LOAD once it has loaded the playlists and the
+	 * first segments, which a router warming them up may take a while to
+	 * hand on: as long as playback may take to start. */
+	r = request_within(a.transport_id, NS_MEDIA, body, LOAD_TIMEOUT_S);
 	memset(&md, 0, sizeof(md));
 	md.ntracks = md.nactive = -1;
 	md.rate = 1;
