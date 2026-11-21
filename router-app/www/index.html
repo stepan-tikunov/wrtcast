@@ -554,7 +554,12 @@ select{width:100%;height:46px;padding:0 12px;border:0;border-radius:14px;backgro
 #wseasons::-webkit-scrollbar{display:none}
 #wlist .dev.done b{color:var(--mu)}
 #wlist .dev.on b{color:var(--ac)}
-#wclear{display:block;flex:none;margin:8px auto 0;padding:10px 16px;border:0;background:none;color:var(--err);font-size:15px}
+/* Under the episodes: all of them watched, or none. */
+#wfoot{display:flex;flex:none;justify-content:center;gap:8px;margin-top:8px}
+#wfoot:not(:has(button:not([hidden]))){display:none}
+#wall,#wclear{padding:10px 16px;border:0;background:none;font-size:15px}
+#wall{color:var(--ac);font-weight:600}
+#wclear{color:var(--err)}
 #stop,#mkdel,#tmdel{display:block;margin:4px auto 0;padding:10px 16px;border:0;background:none;color:var(--err);font-size:15px}
 .sw input:disabled{opacity:.4}
 .hint{margin:0 2px 4px;color:var(--mu);font-size:13px;line-height:1.4}
@@ -942,7 +947,7 @@ svg.spring{animation:spring .3s ease-out}
   <h2><span>Смотрели до серии</span><button class="ib" id="wcollapse" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button></h2>
   <div id="wseasons"></div>
   <div id="wlist"></div>
-  <button id="wclear" hidden>Не смотрели</button>
+  <div id="wfoot"><button id="wall" hidden>Полностью</button><button id="wclear" hidden>Не смотрели</button></div>
 </section>
 <section id="sty" class="sheet" hidden>
   <div class="handle"></div>
@@ -2735,7 +2740,7 @@ async function openSeenSheet(f) {
   seenFor = f;
   $('wseasons').replaceChildren();
   $('wlist').replaceChildren(...[0, 1, 2, 3].map(() => el('div', { className: 'dev' }, el('span', {}, el('b', {}, skl(50))))));
-  $('wclear').hidden = true;
+  $('wclear').hidden = $('wall').hidden = true;
   openLayer('seen');
   try {
     if (f.r) {
@@ -2808,6 +2813,12 @@ function showSeenSeason(s) {
     return b;
   }));
   $('wclear').hidden = f.m ? !f.m.progress : !mk;
+  const end = last.episodes.at(-1);
+  $('wall').hidden = mk?.season == last.season && mk.episode == end.episode;
+  $('wall').onclick = () => {
+    closeTop();
+    markUpTo(f, { season: last.season, episode: end.episode }, true);
+  };
 }
 
 // The sheet's series marked watched up to ep (last: its last episode),
