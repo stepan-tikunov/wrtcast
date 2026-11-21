@@ -213,14 +213,14 @@ html.settled :is(body>header,#home,#msg,.covered){visibility:hidden}
 #ppl .sec em{margin-left:6px;color:var(--mu);font-size:15px;font-style:normal;font-weight:500}
 .pstrip{display:flex;align-items:flex-start;gap:4px;overflow-x:auto;padding:4px 12px 6px;scrollbar-width:none}
 .pstrip::-webkit-scrollbar{display:none}
-.pp{flex:none;width:74px;padding:0;border:0;background:none;color:var(--tx);font-size:12px;line-height:1.25;text-align:center;animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 25ms);transition:transform .12s}
+.pp{flex:none;width:74px;padding:0;overflow:visible;border:0;background:none;color:var(--tx);font-size:12px;line-height:1.25;text-align:center;animation:pop .3s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 25ms);transition:transform .12s}
 .pp:active{transform:scale(.96)}
 .pp .aw,.pp>.sk{width:64px;height:64px;margin:0 auto 7px}
 .pp>.sk{border-radius:50%}
 .pp>.skl{width:56px;height:10px;margin:0 auto 5px}
 .pp>.skl+.skl{width:38px}
 .pp b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:550;overflow-wrap:anywhere}
-.pp>span{display:block;margin-top:2px;overflow:hidden;color:var(--mu);white-space:nowrap;text-overflow:ellipsis}
+.pp>b+span{display:block;margin-top:2px;overflow:hidden;color:var(--mu);white-space:nowrap;text-overflow:ellipsis}
 .pp.all b{color:var(--mu);font-weight:500}
 .pp.all .nop{color:var(--tx)}
 .pp.all .nop svg{width:28px;height:28px}
