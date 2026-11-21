@@ -685,6 +685,18 @@ const now_set = (key, v) => tv_set(key, 'now', v);
 // up to 20 s, again at a new address). A play that failed and put the last
 // state back is over: the stream it started on the TV all the same is taken
 // at once, however recent the state put back.
+// The status of the device dev as castctl tells a TV's; of the page's own
+// player, its media as the page last told it (see /local/progress).
+function status_of(dev) {
+	if (dev.host != HERE)
+		return castctl(dev, 'status');
+	let key = state_key(dev), now = now_get(key), seen = tv_get(key, 'seen');
+	if (!now?.url || seen?.url != now.url)
+		return {};
+	return { media: { url: now.url, state: seen.playing ? 'PLAYING' : 'PAUSED',
+		time: seen.pos + (seen.playing ? max(time() - seen.t, 0) : 0), duration: seen.dur } };
+}
+
 function adopt(key, host, now, m) {
 	let u = m?.url, busy = kv_get('busy:' + key);
 	if (!u || now?.url == u || busy != null && time() - busy < 90)
@@ -3804,15 +3816,18 @@ const routes = {
 			// The dub to start with, by name: the page finds it among the
 			// renditions of the master.
 			audio: filter(s.audio ?? [], a => a.id == r.p.audio)[0]?.name ?? null,
+			// The dubs' names by their renditions' NAME.
+			labels: r.labels,
 			subs: map(picked, (t, i) => ({ name: t.name, lang: t.lang || 'und',
 				url: `/api/sub/${key}/${i}.vtt`, on: 'sub' + t.id == r.p.subs })),
 		};
 	},
 
 	// Where the page's own player is: time and duration in seconds, state
-	// PLAYING, PAUSED or ENDED, the dub and the subtitles by name ('' off);
+	// PLAYING, PAUSED or ENDED, the dub and the subtitles by name ('' off),
+	// the dub's rendition NAME (audio_name);
 	// kept as a TV's status would be (see remember). Answers the sections
-	// of the video, once its duration is known.
+	// of the video, once its duration is known, and its music (see music_of).
 	'POST /local/progress': p => {
 		let key = state_key(device({ device: HERE })), now = now_get(key);
 		if (!now || now.id != title_id(p) || `${now.season ?? ''}` != (p.season ?? '') ||
@@ -3823,7 +3838,7 @@ const routes = {
 				fail(400, `invalid ${k}`);
 		if (index(['PLAYING', 'PAUSED', 'BUFFERING', 'ENDED'], p.state ?? '') < 0)
 			fail(400, 'invalid state');
-		for (let k in ['audio', 'subs'])
+		for (let k in ['audio', 'audio_name', 'subs'])
 			if (p[k] != null && (length(p[k]) > 100 || match(p[k], /[[:cntrl:]]/)))
 				fail(400, `invalid ${k}`);
 		let tracks = [];
@@ -3835,6 +3850,10 @@ const routes = {
 		let m = { state: ended ? 'IDLE' : p.state, idleReason: ended ? 'FINISHED' : null,
 			time: t, duration: dur, tracks };
 		remember(now, m);
+		// As a TV's is seen (see watch_end): the music follows the dub, a
+		// pause has its faces looked for (see status_of).
+		tv_set(key, 'seen', { url: now.url, pos: t, dur, playing: p.state != 'PAUSED' && !ended, t: time(),
+			audio: p.audio || null, subs: p.subs || null, audio_name: p.audio_name || null });
 		if (valid_media(now.media)) {
 			media_set(now.media, 'pos', { pos: t, dur, paused: p.state == 'PAUSED',
 				buffering: p.state == 'BUFFERING', rate: 1, at: time() });
@@ -3843,7 +3862,7 @@ const routes = {
 			else
 				media_headers(now.media, quality_digits(now.quality), t);
 		}
-		return { sections: sections_of(now, dur) };
+		return { sections: sections_of(now, dur), music: ended ? null : music_of(key, now) };
 	},
 
 	// Turns the next episode on or off for what is on (see ended).
@@ -3856,6 +3875,8 @@ const routes = {
 			now.autonext = p.on == '1';
 			now_set(key, now);
 		}
+		if (dev.host == HERE)
+			return { settings: settings() };
 		return with_now(castctl(dev, 'status'), dev);
 	},
 
@@ -3870,6 +3891,8 @@ const routes = {
 			now.autoskip = p.on == '1';
 			now_set(key, now);
 		}
+		if (dev.host == HERE)
+			return { settings: settings() };
 		return with_now(castctl(dev, 'status'), dev);
 	},
 
@@ -4008,7 +4031,7 @@ const routes = {
 	// not_matched (with TMDB), off (title-api has no faces service).
 	'GET /faces': p => {
 		let dev = device(p), key = state_key(dev), now = now_get(key);
-		let m = castctl(dev, 'status').media;
+		let m = status_of(dev).media;
 		if (!now?.id || !m || m.url != now.url)
 			return { reason: 'no_play' };
 		if (m.state != 'PAUSED')

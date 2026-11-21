@@ -891,35 +891,81 @@ svg.spring{animation:spring .3s ease-out}
   .chip:hover:not(.on),.pill:hover:not(.ac),.ib:hover{filter:brightness(1.25)}
   .pill.ac:hover{filter:brightness(1.08)}
 }
-/* The page's own player (device "here"): the video over the page, its
-   settings under it; folded, a bar at the bottom with the video live in it. */
+/* The page's own player (device "here"): the video with its controls over
+   it, which a tap shows and hides, its settings and episodes under it;
+   folded, a bar at the bottom with the video live in it. A phone turned
+   sideways has the video fill the screen, as full screen does. */
 #lp{position:fixed;inset:0;z-index:6;overflow-y:auto;background:var(--bg);overscroll-behavior:contain}
-#lpv{position:sticky;top:0;z-index:1;width:100%;aspect-ratio:16/9;max-height:70dvh;margin:0 auto;padding-top:env(safe-area-inset-top);background:#000}
-#lpvid{display:block;width:100%;height:100%;background:#000}
-#lpvid::cue{background:#0009}
-#lpfold{position:absolute;left:4px;top:calc(4px + env(safe-area-inset-top));color:#fff;background:#0006}
-#lpskip{position:absolute;right:12px;bottom:56px;height:40px;padding:0 16px;font-size:14px;box-shadow:0 4px 16px #0008}
+#lpv{position:sticky;top:0;z-index:1;width:100%;aspect-ratio:16/9;max-height:70dvh;margin:0 auto;border-top:env(safe-area-inset-top) solid #000;background:#000;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+#lpvid{display:block;width:100%;height:100%;object-fit:contain;background:#000}
+/* Subtitles rise above the seek bar while it shows. */
+#lpvid::-webkit-media-text-track-container{transition:transform .2s}
+#lpv.ui #lpvid::-webkit-media-text-track-container{transform:translateY(-52px)}
+#lpov{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(#000a,#0000 28%,#0000 60%,#000c);opacity:0;transition:opacity .2s;pointer-events:none}
+#lpv.ui #lpov{opacity:1;pointer-events:auto}
+.lptop{display:flex;align-items:center;padding:2px 4px}
+#lpov .ib{color:#fff}
+.lph{flex:1;min-width:0;padding:0 6px;color:#fff;visibility:hidden}
+.lph b,.lph span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.lph b{font-size:16px}
+.lph span{color:#ccc;font-size:13px}
+.lpmid{position:absolute;left:50%;top:50%;display:flex;align-items:center;gap:clamp(20px,9vw,72px);transform:translate(-50%,-50%)}
+.lpmid .ib{width:56px;height:56px;font-size:16px;font-weight:650}
+#lppp{width:64px;height:64px;background:#0006;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#lppp svg{width:34px;height:34px}
+.lpbot{display:flex;align-items:center;gap:10px;padding:0 8px 0 14px;color:#fff;font-size:13px;font-variant-numeric:tabular-nums}
+#lppos i{background:#ffffff40}
+#lppos i b{background:var(--ac)}
+#lppos.on i b{background:var(--ac)}
+#lpsecs{position:absolute;inset:0;pointer-events:none}
+#lpsecs span{position:absolute;top:0;bottom:0;background:#ffffff50}
+#lpspd{width:auto;min-width:40px;height:28px;padding:0 8px;border-radius:8px;background:#ffffff26;font-size:13px;font-weight:650}
+#lpjump{position:absolute;top:50%;display:none;padding:10px 18px;border-radius:24px;background:#0009;color:#fff;font-weight:700;transform:translateY(-50%);pointer-events:none}
+#lpjump.on{display:block;animation:lpjump .6s forwards}
+@keyframes lpjump{0%,50%{opacity:1}to{opacity:0}}
 #lpspin{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px;border-width:3px;border-color:#fff;border-top-color:transparent;pointer-events:none}
+#lpv.ui #lpspin{display:none}
+#lpskip{position:absolute;right:12px;bottom:16px;height:40px;padding:0 16px;font-size:14px;box-shadow:0 4px 16px #0008;transition:bottom .2s}
+#lpv #fpill,#lpv #mpill{bottom:16px;height:40px;transition:bottom .2s,opacity .2s}
+#lpv #fpill{right:12px}
+#lpv #mpill{left:12px;max-width:calc(100% - 24px)}
+#lpv.ui :is(#lpskip,#fpill,#mpill){bottom:58px}
+/* Under the video on a phone held upright (see lpPills): over it they'd
+   cover the controls. */
+#lppills{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+#lppills:not(:has(>:not([hidden]))){display:none}
+#lppills :is(#fpill,#mpill){position:static;max-width:100%;box-shadow:none;background:var(--s2)}
+#lpv.full{max-height:none;aspect-ratio:auto;border:0}
+#lpv.full .lph{visibility:visible}
+@media (orientation:landscape) and (max-height:540px){
+  #lp:not(.mini) #lpv{position:fixed;inset:0;z-index:3;max-height:none;aspect-ratio:auto;border:0}
+  #lp:not(.mini) .lph{visibility:visible}
+  #lp:not(.mini) #lpfold{display:none}
+}
 #lpbody{max-width:720px;margin:0 auto;padding:16px 16px max(24px,env(safe-area-inset-bottom))}
 #lpbody h2{margin:0;font-size:22px}
 #lps{margin:4px 0 0;color:var(--mu);font-size:14px}
-#lpch{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
-.lpc{position:relative;display:flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:19px;background:var(--s2);font-size:14px;white-space:nowrap}
+.lprow{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.lpc{position:relative;display:flex;align-items:center;gap:6px;height:38px;padding:0 14px;border:0;border-radius:19px;background:var(--s2);font-size:14px;white-space:nowrap}
 .lpc em{font-style:normal;color:var(--mu)}
 .lpc select{position:absolute;inset:0;width:100%;opacity:0;cursor:pointer}
+.lpc.tg svg{width:18px;height:18px;color:var(--mu)}
+.lpc.tg.on{background:#ffb02024;color:var(--ac)}
+.lpc.tg.on svg{color:var(--ac)}
 #lpnav{display:flex;gap:8px;margin-bottom:8px}
 #lpnav .pill{flex:1}
 #lpcast{width:100%;color:var(--ac)}
+#lpeps h3{margin:22px 0 2px;font-size:17px}
 #lpmini{display:none}
-#lp.mini{inset:auto 8px max(8px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:10px;padding:6px;overflow:hidden;border-radius:16px;background:var(--s2);box-shadow:0 6px 30px #000c;cursor:pointer}
-#lp.mini #lpv{position:relative;flex:none;width:112px;max-height:none;margin:0;padding:0;border-radius:10px;overflow:hidden}
-#lp.mini #lpbody,#lp.mini #lpfold,#lp.mini #lpskip{display:none}
-#lp.mini #lpspin{width:20px;height:20px;margin:-10px;border-width:2px}
+#lp.mini{inset:auto 8px max(8px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:10px;padding:6px;overflow:hidden;border-radius:16px;background:var(--s2);box-shadow:0 6px 30px #000c;cursor:pointer;touch-action:none}
+#lp.mini #lpv{position:relative;flex:none;width:112px;max-height:none;margin:0;border:0;border-radius:10px}
+#lp.mini :is(#lpbody,#lpov,#lpskip,#fpill,#mpill,#lpjump){display:none}
+#lp.mini #lpspin{display:block;width:20px;height:20px;margin:-10px;border-width:2px}
 #lp.mini #lpmini{display:flex;flex:1;min-width:0;align-items:center}
 #lpmini .t{flex:1;min-width:0}
 #lpmini b,#lpmini span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #lpmini b{font-size:15px;font-weight:600}
-#lpmini span{color:var(--mu);font-size:13px}
+#lpmini span{color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums}
 @media (min-width:900px){#lp.mini{left:auto;width:420px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
 </style>
@@ -951,6 +997,10 @@ svg.spring{animation:spring .3s ease-out}
   <symbol id="i-spark" viewBox="0 0 24 24"><path d="M10 2l1.9 5.6 5.6 1.9-5.6 1.9L10 17l-1.9-5.6-5.6-1.9 5.6-1.9zm8.5 11 .95 2.55L22 16.5l-2.55.95L18.5 20l-.95-2.55L15 16.5l2.55-.95z"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></symbol>
   <symbol id="i-person" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></symbol>
+  <symbol id="i-cast" viewBox="0 0 24 24"><path d="M1 18v3h3a3 3 0 0 0-3-3zm0-4v2a5 5 0 0 1 5 5h2a7 7 0 0 0-7-7zm0-4v2a9 9 0 0 1 9 9h2A11 11 0 0 0 1 10zm20-7H3a2 2 0 0 0-2 2v3h2V5h18v14h-7v2h7a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></symbol>
+  <symbol id="i-pip" viewBox="0 0 24 24"><path d="M19 11h-8v6h8v-6zm4 8V5a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2zm-2 0H3V5h18v14z"/></symbol>
+  <symbol id="i-fs" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></symbol>
+  <symbol id="i-fsx" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></symbol>
   <symbol id="i-phone" viewBox="0 0 24 24"><path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm0 18H7V5h10v14z"/></symbol>
   <symbol id="i-tv" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18v12z"/></symbol>
 </svg>
@@ -1009,18 +1059,48 @@ svg.spring{animation:spring .3s ease-out}
 </section>
 
 <section id="lp" hidden>
-  <div id="lpv"><video id="lpvid" playsinline preload="auto"></video><span class="spin" id="lpspin" hidden></span><button class="ib" id="lpfold" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button><button class="pill ac" id="lpskip" hidden></button></div>
+  <style id="lpcue"></style>
+  <div id="lpv">
+    <video id="lpvid" playsinline autopictureinpicture preload="auto"></video>
+    <span class="spin" id="lpspin" hidden></span>
+    <span id="lpjump"></span>
+    <div id="lpov">
+      <div class="lptop">
+        <button class="ib" id="lpfold" aria-label="Свернуть"><svg><use href="#i-down"/></svg></button>
+        <div class="lph"><b id="lpft"></b><span id="lpfs"></span></div>
+        <button class="ib" id="lpcastb" aria-label="На телевизор"><svg><use href="#i-cast"/></svg></button>
+        <button class="ib" id="lppip" aria-label="Картинка в картинке"><svg><use href="#i-pip"/></svg></button>
+        <button class="ib" id="lpfull" aria-label="Во весь экран"><svg><use href="#i-fs"/></svg></button>
+      </div>
+      <div class="lpmid">
+        <button class="ib" id="lprew" aria-label="Назад на 10 секунд">−10</button>
+        <button class="ib" id="lppp" aria-label="Пауза"><svg><use href="#i-pause"/></svg></button>
+        <button class="ib" id="lpff" aria-label="Вперёд на 10 секунд">+10</button>
+      </div>
+      <div class="lpbot"><span id="lpcur">0:00</span><div class="sl" id="lppos" role="slider" aria-label="Позиция"><i><b></b><span id="lpsecs"></span></i></div><span id="lprem"></span><button class="ib" id="lpspd" aria-label="Скорость">1x</button></div>
+    </div>
+    <button class="pill ac" id="lpskip" hidden></button>
+  </div>
   <div id="lpmini"><div class="t"><b id="lpmt"></b><span id="lpms"></span></div><button class="ib" id="lptg" aria-label="Пауза"><svg><use href="#i-pause"/></svg></button><button class="ib" id="lpx" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button></div>
   <div id="lpbody">
     <h2 id="lpt"></h2><p id="lps"></p>
-    <div id="lpch">
-      <label class="lpc" id="lpac"><em>Озвучка</em><b></b><select id="lpaudio"></select></label>
-      <label class="lpc" id="lpsc"><em>Субтитры</em><b></b><select id="lpsubs"></select></label>
-      <label class="lpc" id="lpqc"><em>Качество</em><b></b><select id="lpqual"></select></label>
-      <label class="lpc" id="lpoc"><em>Источник</em><b></b><select id="lpsrc"></select></label>
+    <div id="lppills"></div>
+    <div class="lprow" id="lpch">
+      <label class="lpc"><em>Озвучка</em><b></b><select id="lpaudio"></select></label>
+      <label class="lpc"><em>Субтитры</em><b></b><select id="lpsubs"></select></label>
+      <button class="lpc" id="lpsty" aria-label="Вид субтитров">Aa</button>
+      <label class="lpc"><em>Качество</em><b></b><select id="lpqual"></select></label>
+      <label class="lpc"><em>Скорость</em><b></b><select id="lprate"></select></label>
+      <label class="lpc"><em>Источник</em><b></b><select id="lpsrc"></select></label>
     </div>
-    <div id="lpnav"><button class="pill" id="lpprev"><svg><use href="#i-prev"/></svg>Пред.</button><button class="pill" id="lpnext">След.<svg><use href="#i-next"/></svg></button></div>
+    <div class="lprow" id="lptgs">
+      <button class="lpc tg" id="lpautoskip"><svg><use href="#i-check"/></svg>Пропускать заставку</button>
+      <button class="lpc tg" id="lpautonext"><svg><use href="#i-check"/></svg>Следующая серия сама</button>
+      <button class="lpc tg" id="lpdrc"><svg><use href="#i-check"/></svg>Выравнивать громкость</button>
+    </div>
+    <div id="lpnav"><button class="pill" id="lpprev"><svg><use href="#i-prev"/></svg>Пред. серия</button><button class="pill" id="lpnext">След. серия<svg><use href="#i-next"/></svg></button></div>
     <button class="pill" id="lpcast"><svg><use href="#i-tv"/></svg><span>На телевизор</span></button>
+    <div id="lpeps"></div>
   </div>
 </section>
 <div id="shade" hidden></div>
@@ -2909,7 +2989,7 @@ const sklDesc = () => el('p', { className: 'eo' }, skl(100), skl(100), skl(60));
 // anim, as the season is shown; again, as TMDB's comes over it.
 function renderEpisodes(how) {
   if (!item?.seasons || !season) return;
-  const now = pending || (st?.media && st.now);
+  const now = pending || (st?.media && st.now) || lp;
   const s = season, x = item.tm?.type == 'tv' ? s.tm : item.tmWait ? undefined : null;
   const key = `${item.id}|${s.season}|${now?.id}|${now?.season}|${now?.episode}|${!!pending}|${JSON.stringify(item.progress)}|${x === undefined ? '?' : !!x}`;
   if (!how && $('eps').dataset.key == key) return;
@@ -2923,7 +3003,7 @@ function renderEpisodes(how) {
     const part = p && !p.done && p.pos > 10 && p.dur ? p.pos / p.dur : 0;
     const next = !on && cont?.season == sn && cont.episode == e.episode;
     const t = x?.eps[i], dur = e.duration || t?.runtime * 60;
-    const state = on ? (pending ? 'запуск…' : 'на ТВ') :
+    const state = on ? (pending ? 'запуск…' : lp ? 'смотрите' : 'на ТВ') :
       part ? (next ? 'продолжить · ' : '') + 'ещё ' + Math.ceil((p.dur - p.pos) / 60) + ' мин' :
       next ? 'следующая' : p?.done ? 'просмотрено' : '';
     const cls = 'ep' + (on ? ' on' : '') + (p?.done ? ' done' : '') + (next ? ' cont' : '');
@@ -3935,6 +4015,7 @@ const position = m => (m.time || 0) + (m.state == 'PLAYING' && !stale ? (Date.no
 // once the tapping stops; polled status would undo them until then.
 let seekTimer = null;
 function skip(delta) {
+  if (device == HERE) return lpJump(delta);
   const m = st?.media;
   if (!m) return;
   m.time = Math.max(0, Math.min(position(m) + delta, m.duration || Infinity));
@@ -3953,6 +4034,7 @@ let inflight = 0; // commands still on their way to the TV
 // src tells the router's note of a pause where it came from: the page or
 // the lock screen widget (see pause_note).
 async function cmd(c, arg, src = 'page') {
+  if (device == HERE) return lpCmd(c, arg);
   cmdAt = Date.now();
   inflight++;
   const m = st?.media;
@@ -4430,6 +4512,7 @@ let keepSrc = null, session = false, sessionKey = '';
 
 // Starts the loop; called from taps, which iOS requires for playing.
 function arm() {
+  if (device == HERE) return; // the video is the lock screen's
   session = true;
   if (!keep.paused) return;
   if (!keep.src) keep.src = keepSrc ||= silence(30);
@@ -4485,7 +4568,8 @@ keep.ontimeupdate = keep.onseeked = syncPosition;
 
 if (navigator.mediaSession) {
   const ms = navigator.mediaSession, playing = () => ['PLAYING', 'BUFFERING'].includes(st?.media?.state);
-  const on = (a, f) => { try { ms.setActionHandler(a, f); } catch {} };
+  // While something plays here, its own (see lpAction).
+  const on = (a, f) => { try { ms.setActionHandler(a, d => lp ? lpAction(a, d) : f(d)); } catch {} };
   // After an interruption the widget shows a pause while the TV plays; play
   // then just brings the loop back.
   on('play', () => {
@@ -4592,21 +4676,25 @@ function selectDevice(id) {
 // serves it as to one. hls.js plays it where the browser can't play HLS
 // itself (or can't switch its dubs: Chrome); Safari plays it natively.
 // The position goes to the router as a TV's status would (/local/progress),
-// so the history, the progress and the next episode work as they do there.
+// so the history, the progress, the next episode, the music and the faces
+// work as they do there. The pills of the music and of the faces, and the
+// seek preview's frame, move over here while it plays.
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js';
-const lpv = $('lpvid');
+const RATES = [0.75, 1, 1.25, 1.5, 2];
+const lpv = $('lpvid'), lpBox = $('lpv');
 let lp = null;        // /local's answer for what plays here, or null
 let lpHls = null;     // its hls.js, if it plays through one
 let lpSent = 0;       // when the position was last sent
 let lpSkipped = new Set(); // sections skipped (or rewound into), by start
-let lpWant = null;    // the dub to pick once the renditions are known, by name
+let lpWant = null;    // the dub to pick once the renditions are known
 let lpGen = 0;        // the start under way; a later one wins
+let lpDrag = false;   // the seek bar is held
+let lpUiTimer = null, lpTap = null, lpSwipe = null;
 
 const nativeHls = () => !!lpv.canPlayType('application/vnd.apple.mpegurl') && 'audioTracks' in lpv;
 let hlsLoad = null;
 const loadHls = () => hlsLoad ||= new Promise((ok, no) => {
-  const s = el('script', { src: HLS_JS, onload: ok, onerror: () => { hlsLoad = null; no(new Error('не загрузился hls.js')); } });
-  document.head.append(s);
+  document.head.append(el('script', { src: HLS_JS, onload: ok, onerror: () => { hlsLoad = null; no(new Error('не загрузился hls.js')); } }));
 });
 
 async function localPlay(m) {
@@ -4645,14 +4733,17 @@ const lpEp = r => r.season != null ? `${r.season} сезон · ${r.episode} с�
 
 // Opens the player at once, with what is known before the router answers.
 function lpOpen(m) {
+  if ($('lp').hidden) $('lppos').append($('frame'));
   $('lp').hidden = false;
+  lpPills();
   lpFold(false);
   $('lpspin').hidden = false;
   $('lpskip').hidden = true;
-  $('lpt').textContent = $('lpmt').textContent = m.title || '';
-  $('lps').textContent = $('lpms').textContent = lpEp(m);
-  $('lpch').hidden = $('lpnav').hidden = true;
+  $('lpt').textContent = $('lpmt').textContent = $('lpft').textContent = m.title || '';
+  $('lps').textContent = $('lpms').textContent = $('lpfs').textContent = lpEp(m);
+  $('lpch').hidden = $('lptgs').hidden = $('lpnav').hidden = true;
   lpv.poster = m.poster || '';
+  lpUi(true);
 }
 
 async function lpStart(r) {
@@ -4661,14 +4752,23 @@ async function lpStart(r) {
   lpSent = 0;
   lpSkipped = new Set();
   lp.sections = [];
+  lp.labels ||= {};
   lpv.poster = r.poster || '';
-  // Subtitles are the router's WebVTT files, beside the stream.
-  for (const t of r.subs)
-    lpv.append(el('track', { kind: 'subtitles', label: t.name, srclang: t.lang, src: t.url }));
-  lpSubs(r.subs.findIndex(t => t.on));
+  // Subtitles are the router's WebVTT files, beside the stream; hls.js
+  // clears the cues of every text track as it loads the manifest, so they
+  // come after it.
+  const subs = () => {
+    if (lp != r || lpv.querySelector('track')) return;
+    for (const t of r.subs)
+      lpv.append(el('track', { kind: 'subtitles', label: t.name, srclang: t.lang, src: t.url }));
+    lpSubs(r.subs.findIndex(t => t.on));
+  };
+  lpCue();
   if (!lpWant) lpWant = r.audio;
+  const rate = lpv.playbackRate;
   if (nativeHls()) {
     lpv.src = r.url;
+    subs();
     lpv.addEventListener('loadedmetadata', () => {
       if (r.start > 0) lpv.currentTime = r.start;
       lpAudioPick();
@@ -4681,6 +4781,7 @@ async function lpStart(r) {
     // ahead as a TV does.
     const h = lpHls = new Hls({ startPosition: r.start || -1, maxBufferLength: 30, maxMaxBufferLength: 60, backBufferLength: 30 });
     h.on(Hls.Events.AUDIO_TRACKS_UPDATED, lpAudioPick);
+    h.on(Hls.Events.MANIFEST_PARSED, subs);
     h.on(Hls.Events.AUDIO_TRACK_SWITCHED, lpRender);
     let tries = 0;
     h.on(Hls.Events.ERROR, (_, d) => {
@@ -4693,8 +4794,12 @@ async function lpStart(r) {
     h.loadSource(r.url);
     h.attachMedia(lpv);
   }
-  lpv.play().catch(() => {}); // refused without a tap: the controls offer Play
+  lpv.playbackRate = lpv.defaultPlaybackRate = rate;
+  lpv.play().catch(() => lpUi(true)); // refused without a tap: Play is there
+  lpSession();
   lpRender();
+  lpEpisodes();
+  renderEpisodes();
 }
 
 // Stops the video and forgets its stream; the player stays as it is.
@@ -4706,7 +4811,8 @@ function lpStop() {
   lpv.load();
 }
 
-// Closes the player; report: the position goes to the router first.
+// Closes the player; report: the position goes to the router first. The
+// pills and the preview's frame go back to the TV's player.
 function lpClose(report = true) {
   if (!lp && $('lp').hidden) return;
   lpGen++;
@@ -4715,15 +4821,68 @@ function lpClose(report = true) {
   lp = null;
   $('lp').hidden = true;
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
+  watchFaces({});
+  watchMusic({});
+  $('mpill').hidden = true;
+  $('bar').before($('fpill'), $('mpill'));
+  $('pos').append($('frame'));
+  if (navigator.mediaSession) navigator.mediaSession.metadata = null;
   loadRecent();
+  renderEpisodes();
 }
 
 function lpFold(mini) {
   $('lp').classList.toggle('mini', mini);
-  lpv.controls = !mini;
+  if (!mini) lpUi(true);
 }
 
-const lpAudios = () => lpHls ? lpHls.audioTracks.map(t => t.name) : [...(lpv.audioTracks || [])].map(t => t.label);
+// The pills of the music and of the faces: over the video while it fills
+// the screen, else under it.
+const lpWide = matchMedia('(orientation:landscape) and (max-height:540px)');
+function lpPills() {
+  const to = lpBox.classList.contains('full') || lpWide.matches ? lpBox : $('lppills');
+  if ($('fpill').parentNode != to) to.append($('fpill'), $('mpill'));
+}
+lpWide.addEventListener?.('change', () => lp && lpPills());
+
+// The controls over the video: shown for 3 s while it plays, all along
+// while it is paused or the bar is held.
+function lpUi(on) {
+  clearTimeout(lpUiTimer);
+  lpBox.classList.toggle('ui', on);
+  if (on && !lpv.paused && !lpDrag) lpUiTimer = setTimeout(() => lpUi(false), 3000);
+}
+
+function lpJump(d) {
+  if (!lp) return;
+  lpv.currentTime = Math.max(0, Math.min(lpv.currentTime + d, (lpv.duration || Infinity) - 1));
+  const j = $('lpjump');
+  j.textContent = (d > 0 ? '+' : '−') + Math.abs(d);
+  j.style.left = d > 0 ? '' : '12%';
+  j.style.right = d > 0 ? '12%' : '';
+  j.classList.remove('on');
+  void j.offsetWidth;
+  j.classList.add('on');
+}
+
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+function lpFull() {
+  if (fsEl()) return (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  if (lpBox.requestFullscreen) lpBox.requestFullscreen().catch(() => {});
+  else if (lpBox.webkitRequestFullscreen) lpBox.webkitRequestFullscreen();
+  else lpv.webkitEnterFullscreen?.(); // iPhone: the system's player
+}
+
+function lpPip() {
+  if (document.pictureInPictureElement) return document.exitPictureInPicture().catch(() => {});
+  if (lpv.requestPictureInPicture) return lpv.requestPictureInPicture().catch(e => toast(e));
+  lpv.webkitSetPresentationMode?.('picture-in-picture');
+}
+
+// The renditions' NAMEs, and their dubs' names to show (see /local).
+const lpNames = () => lpHls ? lpHls.audioTracks.map(t => t.name) : [...(lpv.audioTracks || [])].map(t => t.label);
+const lpLabel = n => lp?.labels?.[n] ?? n;
 const lpAudioAt = () => lpHls ? lpHls.audioTrack : [...(lpv.audioTracks || [])].findIndex(t => t.enabled);
 function lpAudioSet(i) {
   if (lpHls) lpHls.audioTrack = i;
@@ -4733,17 +4892,33 @@ function lpAudioSet(i) {
 // The dub asked for (the title's, or the one before a replay), once the
 // renditions are known.
 function lpAudioPick() {
-  const i = lpWant ? lpAudios().indexOf(lpWant) : -1;
+  const want = lpWant, i = want ? lpNames().findIndex(n => n == want || lpLabel(n) == want) : -1;
   lpWant = null;
   if (i >= 0 && i != lpAudioAt()) lpAudioSet(i);
   else lpRender();
 }
 
+// The subtitles picked, by index; hls.js turns text tracks on of its own,
+// so they are kept as picked.
+let lpSubIdx = -1;
+const lpSubsKeep = () => [...lpv.textTracks].forEach((t, j) => {
+  const mode = lpSubIdx == j ? 'showing' : 'disabled';
+  if (t.mode != mode) t.mode = mode;
+});
 function lpSubs(i) {
-  [...lpv.textTracks].forEach((t, j) => { t.mode = i == j ? 'showing' : 'disabled'; });
+  lpSubIdx = i;
+  lpSubsKeep();
   lpRender();
 }
-const lpSubsAt = () => [...lpv.textTracks].findIndex(t => t.mode == 'showing');
+lpv.textTracks.addEventListener('change', lpSubsKeep);
+const lpSubsAt = () => lpSubIdx;
+
+// The subtitles as "Вид субтитров" sets them, sized to the video.
+function lpCue() {
+  const s = subStyle || {}, f = FONTS.find(f => f[0] == s.font) || FONTS[0];
+  const px = Math.max(12, Math.round(lpBox.clientHeight * 0.05 * (s.size ?? 1)));
+  $('lpcue').textContent = `#lpvid::cue{font-size:${px}px;font-family:${f[2]};color:#fff;background:rgba(0,0,0,${s.bg != null ? s.bg / 100 : .6})}`;
+}
 
 // A chip: its options (value, label) and the one picked; one option alone
 // hides it.
@@ -4761,23 +4936,53 @@ function lpChip(id, opts, cur) {
 
 function lpRender() {
   if (!lp) return;
-  $('lpt').textContent = $('lpmt').textContent = lp.title || '';
-  $('lps').textContent = lpEp(lp);
-  $('lpch').hidden = false;
-  lpChip('lpaudio', lpAudios().map((n, i) => [i, n]), lpAudioAt());
+  $('lpt').textContent = $('lpmt').textContent = $('lpft').textContent = lp.title || '';
+  $('lps').textContent = $('lpfs').textContent = lpEp(lp);
+  $('lpch').hidden = $('lptgs').hidden = false;
+  lpChip('lpaudio', lpNames().map((n, i) => [i, lpLabel(n)]), lpAudioAt());
   lpChip('lpsubs', [[-1, 'Выкл'], ...lp.subs.map((t, i) => [i, t.name])], lpSubsAt());
+  $('lpsty').hidden = !lp.subs.length;
   lpChip('lpqual', lp.qualities.map(q => [q, q]), lp.quality);
+  lpChip('lprate', RATES.map(r => [r, r + 'x']), lpv.playbackRate);
   lpChip('lpsrc', lp.sources.map(n => [n, n]), lp.source);
+  $('lpspd').textContent = lpv.playbackRate + 'x';
+  $('lpautoskip').classList.toggle('on', !!lp.autoskip);
+  $('lpautonext').classList.toggle('on', !!lp.autonext);
+  $('lpautonext').hidden = lp.season == null;
+  $('lpdrc').classList.toggle('on', !!lp.drc);
+  $('lpdrc').hidden = !lp.drc_ok;
   $('lpnav').hidden = lp.season == null;
   $('lpcast').querySelector('span').textContent = 'На телевизор' + (lpv.currentTime > 10 ? ' — с ' + fmt(lpv.currentTime) : '');
+  $('lppip').hidden = !(document.pictureInPictureEnabled || lpv.webkitSupportsPresentationMode);
   icon('lptg', lpv.paused ? 'play' : 'pause');
+  icon('lppp', lpv.paused ? 'play' : 'pause');
+  icon('lpfull', fsEl() ? 'fsx' : 'fs');
+  lpShowPos();
   lpShowTime();
+}
+
+function lpShowPos(t = lpv.currentTime, max = lpv.duration) {
+  if (!(max > 0) || !isFinite(max)) return;
+  showLevel('lppos', t / max);
+  $('lpcur').textContent = fmt(t);
+  $('lprem').textContent = '−' + fmt(max - t);
+  const key = JSON.stringify([lp?.sections, max]);
+  if ($('lpsecs').dataset.k == key) return;
+  $('lpsecs').dataset.k = key;
+  $('lpsecs').replaceChildren(...(lp?.sections || []).map(x => {
+    const e = el('span');
+    e.style.left = 100 * Math.max(x.start, 0) / max + '%';
+    e.style.width = 100 * (Math.min(x.end, max) - Math.max(x.start, 0)) / max + '%';
+    return e;
+  }));
 }
 
 function lpShowTime() {
   if (!lp) return;
   const t = lpv.currentTime;
   $('lpms').textContent = [lp.season != null && `С${lp.season} Э${lp.episode}`, lpv.duration > 0 && fmt(t) + ' / ' + fmt(lpv.duration)].filter(Boolean).join(' · ');
+  showMusic(t);
+  $('mpill').classList.toggle('on', !lpv.paused);
   // The recap or the intro under way: skipped by itself with autoskip
   // (once: rewound into, it plays), else a pill skips it; the credits of an
   // episode offer the next one.
@@ -4798,48 +5003,129 @@ function lpShowTime() {
   $('lpskip').hidden = !pill;
   if (pill) {
     $('lpskip').textContent = pill[0];
-    $('lpskip').onclick = pill[1];
+    $('lpskip').onclick = e => { e.stopPropagation(); pill[1](); };
   }
 }
 
+// What plays, as the TV's status has it, for the faces and the music.
+const lpStatus = () => lp ? {
+  media: { state: lpv.paused ? 'PAUSED' : 'PLAYING', time: lpv.currentTime },
+  now: { id: lp.id, season: lp.season, episode: lp.episode, music: lp.music ?? null },
+} : {};
+
 // Tells the router where the video is; keepalive, so a page closing
-// still gets it there.
+// still gets it there. Its answer brings the sections and the music.
 function lpReport(state) {
   if (!lp || !(lpv.duration > 0) || !isFinite(lpv.duration)) return;
   lpSent = Date.now();
-  const r = lp, subs = lpSubsAt();
+  const r = lp, subs = lpSubsAt(), name = lpNames()[lpAudioAt()];
   const body = { id: r.id, time: lpv.currentTime.toFixed(1), duration: lpv.duration.toFixed(1), state,
     subs: subs >= 0 ? r.subs[subs].name : '' };
-  const audio = lpAudios()[lpAudioAt()];
-  if (audio) body.audio = audio;
+  if (name) Object.assign(body, { audio: lpLabel(name), audio_name: name });
   if (r.season != null) Object.assign(body, { season: String(r.season), episode: r.episode });
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['X-Token'] = token;
-  fetch('/api/local/progress', { method: 'POST', headers, body: JSON.stringify(body), keepalive: true })
+  return fetch('/api/local/progress', { method: 'POST', headers, body: JSON.stringify(body), keepalive: true })
     .then(x => x.ok ? x.json() : null)
-    .then(j => { if (j?.sections && lp == r) lp.sections = j.sections; })
+    .then(j => {
+      if (!j || lp != r) return;
+      if (j.sections) lp.sections = j.sections;
+      if (j.music !== undefined) lp.music = j.music;
+      watchMusic(lpStatus());
+      lpShowPos();
+    })
     .catch(() => {});
 }
 
 // What plays here, as play takes it, from where it is.
 const lpHere = () => ({ id: lp.id, title: lp.title, poster: lp.poster, source: lp.source,
   start: Math.floor(lpv.currentTime), season: lp.season ?? undefined, episode: lp.episode ?? undefined,
-  keepAudio: lpAudios()[lpAudioAt()] });
+  keepAudio: lpNames()[lpAudioAt()] });
+
+// The episodes of the season, under the player.
+async function lpEpisodes() {
+  const r = lp;
+  $('lpeps').replaceChildren();
+  if (r?.season == null) return;
+  let t;
+  try {
+    t = await title(r.id);
+  } catch {
+    return;
+  }
+  const s = t.seasons?.find(s => s.season == r.season);
+  if (lp != r || !s) return;
+  $('lpeps').replaceChildren(el('h3', {}, `${s.season} сезон`), ...s.episodes.map(e => {
+    const on = e.episode == r.episode, name = epTitle(e.title);
+    const b = el('button', { className: 'ep' + (on ? ' on' : '') },
+      ...(name ? [el('b', {}, e.episode), el('span', {}, name)] : [el('span', {}, `${e.episode} серия`)]),
+      el('small', {}, on ? 'смотрите' : e.duration ? Math.round(e.duration / 60) + ' мин' : ''));
+    b.onclick = () => on ? $('lp').scrollTo({ top: 0, behavior: 'smooth' }) :
+      localPlay({ id: r.id, title: r.title, poster: r.poster, season: s.season, episode: e.episode, source: r.source });
+    return b;
+  }));
+}
+
+// The lock screen and the headset: the TV's handlers hand over to these
+// while something plays here (see syncSession's).
+function lpSession() {
+  const ms = navigator.mediaSession;
+  if (!ms || !lp) return;
+  ms.metadata = new MediaMetadata({ title: lp.title || '', artist: lpEp(lp), artwork: lp.poster ? [{ src: lp.poster }] : [] });
+  const on = (a, f) => { try { ms.setActionHandler(a, f); } catch {} };
+  on('nexttrack', lp.season != null ? () => stepEpisode(1, lp) : null);
+  on('previoustrack', lp.season != null ? () => stepEpisode(-1, lp) : null);
+}
+function lpAction(a, d) {
+  if (a == 'play') lpv.play().catch(() => {});
+  else if (a == 'pause') lpv.pause();
+  else if (a == 'seekbackward') lpJump(-(d.seekOffset || 10));
+  else if (a == 'seekforward') lpJump(d.seekOffset || 10);
+  else if (a == 'seekto' && d.seekTime != null) lpv.currentTime = d.seekTime;
+}
+// What the page's commands to a TV do here (the music sheet seeks).
+function lpCmd(c, arg) {
+  if (!lp) return;
+  if (c == 'seek') lpv.currentTime = +arg;
+  else if (c == 'toggle') lpv.paused ? lpv.play().catch(() => {}) : lpv.pause();
+  else if (c == 'pause') lpv.pause();
+  else if (c == 'resume') lpv.play().catch(() => {});
+}
 
 lpv.addEventListener('timeupdate', () => {
   if (!lp) return;
   if (!lpv.paused && Date.now() - lpSent > 10000) lpReport('PLAYING');
+  if (!lpDrag) lpShowPos();
   lpShowTime();
 });
 lpv.addEventListener('waiting', () => { if (lp) $('lpspin').hidden = false; });
 // The first report once it plays from where it starts: it brings the sections.
-lpv.addEventListener('playing', () => { $('lpspin').hidden = true; if (!lpSent) lpReport('PLAYING'); lpRender(); });
+lpv.addEventListener('playing', () => {
+  $('lpspin').hidden = true;
+  if (!lpSent) lpReport('PLAYING');
+  lpRender();
+});
 lpv.addEventListener('canplay', () => { $('lpspin').hidden = true; });
-lpv.addEventListener('pause', () => { lpReport('PAUSED'); lpRender(); });
-lpv.addEventListener('play', lpRender);
+lpv.addEventListener('pause', () => {
+  lpRender();
+  lpUi(true);
+  // The faces are looked for at where it stopped, once the router knows it.
+  const r = lpReport('PAUSED');
+  if (r) r.then(() => lp && watchFaces(lpStatus()));
+});
+lpv.addEventListener('play', () => {
+  lpRender();
+  lpUi(true);
+  if (lp) watchFaces(lpStatus());
+});
+lpv.addEventListener('ratechange', lpRender);
 // Seeking back into a section skipped lets it play.
 lpv.addEventListener('seeked', () => {
   for (const x of lp?.sections || []) if (lpv.currentTime < x.start) lpSkipped.delete(x.start);
+  if (lp && lpv.paused) {
+    const r = lpReport('PAUSED');
+    if (r) r.then(() => lp && watchFaces(lpStatus()));
+  }
 });
 lpv.addEventListener('ended', () => {
   lpReport('ENDED');
@@ -4847,29 +5133,119 @@ lpv.addEventListener('ended', () => {
 });
 addEventListener('pagehide', () => lp && lpReport(lpv.paused ? 'PAUSED' : 'PLAYING'));
 document.addEventListener('visibilitychange', () => document.hidden && lp && lpReport(lpv.paused ? 'PAUSED' : 'PLAYING'));
-// Full screen turns the phone's picture sideways.
-document.addEventListener('fullscreenchange', () => {
-  if (document.fullscreenElement == lpv) screen.orientation?.lock?.('landscape').catch(() => {});
-  else screen.orientation?.unlock?.();
+for (const ev of ['fullscreenchange', 'webkitfullscreenchange'])
+  document.addEventListener(ev, () => {
+    const on = fsEl() == lpBox;
+    lpBox.classList.toggle('full', on);
+    // Full screen turns the phone's picture sideways.
+    if (on) screen.orientation?.lock?.('landscape').catch(() => {});
+    else if (!fsEl()) screen.orientation?.unlock?.();
+    requestAnimationFrame(lpCue);
+    lpPills();
+    lpRender();
+  });
+addEventListener('resize', () => lp && lpCue());
+
+// A tap shows or hides the controls; a double tap at a side jumps 10 s,
+// in the middle goes full screen. Folded, a tap opens it.
+lpBox.addEventListener('click', e => {
+  if ($('lp').classList.contains('mini')) return;
+  if (e.target.closest('button, .sl')) return lpUi(true);
+  const r = lpBox.getBoundingClientRect(), x = (e.clientX - r.left) / r.width;
+  if (lpTap) {
+    clearTimeout(lpTap);
+    lpTap = null;
+    if (x < .35) lpJump(-10);
+    else if (x > .65) lpJump(10);
+    else lpFull();
+    return;
+  }
+  lpTap = setTimeout(() => {
+    lpTap = null;
+    lpUi(!lpBox.classList.contains('ui'));
+  }, 250);
+});
+// Folded, a swipe down closes it and up opens it; open, a swipe down on
+// the video folds it.
+$('lp').addEventListener('pointerdown', e => {
+  const mini = $('lp').classList.contains('mini');
+  if (mini || !fsEl() && e.target.closest('#lpv') && !e.target.closest('.sl, button'))
+    lpSwipe = { y: e.clientY, x: e.clientX, mini };
+});
+$('lp').addEventListener('pointerup', e => {
+  const s = lpSwipe;
+  lpSwipe = null;
+  if (!s) return;
+  const dy = e.clientY - s.y;
+  if (Math.abs(e.clientX - s.x) > Math.abs(dy) || Math.abs(dy) < 50) return;
+  lpSwipe = 'done'; // not a tap
+  setTimeout(() => lpSwipe = null, 300);
+  if (s.mini) dy > 0 ? lpClose() : lpFold(false);
+  else if (dy > 0) lpFold(true);
+});
+$('lp').addEventListener('click', e => {
+  if (lpSwipe == 'done') return e.stopPropagation();
+  if ($('lp').classList.contains('mini') && !e.target.closest('button')) lpFold(false);
+}, true);
+
+slider($('lppos'), {
+  start() {
+    if (!lp || !(lpv.duration > 0)) return;
+    lpDrag = true;
+    lpUi(true);
+    preview.start({ url: lp.url });
+    return { v: lpv.currentTime, max: lpv.duration };
+  },
+  show(v, max, moved) {
+    lpShowPos(v, max);
+    preview.show(v, v / max, moved);
+  },
+  end(v) {
+    lpDrag = false;
+    preview.end();
+    if (v != null) lpv.currentTime = v;
+    lpShowPos();
+    lpUi(true);
+  },
 });
 
 $('lpfold').onclick = () => lpFold(true);
-$('lp').addEventListener('click', e => {
-  if ($('lp').classList.contains('mini') && !e.target.closest('button')) lpFold(false);
-});
-$('lptg').onclick = () => lpv.paused ? lpv.play().catch(() => {}) : lpv.pause();
+$('lppp').onclick = $('lptg').onclick = () => lpv.paused ? lpv.play().catch(() => {}) : lpv.pause();
+$('lprew').onclick = () => lpJump(-10);
+$('lpff').onclick = () => lpJump(10);
+$('lpfull').onclick = lpFull;
+$('lppip').onclick = lpPip;
+$('lpspd').onclick = () => { lpv.playbackRate = RATES[(RATES.indexOf(lpv.playbackRate) + 1) % RATES.length] ?? 1; };
 $('lpx').onclick = () => lpClose();
 $('lpaudio').onchange = e => lpAudioSet(+e.target.value);
 $('lpsubs').onchange = e => lpSubs(+e.target.value);
+$('lpsty').onclick = () => {
+  openLayer('sty');
+  renderStyle();
+};
+$('lprate').onchange = e => { lpv.playbackRate = +e.target.value; };
 $('lpqual').onchange = e => {
   localStorage.quality = e.target.value;
   localPlay({ ...lpHere(), quality: e.target.value, reuse: 1 });
 };
 $('lpsrc').onchange = e => localPlay({ ...lpHere(), source: e.target.value });
+// The router's settings, as the TV's player sets them.
+for (const k of ['autoskip', 'autonext'])
+  $('lp' + k).onclick = () => {
+    if (!lp) return;
+    lp[k] = !lp[k];
+    lpRender();
+    api(withDevice(k), { on: lp[k] ? '1' : '0' }).catch(toast);
+  };
+$('lpdrc').onclick = () => {
+  if (!lp) return;
+  localStorage.drc = lp.drc ? '0' : '1';
+  localPlay({ ...lpHere(), drc: localStorage.drc, reuse: 1 });
+};
 $('lpprev').onclick = () => stepEpisode(-1, lp);
 $('lpnext').onclick = () => stepEpisode(1, lp);
 // The same title, from where it is, on the TV picked last.
-$('lpcast').onclick = () => {
+$('lpcast').onclick = $('lpcastb').onclick = () => {
   if (!lp) return;
   const m = lpHere();
   delete m.keepAudio;
@@ -4920,7 +5296,8 @@ function setStyle(s) {
   if (s) localStorage.subs = JSON.stringify(s);
   else localStorage.removeItem('subs');
   renderStyle();
-  if (st?.media) cmd('substyle', styleSpec(s || {}));
+  if (lp) lpCue();
+  else if (st?.media) cmd('substyle', styleSpec(s || {}));
 }
 
 // ---- seek preview -------------------------------------------------------
