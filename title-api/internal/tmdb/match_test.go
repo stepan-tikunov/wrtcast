@@ -184,3 +184,57 @@ func TestOpened(t *testing.T) {
 		t.Fatalf("WaitMatch of a title not opened = %v, %v", ok, pending)
 	}
 }
+
+// The TMDB titles not found on the provider are forgotten once titles come
+// to be matched otherwise, those found kept; again at the same version,
+// nothing is.
+func TestMatchingVersion(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+	ctx := context.Background()
+	if _, err := openStore(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	insert := func(id int, state string) {
+		if _, err := db.Exec(`INSERT INTO tmdb_lookups (kind, tmdb_id, state, updated) VALUES ('movie', ?, ?, 0)`, id, state); err != nil {
+			t.Fatal(err)
+		}
+	}
+	states := func() map[int]string {
+		rows, err := db.Query(`SELECT tmdb_id, state FROM tmdb_lookups`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		result := map[int]string{}
+		for rows.Next() {
+			var id int
+			var state string
+			rows.Scan(&id, &state)
+			result[id] = state
+		}
+		return result
+	}
+	insert(1, lookupNotFound)
+	if _, err := openStore(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if got := states(); len(got) != 1 {
+		t.Fatalf("same version: %v", got)
+	}
+	if _, err := db.Exec(`UPDATE tmdb_settings SET value = '1' WHERE key = 'matching'`); err != nil {
+		t.Fatal(err)
+	}
+	insert(2, lookupFound)
+	insert(3, lookupFailed)
+	if _, err := openStore(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if got := states(); len(got) != 2 || got[2] != lookupFound || got[3] != lookupFailed {
+		t.Fatalf("new version: %v", got)
+	}
+}

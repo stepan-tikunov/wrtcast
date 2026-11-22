@@ -43,11 +43,31 @@ type store struct {
 	db *sql.DB
 }
 
+// matchingVersion is that of how titles are matched by name (see exact),
+// raised as they come to be matched otherwise: the TMDB titles not found
+// on the provider before are then looked for again when asked, not a week
+// later (2: a year off TMDB's, such as "Залечь на дно в Брюгге", 2007 on the
+// provider and 2008 on TMDB).
+const matchingVersion = "2"
+
 func openStore(ctx context.Context, db *sql.DB) (*store, error) {
 	if _, err := db.ExecContext(ctx, schema); err != nil {
 		return nil, fmt.Errorf("initialize TMDB state: %w", err)
 	}
-	return &store{db: db}, nil
+	s := &store{db: db}
+	version, err := s.setting(ctx, "matching")
+	if err != nil {
+		return nil, fmt.Errorf("initialize TMDB state: %w", err)
+	}
+	if version != matchingVersion {
+		if _, err := db.ExecContext(ctx, "DELETE FROM tmdb_lookups WHERE state = ?", lookupNotFound); err != nil {
+			return nil, fmt.Errorf("initialize TMDB state: %w", err)
+		}
+		if err := s.setSetting(ctx, "matching", matchingVersion); err != nil {
+			return nil, fmt.Errorf("initialize TMDB state: %w", err)
+		}
+	}
+	return s, nil
 }
 
 func (s *store) setting(ctx context.Context, key string) (string, error) {
